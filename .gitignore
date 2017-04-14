@@ -3,3 +3,10 @@ Debug*/
 Release*/
 *.o
 *.db
+*.bin
+test/asm/SNES/SongSampleList.asm
+test/asm/tempmain.asm
+test/temp.asm
+test/temp.log
+test/temp.txt
+*.spc

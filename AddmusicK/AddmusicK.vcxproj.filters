@@ -42,6 +42,9 @@
     <ClInclude Include="asardll.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="D:\C++\lodepng\lodepng.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AddmusicK.cpp">
@@ -57,6 +60,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="asardll.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="D:\C++\lodepng\lodepng.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

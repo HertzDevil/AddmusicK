@@ -76,13 +76,14 @@
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <MinimalRebuild>true</MinimalRebuild>
       <StringPooling>true</StringPooling>
-      <AdditionalIncludeDirectories>D:\C++\lodepng\;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\C++\lodepng\</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>AM405Remover.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -101,7 +102,7 @@
       <StringPooling>true</StringPooling>
       <MinimalRebuild>true</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>D:\C++\lodepng\;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\C++\lodepng\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -109,6 +110,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>AM405Remover.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DLL Release|Win32'">
@@ -127,7 +129,7 @@
       <StringPooling>true</StringPooling>
       <MinimalRebuild>true</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>D:\C++\lodepng\;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\C++\lodepng\</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -135,6 +137,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>asarlib.dll;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -143,6 +146,7 @@
   <ItemGroup>
     <ClInclude Include="asardll.h" />
     <ClInclude Include="BankDefine.h" />
+    <ClInclude Include="D:\C++\lodepng\lodepng.h" />
     <ClInclude Include="Directory.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="Music.h" />
@@ -157,6 +161,7 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='DLL Release|Win32'">CompileAsCpp</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
     </ClCompile>
+    <ClCompile Include="D:\C++\lodepng\lodepng.cpp" />
     <ClCompile Include="globals.cpp" />
     <ClCompile Include="Music.cpp" />
     <ClCompile Include="SoundEffect.cpp" />

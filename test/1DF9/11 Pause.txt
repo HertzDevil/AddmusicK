@@ -1,0 +1,15 @@
+$DA $02 $0C $54 $B4 $B0 $B4   #jsr changePause $18 $B0
+
+#asm changePause
+{
+	mov	a, $0387		; \
+	mov	!SpeedUpBackUp, a	; | Set the tempo increase to 0 and save it.
+	mov	a, #$00			; |
+	mov	$0387, a		; /
+
+	inc	a
+	mov	!PauseMusic, a
+	mov	$f2, #$5c		; \ Key off voices
+	mov	$f3, #$ff		; /
+	ret
+}
