@@ -153,6 +153,7 @@ private:
 
 	void parseSPCInfo();
 
+	void trimChars(size_t count);		// // //
 	
 	//std::vector<std::string> defineStrings;
 

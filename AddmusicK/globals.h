@@ -49,8 +49,6 @@ class SampleGroup;
 #include <map>
 #include "Directory.h"
 #include "asardll.h"
-#include <sys/types.h>
-#include <sys/stat.h>
 
 
 //extern ROM rom;
