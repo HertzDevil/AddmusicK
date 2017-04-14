@@ -85,7 +85,6 @@ static unsigned int tempo;
 //static bool onlyHadOneTempo;
 static bool tempoDefined;
 
-static bool sortReplacements;
 static bool manualNoteWarning;
 
 static bool channelDefined;
@@ -113,11 +112,6 @@ static int lastFCDelayValue[9];
 
 
 
-bool sortFunction(const std::pair<const std::string, std::string> *s1, const std::pair<const std::string, std::string> *s2)
-{
-	return (s1->first.length() > s2->first.length());
-}
-
 // // //
 void Music::trimChars(size_t count) {
 	text = text.substr(count);
@@ -133,28 +127,16 @@ bool Music::doReplacement()
 		return false;
 	}
 
-	if (sortReplacements)
-	{
-		sortedReplacements.clear();
-		for (auto it = replacements.begin(); it != replacements.end(); it++)
-		{
-			sortedReplacements.push_back(&*it);
-		}
-
-		std::sort(sortedReplacements.begin(), sortedReplacements.end(), sortFunction);
-		sortReplacements = false;
-	}
-
-	for (unsigned int z = 0; z < sortedReplacements.size(); z++)
-	{
-		if (strncmp(text.c_str(), sortedReplacements[z]->first.c_str(), sortedReplacements[z]->first.length()) == 0)
-		{
-			text.replace(text.begin(), text.begin() + sortedReplacements[z]->first.length(), sortedReplacements[z]->second.begin(), sortedReplacements[z]->second.end());
+	// // //
+	for (const auto &x : replacements) {
+		if (strncmp(text.c_str(), x.first.c_str(), x.first.length()) == 0) {
+			text.replace(text.begin(), text.begin() + x.first.length(), x.second.begin(), x.second.end());
 			r++;
 			doReplacement();
 			r--;
 		}
 	}
+
 	return true;
 }
 
@@ -182,7 +164,7 @@ void Music::init()
 	tempoDefined = false;
 	//am4silence = 0;
 	//songVersionIdentified = false;
-	sortReplacements = true;
+	// // //
 	hasYoshiDrums = false;
 	//onlyHadOneTempo = true;
 	tempo = 0x36;
@@ -2383,7 +2365,7 @@ void Music::parseSpecialDirective()
 
 void Music::parseReplacementDirective()
 {
-	sortReplacements = true;
+	// // //
 	trimChars(1);
 
 	int quotedStringLength = 0;
@@ -2417,8 +2399,6 @@ void Music::parseReplacementDirective()
 	}
 
 	replacements[find] = replacement;
-
-	//std::sort(replacements.begin(), replacements.end(), sortFunction);
 }
 
 void Music::parseInstrumentDefinitions()
@@ -2818,13 +2798,7 @@ int Music::getNoteLength(int i)
 	return i;
 }
 
-bool sortTempoPair(const std::pair<double, int> &p1, const std::pair<double, int> &p2)
-{
-	if (p1.first == p2.first)
-		return p1.second < p2.second;
-
-	return p1.first < p2.first;
-}
+// // //
 
 void Music::pointersFirstPass()
 {
@@ -3041,13 +3015,13 @@ void Music::pointersFirstPass()
 		double l1 = 0, l2 = 0;
 		bool onL1 = true;
 
-		std::sort(tempoChanges.begin(), tempoChanges.end(), sortTempoPair);
-		if (tempoChanges.size() == 0 || tempoChanges[0].first != 0)
+		std::sort(tempoChanges.begin(), tempoChanges.end());		// // //
+		if (tempoChanges.empty() || tempoChanges[0].first != 0)
 		{
-			tempoChanges.insert(tempoChanges.begin(), std::pair<double, int>(0, 0x36));			// Stick the default tempo at the beginning if necessary.
+			tempoChanges.insert(tempoChanges.begin(), std::make_pair(0., 0x36)); // Stick the default tempo at the beginning if necessary.
 		}
 
-		tempoChanges.push_back(std::pair<double, int>(totalLength, 0));			// Add in a dummy tempo change at the very end.
+		tempoChanges.push_back(std::make_pair(totalLength, 0));			// Add in a dummy tempo change at the very end.
 
 		for (size_t z = 0; z < tempoChanges.size() - 1; z++)
 		{
