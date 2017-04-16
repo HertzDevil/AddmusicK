@@ -118,21 +118,22 @@ void Music::trimChars(size_t count) {
 }
 
 // // //
-bool Music::doReplacement(std::string &str)
+bool Music::doReplacement(std::string &str, std::size_t whence)
 {
 	AMKd::Utility::Trie<bool> prefix;
 
-	const auto equalFunc = [&str] (const auto &x) {
+	const auto equalFunc = [&] (const auto &x) {
 		const std::string &rhs = x.first;
-		return std::string_view(str.c_str(), rhs.length()) == rhs;
+		return std::string_view(str.c_str() + whence, rhs.length()) == rhs;
 	};
 
 	while (true) {
 		auto it = std::find_if(replacements.cbegin(), replacements.cend(), equalFunc);
 		if (it == replacements.cend())
 			break;
-		str.replace(str.begin(), str.begin() + it->first.length(), it->second.begin(), it->second.end());
-		if (prefix.SearchIndex(str) != std::string_view::npos)
+		str.replace(str.begin() + whence, str.begin() + whence + it->first.length(),
+					it->second.begin(), it->second.end());
+		if (prefix.SearchIndex(str.c_str() + whence) != std::string_view::npos)
 			return false;
 		prefix.Insert(it->first, true);
 	}
@@ -2368,34 +2369,73 @@ void Music::parseReplacementDirective()
 	int quotedStringLength = 0;
 
 	std::string s = getQuotedString(text, 0, quotedStringLength);		// // //
-	std::string find, replacement;
 
 	i = s.find('=');
 
 	if (i == -1)
 		printError("Error parsing replacement directive; could not find '='", true, name, line);
 
-	find = s.substr(0, i);
-	replacement = s.substr(i + 1);
+	std::string findStr = s.substr(0, i);
+	std::string replStr = s.substr(i + 1);
 
 	trimChars(quotedStringLength + 1);		// // //
 
-	while (isspace(find[find.length() - 1]))
-	{
-		find.erase(find.end() - 1, find.end());
-		if (find.length() == 0)
-			printError("Error parsing replacement directive; string to find was of zero length.", true, name, line);
+	// // //
+	if (!findStr.empty())
+		while (isspace(findStr.back()))
+			findStr.pop_back();
+	if (findStr.empty())
+		fatalError("Error parsing replacement directive; string to find was of zero length.");
+
+	if (!replStr.empty())
+		while (isspace(replStr.front()))
+			replStr.erase(0, 1);
+	if (replStr.empty())
+		fatalError("Error parsing replacement directive; string to replace was of zero length.");
+
+	auto it = replacements.find(findStr);
+	if (it != replacements.end())
+		replacements.erase(it);
+
+	// keep substituting existing lexical macros in the result string; if the
+	// original string appears as a substring of any intermediate result, then
+	// the macro must fire an infinite recursion due to the macros alone
+	// any macro that ultimately consumes external text cannot loop, so this
+	// check is sufficient
+	std::string replNew = replStr;
+	for (std::size_t p = 0; p < replNew.size(); ++p) {
+		auto it = std::find_if(replacements.cbegin(), replacements.cend(), [&] (const auto &x) {
+			const std::string &rhs = x.first;
+			std::size_t len = rhs.length();
+			return p + len <= replNew.size() && std::string_view(replNew.c_str() + p, len) == rhs;
+		});
+		if (it == replacements.cend())
+			continue;
+		replNew.replace(replNew.begin() + p, replNew.begin() + p + it->first.length(),
+						it->second.begin(), it->second.end());
+		if (replNew.find(findStr, p) != std::string::npos)
+			fatalError("Using this replacement macro will lead to infinite recursion.");
 	}
 
-	if (replacement.length() != 0)
-	{
-		while (isspace(replacement[0]))
-		{
-			replacement.erase(replacement.begin(), replacement.begin() + 1);
+	// repeat for the existing replacement macros, against the new one
+	/*
+	const std::size_t flen = findStr.length();
+	for (auto &it : replacements) {
+		const std::string &fi = it.first;
+		std::string &re = it.second;
+		std::size_t p = 0;
+		while (true) {
+			p = re.find(findStr, p);
+			if (p == std::string::npos)
+				break;
+			re.replace(re.begin() + p, re.begin() + p + findStr.length(),
+					   replNew.begin(), replNew.end());
+			// ???
 		}
 	}
+	*/
 
-	replacements[find] = replacement;
+	replacements[findStr] = replNew;
 }
 
 void Music::parseInstrumentDefinitions()
