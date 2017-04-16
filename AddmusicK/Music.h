@@ -101,7 +101,7 @@ public:
 	Music();
 
 	void init();
-	bool doReplacement();
+	bool doReplacement(std::string &str);		// // //
 private:
 	void pointersFirstPass();
 	void parseComment();

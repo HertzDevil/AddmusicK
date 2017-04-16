@@ -9,6 +9,7 @@
 #include <sstream>
 #include <algorithm>
 
+#include "Utility/Trie.h"		// // //
 //#include "Preprocessor.h"
 
 
@@ -27,10 +28,8 @@
 	return; 							\
 } while (false)
 
-#define fatalError(str) do {			\
-	printError(str, true, name, line);	\
-	return;								\
-} while (false)
+#define fatalError(str) if (false); else	\
+	printError(str, true, name, line)
 
 static int line, channel, prevChannel, octave, prevNoteLength, defaultNoteLength;
 static int instrument[9];
@@ -115,27 +114,27 @@ static int lastFCDelayValue[9];
 
 // // //
 void Music::trimChars(size_t count) {
-	text = text.substr(count);
+	text.erase(0, count);
 }
 
-bool Music::doReplacement()
+// // //
+bool Music::doReplacement(std::string &str)
 {
-	static int r = 0;
+	AMKd::Utility::Trie<bool> prefix;
 
-	if (r == 500)
-	{
-		printError("Infinite Recursion Kitty disapproves of your antics.", true, name, line);
-		return false;
-	}
+	const auto equalFunc = [&str] (const auto &x) {
+		const std::string &rhs = x.first;
+		return std::string_view(str.c_str(), rhs.length()) == rhs;
+	};
 
-	// // //
-	for (const auto &x : replacements) {
-		if (strncmp(text.c_str(), x.first.c_str(), x.first.length()) == 0) {
-			text.replace(text.begin(), text.begin() + x.first.length(), x.second.begin(), x.second.end());
-			r++;
-			doReplacement();
-			r--;
-		}
+	while (true) {
+		auto it = std::find_if(replacements.cbegin(), replacements.cend(), equalFunc);
+		if (it == replacements.cend())
+			break;
+		str.replace(str.begin(), str.begin() + it->first.length(), it->second.begin(), it->second.end());
+		if (prefix.SearchIndex(str) != std::string_view::npos)
+			return false;
+		prefix.Insert(it->first, true);
 	}
 
 	return true;
@@ -380,8 +379,8 @@ void Music::compile()
 #ifdef _DEBUG
 		current = text;
 #endif
-
-		doReplacement(text);		// // //
+		if (!doReplacement(text))		// // //
+			fatalError("Infinite lexical macro substitution.");
 
 		if (hexLeft != 0 && !isspace(tolower(text.front())) && tolower(text.front()) != '$' && text.front() != '\n')
 		{
@@ -2650,7 +2649,8 @@ int Music::getInt()
 	// l8r$ED$00$00
 	// Yeah. Oh well.
 	// Attempt to do a replacement.  (So things like "ab = 8"    [c1]ab    are valid).
-	doReplacement();
+	if (!doReplacement(text))		// // //
+		fatalError("Infinite lexical macro substitution.");
 
 	int i = 0;
 	int d = 0;
@@ -2667,8 +2667,8 @@ int Music::getInt()
 
 int Music::getIntWithNegative()
 {
-
-	doReplacement();
+	if (!doReplacement(text))		// // //
+		fatalError("Infinite lexical macro substitution.");
 
 	int i = 0;
 	int d = 0;
@@ -2697,8 +2697,8 @@ int Music::getIntWithNegative()
 
 int Music::getInt(const std::string &str, int &p)
 {
-
-	doReplacement();
+	if (!doReplacement(text))		// // //
+		fatalError("Infinite lexical macro substitution.");
 
 	int i = 0;
 	int d = 0;
@@ -2715,8 +2715,8 @@ int Music::getInt(const std::string &str, int &p)
 
 int Music::getHex(bool anyLength)
 {
-	doReplacement();
-
+	if (!doReplacement(text))		// // //
+		fatalError("Infinite lexical macro substitution.");
 
 	int i = 0;
 	int d = 0;

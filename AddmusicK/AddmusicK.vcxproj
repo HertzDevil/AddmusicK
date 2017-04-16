@@ -78,6 +78,7 @@
       <StringPooling>true</StringPooling>
       <AdditionalIncludeDirectories>D:\C++\lodepng\</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -103,6 +104,7 @@
       <MinimalRebuild>true</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>D:\C++\lodepng\</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -130,6 +132,7 @@
       <MinimalRebuild>true</MinimalRebuild>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalIncludeDirectories>D:\C++\lodepng\</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -153,6 +156,7 @@
     <ClInclude Include="Sample.h" />
     <ClInclude Include="SampleGroup.h" />
     <ClInclude Include="SoundEffect.h" />
+    <ClInclude Include="Utility\Trie.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AddmusicK.cpp" />

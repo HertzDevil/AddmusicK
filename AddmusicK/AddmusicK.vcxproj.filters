@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\Utility">
+      <UniqueIdentifier>{6fb9062c-9640-4bc6-afe9-6e297165bdf0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
@@ -41,6 +44,9 @@
     </ClInclude>
     <ClInclude Include="asardll.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utility\Trie.h">
+      <Filter>Header Files\Utility</Filter>
     </ClInclude>
     <ClInclude Include="D:\C++\lodepng\lodepng.h">
       <Filter>Header Files</Filter>
