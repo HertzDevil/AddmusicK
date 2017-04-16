@@ -9,24 +9,24 @@ static bool triplet;
 static int defaultNoteValue;
 static bool inDefineBlock;
 
-#define skipSpaces		\
-while (isspace(text[pos]))	\
-{				\
-	if (text[pos] == '\n')	\
-		line++;		\
-	pos++;			\
-}				\
-	
-#define error(str) {				\
-	printError(str, false, name, line);	\
-	continue; }				\
+#define skipSpaces				\
+while (isspace(text[pos])) {	\
+	if (text[pos] == '\n')		\
+		line++;					\
+	pos++;						\
+}								\
 
-#define error2(str) {				\
+#define error(str) if (false); else {	\
 	printError(str, false, name, line);	\
-	return; }				\
-	
+	continue;							\
+}
 
-#define append(value) soundEffects[bank][index].data.push_back(value)
+#define error2(str) do {				\
+	printError(str, false, name, line);	\
+	return; 							\
+} while (false)
+
+#define append(value) (soundEffects[bank][index].data.push_back(value))
 
 std::string &SoundEffect::getEffectiveName()
 {
@@ -434,7 +434,7 @@ void SoundEffect::parseASM()
 {
 	pos+=4;
 	if (isspace(text[pos]) == false)
-		error2("Error parsing asm directive.")
+		error2("Error parsing asm directive.");		// // //
 
 	skipSpaces;
 
@@ -451,14 +451,14 @@ void SoundEffect::parseASM()
 	skipSpaces;
 
 	if (text[pos] != '{')
-		error2("Error parsing asm directive.")
+		error2("Error parsing asm directive.");		// // //
 
 	int startPos = ++pos;
 
 	while (text[pos] != '}')
 	{
 		if (pos >= text.length())
-			error2("Error parsing asm directive.")
+			error2("Error parsing asm directive.");		// // //
 
 		pos++;
 	}
@@ -525,7 +525,7 @@ void SoundEffect::parseJSR()
 {	
 	pos+=4;
 	if (isspace(text[pos]) == false)
-		error2("Error parsing jsr command.")
+		error2("Error parsing jsr command.");		// // //
 
 	skipSpaces;
 
@@ -647,7 +647,7 @@ void SoundEffect::parseEndif()
 {
 	pos += 6;
 	if (inDefineBlock == false)
-		error2("#endif was found without a matching #ifdef or #ifndef")
+		error2("#endif was found without a matching #ifdef or #ifndef");		// // //
 	else
 		inDefineBlock = false;
 }
