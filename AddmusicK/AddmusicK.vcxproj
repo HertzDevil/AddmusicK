@@ -152,6 +152,8 @@
     <ClInclude Include="D:\C++\lodepng\lodepng.h" />
     <ClInclude Include="Directory.h" />
     <ClInclude Include="globals.h" />
+    <ClInclude Include="MML\Lexer.h" />
+    <ClInclude Include="MML\SourceFile.h" />
     <ClInclude Include="Music.h" />
     <ClInclude Include="Sample.h" />
     <ClInclude Include="SampleGroup.h" />
@@ -167,6 +169,8 @@
     </ClCompile>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp" />
     <ClCompile Include="globals.cpp" />
+    <ClCompile Include="MML\Lexer.cpp" />
+    <ClCompile Include="MML\SourceFile.cpp" />
     <ClCompile Include="Music.cpp" />
     <ClCompile Include="SoundEffect.cpp" />
   </ItemGroup>

@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\MML">
+      <UniqueIdentifier>{8ad6734a-d88e-4804-8dd7-7cbcca0fae0c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\MML">
+      <UniqueIdentifier>{509f9eea-9ae4-4006-8ef1-9d9729218ed4}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Header Files\Utility">
       <UniqueIdentifier>{6fb9062c-9640-4bc6-afe9-6e297165bdf0}</UniqueIdentifier>
     </Filter>
@@ -45,8 +51,14 @@
     <ClInclude Include="asardll.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MML\Lexer.h">
+      <Filter>Header Files\MML</Filter>
+    </ClInclude>
     <ClInclude Include="Utility\Trie.h">
       <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="MML\SourceFile.h">
+      <Filter>Header Files\MML</Filter>
     </ClInclude>
     <ClInclude Include="D:\C++\lodepng\lodepng.h">
       <Filter>Header Files</Filter>
@@ -67,6 +79,12 @@
     </ClCompile>
     <ClCompile Include="asardll.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MML\Lexer.cpp">
+      <Filter>Source Files\MML</Filter>
+    </ClCompile>
+    <ClCompile Include="MML\SourceFile.cpp">
+      <Filter>Source Files\MML</Filter>
     </ClCompile>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp">
       <Filter>Source Files</Filter>
