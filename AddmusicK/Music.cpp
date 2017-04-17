@@ -93,32 +93,6 @@ std::string current;
 
 
 
-// // // eventually replace this with AMKd::Music::Track
-struct Track
-{
-	std::vector<byte> data;
-	std::vector<unsigned short> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
-
-	double channelLength = 0.; // How many ticks are in each channel.
-	int q = 0x7F;
-	int instrument = 0;
-	int lastFAGainValue = 0;
-	//int lastFADelayValue = 0;
-	int lastFCGainValue = 0;
-	int lastFCDelayValue = 0;
-
-	unsigned short phrasePointers[2] = {0, 0}; // first 8 only
-	bool noMusic[2] = {false, false}; // first 8 only
-	bool passedIntro = false; // first 8 only
-	bool updateQ = true;
-	bool usingFA = false;
-	bool usingFC = false;
-	bool ignoreTuning = false; // Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
-};
-static Track tracks[9];
-
-
-
 // // //
 void Music::append(byte value) {
 	tracks[channel].data.push_back(value);		// // //
@@ -283,10 +257,8 @@ void Music::init()
 	inDefineBlock = false;
 
 	// // //
-	for (int z = 0; z < 9; ++z) {
-		tracks[z] = Track { };
+	for (int z = 0; z < 9; ++z)
 		tracks[z].ignoreTuning = (songTargetProgram == TargetType::AM4); // AM4 fix for tuning[] related stuff.
-	}
 
 	hasIntro = false;
 	doesntLoop = false;
@@ -2810,7 +2782,7 @@ int Music::getNoteLength(int i)
 // // //
 std::string Music::getQuotedString() {
 	if (!trimChar('\"'))
-		error("Unexpected symbol found in path command.  Expected a quoted string.");
+		fatalError("Unexpected symbol found in path command.  Expected a quoted string.");
 
 	std::string tempstr;
 
@@ -2974,15 +2946,17 @@ void Music::pointersFirstPass()
 
 	add += instrumentData.size();
 	for (int i = 0; i < 8; ++i) {		// // //
-		allPointersAndInstrs[i * 2 + 0 + add] = tracks[i].data.empty() ? 0xFB : ((tracks[i].phrasePointers[0] + spaceForPointersAndInstrs) & 0xFF);
-		allPointersAndInstrs[i * 2 + 1 + add] = tracks[i].data.empty() ? 0xFF : ((tracks[i].phrasePointers[0] + spaceForPointersAndInstrs) >> 8);
+		unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[0] + spaceForPointersAndInstrs);
+		allPointersAndInstrs[i * 2 + 0 + add] = adr & 0xFF;
+		allPointersAndInstrs[i * 2 + 1 + add] = adr >> 8;
 	}
 
 	if (hasIntro)
 	{
 		for (int i = 0; i < 8; ++i) {		// // //
-			allPointersAndInstrs[i * 2 + 16 + add] = tracks[i].data.empty() ? 0xFB : ((tracks[i].phrasePointers[1] + spaceForPointersAndInstrs) & 0xFF);
-			allPointersAndInstrs[i * 2 + 17 + add] = tracks[i].data.empty() ? 0xFF : ((tracks[i].phrasePointers[1] + spaceForPointersAndInstrs) >> 8);
+			unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[1] + spaceForPointersAndInstrs);
+			allPointersAndInstrs[i * 2 + 16 + add] = adr & 0xFF;
+			allPointersAndInstrs[i * 2 + 17 + add] = adr >> 8;
 		}
 	}
 

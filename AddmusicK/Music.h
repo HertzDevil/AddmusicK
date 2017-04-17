@@ -19,6 +19,29 @@ struct SpaceInfo {
 
 };
 
+// // // eventually replace this with AMKd::Music::Track
+struct Track
+{
+	std::vector<byte> data;
+	std::vector<unsigned short> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
+
+	double channelLength = 0.; // How many ticks are in each channel.
+	int q = 0x7F;
+	int instrument = 0;
+	int lastFAGainValue = 0;
+	//int lastFADelayValue = 0;
+	int lastFCGainValue = 0;
+	int lastFCDelayValue = 0;
+
+	unsigned short phrasePointers[2] = {0, 0}; // first 8 only
+	bool noMusic[2] = {false, false}; // first 8 only
+	bool passedIntro = false; // first 8 only
+	bool updateQ = true;
+	bool usingFA = false;
+	bool usingFC = false;
+	bool ignoreTuning = false; // Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
+};
+
 // // //
 const auto replacementComp = [] (const std::string &a, const std::string &b) {
 	size_t al = a.length(), bl = b.length();
@@ -56,6 +79,7 @@ public:
 
 	SpaceInfo spaceInfo;
 
+	Track tracks[9];		// // //
 	
 	unsigned int introLength;
 	unsigned int mainLength;

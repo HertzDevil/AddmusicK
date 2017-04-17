@@ -1176,16 +1176,17 @@ void fixMusicPointers()
 			untilJump--;
 		}
 
-		int normalChannelsSize = musics[i].data[0].size() + musics[i].data[1].size() + musics[i].data[2].size() + musics[i].data[3].size() + musics[i].data[4].size() + musics[i].data[5].size() + musics[i].data[6].size() + musics[i].data[7].size();
+		int normalChannelsSize = 0;		// // //
+		for (int j = 0; j < 8; ++j)
+			normalChannelsSize += musics[i].tracks[j].data.size();
 
-		for (int j = 0; j < 9; j++)
-		{
-			for (unsigned int k = 0; k < musics[i].loopLocations[j].size(); k++)
+		for (Track &t : musics[i].tracks) {		// // //
+			for (unsigned int k = 0; k < t.loopLocations.size(); k++)
 			{
-				int temp = (musics[i].data[j][musics[i].loopLocations[j][k]] & 0xFF) | (musics[i].data[j][musics[i].loopLocations[j][k] + 1] << 8);
+				int temp = (t.data[t.loopLocations[k]] & 0xFF) | (t.data[t.loopLocations[k] + 1] << 8);
 				temp += musics[i].posInARAM + normalChannelsSize + musics[i].spaceForPointersAndInstrs;
-				musics[i].data[j][musics[i].loopLocations[j][k]] = temp & 0xFF;
-				musics[i].data[j][musics[i].loopLocations[j][k] + 1] = temp >> 8;
+				t.data[t.loopLocations[k]] = temp & 0xFF;
+				t.data[t.loopLocations[k] + 1] = temp >> 8;
 			}
 		}
 
@@ -1215,13 +1216,10 @@ void fixMusicPointers()
 			final.push_back(songDataARAMPos >> 8);
 		}
 
-
-		for (unsigned int j = 0; j < musics[i].allPointersAndInstrs.size(); j++)
-			final.push_back(musics[i].allPointersAndInstrs[j]);
-
-		for (unsigned int j = 0; j < 9; j++)
-			for (unsigned int k = 0; k < musics[i].data[j].size(); k++)
-				final.push_back(musics[i].data[j][k]);
+		// // //
+		final.insert(final.end(), musics[i].allPointersAndInstrs.cbegin(), musics[i].allPointersAndInstrs.cend());
+		for (const auto &x : musics[i].tracks)
+			final.insert(final.end(), x.data.cbegin(), x.data.cend());
 
 		if (musics[i].minSize > 0 && i <= highestGlobalSong)
 			while (final.size() < musics[i].minSize)
