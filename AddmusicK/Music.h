@@ -158,7 +158,12 @@ private:
 
 	void parseSPCInfo();
 
+	void append(byte value);		// // //
+	bool trim(std::string_view str);		// // //
+	bool trimDirective(std::string_view str);		// // //
 	void trimChars(size_t count);		// // //
+	void skipSpaces();		// // //
+	[[noreturn]] void fatalError(const std::string &str);		// // //
 	
 	//std::vector<std::string> defineStrings;
 
