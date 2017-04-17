@@ -110,10 +110,34 @@ void Music::append(byte value) {
 // // //
 bool Music::trim(std::string_view str) {
 	if (std::string_view(text.c_str(), str.size()) == str) {
-		trimChars(str.size());
+		skipChars(str.size());
 		return true;
 	}
 	return false;
+}
+
+// // //
+bool Music::trimChar(char c) {
+	if (!text.empty()) {
+		char ch = text.front();
+		if (ch == c) {
+			skipChars(1);
+			return true;
+		}
+	}
+	return false;
+}
+
+// // //
+char Music::trimChar(std::string_view clist) {
+	if (!text.empty()) {
+		char ch = text.front();
+		if (clist.find(ch, 0) != std::string_view::npos) {
+			skipChars(1);
+			return ch;
+		}
+	}
+	return '\0';
 }
 
 // // //
@@ -127,7 +151,7 @@ bool Music::trimDirective(std::string_view str) {
 	std::use_facet<std::ctype<char>>(std::locale("")).tolower(&prefix[0], &prefix[0] + prefix.size());
 
 	if (prefix == str && ::isspace(text[l])) {
-		trimChars(l + 1);
+		skipChars(l + 1);
 		return true;
 	}
 
@@ -135,7 +159,7 @@ bool Music::trimDirective(std::string_view str) {
 }
 
 // // //
-void Music::trimChars(size_t count) {
+void Music::skipChars(size_t count) {
 	text.erase(0, count);
 }
 
@@ -144,7 +168,7 @@ void Music::skipSpaces() {
 	while (!text.empty() && isspace(text.front())) {
 		if (text.front() == '\n')
 			line++;
-		trimChars(1);
+		skipChars(1);
 	}
 }
 
@@ -464,8 +488,8 @@ void Music::compile()
 		case 'h': parseHDirective();		break;
 		case 'n': parseNCommand();		break;
 		case '\"':parseReplacementDirective();	break;
-		case '\n': trimChars(1); line++;		break;
-		case '|': trimChars(1); hexLeft = 0;		break;
+		case '\n': skipChars(1); line++;		break;
+		case '|': skipChars(1); hexLeft = 0;		break;
 		case 'c': case 'd': case 'e': case 'f': case 'g': case 'a': case 'b': case 'r': case '^':
 			parseNote();			break;
 		case ';':
@@ -473,11 +497,11 @@ void Music::compile()
 		default:
 			if (isspace(text.front()))
 			{
-				trimChars(1); break;
+				skipChars(1); break;
 			}
 			else
 			{
-				std::cout << "File " << name << ", line " << line << ": Unexpected character \"" << text.front() << "\" found." << std::endl; trimChars(1); break;
+				std::cout << "File " << name << ", line " << line << ": Unexpected character \"" << text.front() << "\" found." << std::endl; skipChars(1); break;
 			}
 		}
 	}
@@ -490,18 +514,18 @@ void Music::parseComment()
 	if (songTargetProgram == 2)
 	{
 
-		trimChars(1);
+		skipChars(1);
 		while (!text.empty())		// // //
 		{
 			if (text.front() == '\n')
 				break;
-			trimChars(1);
+			skipChars(1);
 		}
 		line++;
 	}
 	else
 	{
-		trimChars(1);
+		skipChars(1);
 		error("Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2.");		// // //
 	}
 }
@@ -528,7 +552,7 @@ void Music::printChannelDataNonVerbose(int totalSize)
 
 void Music::parseQMarkDirective()
 {
-	trimChars(1);
+	skipChars(1);
 	i = getInt();
 	if (i == -1) i = 0;
 	switch (i)
@@ -544,7 +568,7 @@ void Music::parseExMarkDirective()
 }
 void Music::parseChannelDirective()
 {
-	trimChars(1);
+	skipChars(1);
 	if (isalpha(text.front()))
 	{
 		parseSpecialDirective();
@@ -572,7 +596,7 @@ void Music::parseChannelDirective()
 }
 void Music::parseLDirective()
 {
-	trimChars(1);
+	skipChars(1);
 	i = getInt();
 
 	if (i == -1) error("Error parsing \"l\" directive.");		// // //
@@ -582,7 +606,7 @@ void Music::parseLDirective()
 }
 void Music::parseGlobalVolumeCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	i = getInt();
 	if (i == -1) error("Error parsing global volume (\"w\") command.");		// // //
 	if (i < 0 || i > 255) error("Illegal value for global volume (\"w\") command.");		// // //
@@ -592,7 +616,7 @@ void Music::parseGlobalVolumeCommand()
 }
 void Music::parseVolumeCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	i = getInt();
 
 	if (i == -1) error("Error parsing volume (\"v\") command.");		// // //
@@ -603,7 +627,7 @@ void Music::parseVolumeCommand()
 }
 void Music::parseQuantizationCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	i = getHex();
 	if (i == -1) error("Error parsing quantization (\"q\") command.");		// // //
 	if (i < 1 || i > 0x7F) error("Error parsing quantization (\"q\") command.");		// // //
@@ -624,7 +648,7 @@ void Music::parseQuantizationCommand()
 }
 void Music::parsePanCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	i = getInt();
 	int pan = i;
 
@@ -635,7 +659,7 @@ void Music::parsePanCommand()
 
 	if (text.front() == ',')
 	{
-		trimChars(1);
+		skipChars(1);
 		i = getInt();
 		if (i == -1) error("Error parsing pan (\"y\") command.");		// // //
 		if (i > 2)  error("Illegal value for pan (\"y\") command.");		// // //
@@ -643,7 +667,7 @@ void Music::parsePanCommand()
 		skipSpaces();
 		if (text.front() != ',') error("Error parsing pan (\"y\") command.");		// // //
 
-			trimChars(1);
+			skipChars(1);
 		i = getInt();
 		if (i == -1) error("Error parsing pan (\"y\") command.");		// // //
 		if (i > 2)  error("Illegal value for pan (\"y\") command.");		// // //
@@ -671,7 +695,7 @@ void Music::parseIntroDirective()
 	}
 
 	hasIntro = true;
-	trimChars(1);
+	skipChars(1);
 	phrasePointers[channel][1] = data[channel].size();
 	prevNoteLength = -1;
 	hasIntro = true;
@@ -679,7 +703,7 @@ void Music::parseIntroDirective()
 }
 void Music::parseT()
 {
-	trimChars(1);
+	skipChars(1);
 	if (strncmp(&text.front(), "uning[", 6) == 0)
 		parseTransposeDirective();
 	else
@@ -716,7 +740,7 @@ void Music::parseTempoCommand()
 }
 void Music::parseTransposeDirective()
 {
-	trimChars(6);		// // //
+	skipChars(6);		// // //
 
 	i = getInt();
 
@@ -724,19 +748,19 @@ void Music::parseTransposeDirective()
 	if (i < 0 || i > 255)  error("Illegal instrument value for tuning directive.");		// // //
 
 	if (text.front() != ']') error("Error parsing tuning directive.");		// // //
-		trimChars(1);
+		skipChars(1);
 	skipSpaces();
 
 	if (text.front() != '=') error("Error parsing tuning directive.");		// // //
-		trimChars(1);
+		skipChars(1);
 
 	while (true)
 	{
 		skipSpaces();
 
 		bool plus = true;
-		if (text.front() == '+') trimChars(1);
-		else if (text.front() == '-') { trimChars(1); plus = false; }
+		if (text.front() == '+') skipChars(1);
+		else if (text.front() == '-') { skipChars(1); plus = false; }
 
 		j = getInt();
 
@@ -748,7 +772,7 @@ void Music::parseTransposeDirective()
 		skipSpaces();
 
 		if (text.front() != ',') break;
-		trimChars(1);
+		skipChars(1);
 		i++;
 		if (i >= 256) error("Illegal value for tuning directive.");		// // //
 	}
@@ -757,7 +781,7 @@ void Music::parseTransposeDirective()
 }
 void Music::parseOctaveDirective()
 {
-	trimChars(1);
+	skipChars(1);
 	i = getInt();
 	if (i == -1) error("Error parsing octave (\"o\") directive.");		// // //
 	if (i < 0 || i > 6) error("Error parsing octave (\"o\") directive.");		// // //
@@ -765,11 +789,11 @@ void Music::parseOctaveDirective()
 }
 void Music::parseInstrumentCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	bool direct = false;
 	if (text.front() == '@') 
 	{
-		trimChars(1); 
+		skipChars(1); 
 		direct = true; 
 	}
 
@@ -824,10 +848,10 @@ void Music::parseOpenParenCommand()
 
 void Music::parseSampleLoadCommand()
 {
-	trimChars(1);		// // //
+	skipChars(1);		// // //
 	if (text.front() == '@')
 	{
-		trimChars(1);
+		skipChars(1);
 		i = getInt();
 		i = instrToSample[i];
 		if (text.front() != ',')
@@ -835,19 +859,19 @@ void Music::parseSampleLoadCommand()
 			error("Error parsing sample load command.");		// // //
 				return;
 		}
-		trimChars(1);
+		skipChars(1);
 	}
 	else
 	{
-		trimChars(1);
+		skipChars(1);
 		std::string s = "";
 		while (text.front() != '"')
 		{
 			if (text.empty()) error("Error parsing sample load command.");		// // //
 				s += text.front();
-			trimChars(1);
+			skipChars(1);
 		}
-		trimChars(1);
+		skipChars(1);
 		if (text.front() != ',')
 		{
 			error("Error parsing sample load command.");		// // //
@@ -870,7 +894,7 @@ void Music::parseSampleLoadCommand()
 		if (i == -1)
 			error("The specified sample was not included in this song.");
 
-		trimChars(1);
+		skipChars(1);
 	}
 	skipSpaces();
 	if (text.front() != '$')
@@ -878,14 +902,14 @@ void Music::parseSampleLoadCommand()
 		error("Error parsing sample load command.");		// // //
 			return;
 	}
-	trimChars(1);
+	skipChars(1);
 	j = getHex();
 	if (j == -1 || j > 0xFF)
 		error("Error parsing sample load command.");		// // //
 
 	if (text.front() != ')')
 		error("Error parsing sample load command.");		// // //
-	trimChars(1);
+	skipChars(1);
 
 	if (optimizeSampleUsage)
 		usedSamples[i] = true;
@@ -900,13 +924,13 @@ void Music::parseSampleLoadCommand()
 void Music::parseLabelLoopCommand()
 {
 
-	trimChars(1);
+	skipChars(1);
 	if (text.front() == '!')
 	{
 		if (targetAMKVersion < 2)
 			error("Unrecognized character '!'.");
 
-		trimChars(1);
+		skipChars(1);
 		skipSpaces();
 
 		if (channelDefined == true)						// A channel's been defined, we're parsing a remote 
@@ -916,9 +940,9 @@ void Music::parseLabelLoopCommand()
 			if (i == -1) error("Error parsing remote code setup.");		// // //
 				skipSpaces();
 			if (text.front() != ',') error("Error parsing code setup.");		// // //
-				trimChars(1);
+				skipChars(1);
 			skipSpaces();
-			//if (text.front() == '-') negative = true, trimChars(1);
+			//if (text.front() == '-') negative = true, skipChars(1);
 			try
 			{
 				j = getIntWithNegative();
@@ -933,11 +957,11 @@ void Music::parseLabelLoopCommand()
 			if (j == 1 || j == 2)
 			{
 				if (text.front() != ',') error("Error parsing remote code setup. Missing the third argument.");		// // //
-					trimChars(1);
+					skipChars(1);
 				skipSpaces();
 				if (text.front() == '$')
 				{
-					trimChars(1);
+					skipChars(1);
 					k = getHex();
 					if (k == -1) error("Error parsing remote code setup. Could not parse the third argument as a hex command.");		// // //
 				}
@@ -955,7 +979,7 @@ void Music::parseLabelLoopCommand()
 
 			if (text.front() != ')')
 				error("Error parsing remote setup.");		// // //
-				trimChars(1);
+				skipChars(1);
 
 			if (text.front() == '[')
 			{
@@ -981,7 +1005,7 @@ void Music::parseLabelLoopCommand()
 			if (text.front() != ')')
 				error("Error parsing remote code definition.");
 
-			trimChars(1);
+			skipChars(1);
 
 			if (text.front() == '[')
 			{
@@ -1007,7 +1031,7 @@ void Music::parseLabelLoopCommand()
 
 	if (text.front() != ')')  error("Error parsing label loop.");		// // //
 
-		trimChars(1);
+		skipChars(1);
 
 	updateQ[channel] = true;
 	updateQ[8] = true;
@@ -1062,7 +1086,7 @@ void Music::parseLoopCommand()
 			error("You cannot nest a subloop within another subloop.");
 		if (loopLabel > 0 && text.front() == ')')
 			error("A label loop cannot define a subloop.  Use a standard or remote loop instead.");
-		trimChars(2);		// // //
+		skipChars(2);		// // //
 
 		handleSuperLoopEnter();
 
@@ -1074,7 +1098,7 @@ void Music::parseLoopCommand()
 	{
 		error("You cannot nest standard [ ] loops.");
 	}
-	trimChars(1);		// // //
+	skipChars(1);		// // //
 
 	prevLoop = data[8].size();
 
@@ -1102,7 +1126,7 @@ void Music::parseLoopCommand()
 
 void Music::parseLoopEndCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	if (channel < 8)
 		updateQ[channel] = true;
 
@@ -1110,7 +1134,7 @@ void Music::parseLoopEndCommand()
 	prevNoteLength = -1;
 	if (text.front() == ']')
 	{
-		trimChars(1);
+		skipChars(1);
 		if (text.front() == ']')
 			fatalError(R"(An ambiguous use of the ] and ]] loop delimiters was found ("]]]").  Separate\nthe "]]" and "]" to clarify your intention.)");		// // //
 
@@ -1162,7 +1186,7 @@ void Music::parseLoopEndCommand()
 void Music::parseStarLoopCommand()
 {
 
-	trimChars(1);
+	skipChars(1);
 
 	if (channel == 8)  error("Nested loops are not allowed.");		// // //
 
@@ -1188,13 +1212,13 @@ void Music::parseStarLoopCommand()
 }
 void Music::parseVibratoCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	int t1, t2, t3;
 	t1 = getInt();
 	if (t1 == -1) error("Error parsing vibrato command.");
 	skipSpaces();
 	if (text.front() != ',') error("Error parsing vibrato command.");
-	trimChars(1);
+	skipChars(1);
 	skipSpaces();
 	t2 = getInt();
 	if (t2 == -1) error("Error parsing vibrato command.");
@@ -1202,7 +1226,7 @@ void Music::parseVibratoCommand()
 
 	if (text.front() == ',')	// The user has specified the delay.
 	{
-		trimChars(1);
+		skipChars(1);
 		skipSpaces();
 		t3 = getInt();
 		if (t3 == -1) error("Error parsing vibrato command.");
@@ -1229,7 +1253,7 @@ void Music::parseVibratoCommand()
 }
 void Music::parseTripletOpenDirective()
 {
-	trimChars(1);
+	skipChars(1);
 	if (triplet == false)
 		triplet = true;
 	else
@@ -1237,7 +1261,7 @@ void Music::parseTripletOpenDirective()
 }
 void Music::parseTripletCloseDirective()
 {
-	trimChars(1);
+	skipChars(1);
 	if (triplet == true)
 		triplet = false;
 	else
@@ -1245,7 +1269,7 @@ void Music::parseTripletCloseDirective()
 }
 void Music::parseRaiseOctaveDirective()
 {
-	trimChars(1);
+	skipChars(1);
 	octave++;
 	if (octave > 7)
 	{
@@ -1255,7 +1279,7 @@ void Music::parseRaiseOctaveDirective()
 }
 void Music::parseLowerOctaveDirective()
 {
-	trimChars(1);
+	skipChars(1);
 	octave--;
 	if (octave < -1)
 	{
@@ -1265,7 +1289,7 @@ void Music::parseLowerOctaveDirective()
 }
 void Music::parsePitchSlideCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	if (inPitchSlide)
 	{
 		error("Pitch slide directive specified multiple times in a row.");
@@ -1284,7 +1308,7 @@ void Music::parseHFDInstrumentHack(int addr, int bytes)
 			error("Unknown HFD hex command.");
 			return;
 		}
-		trimChars(1);
+		skipChars(1);
 		i = getHex();
 		if (i == -1 || i > 0xFF)
 		{
@@ -1314,7 +1338,7 @@ void Music::parseHFDHex()
 	skipSpaces();
 	if (text.front() == '$')
 	{
-		trimChars(1);
+		skipChars(1);
 		i = getHex();
 		if (i == -1)
 		{
@@ -1332,7 +1356,7 @@ void Music::parseHFDHex()
 				error("Unknown HFD hex command.");
 				return;
 			}
-			trimChars(1);
+			skipChars(1);
 			reg = getHex();
 			if (reg == -1)
 			{
@@ -1345,7 +1369,7 @@ void Music::parseHFDHex()
 				error("Unknown HFD hex command.");
 				return;
 			}
-			trimChars(1);
+			skipChars(1);
 			val = getHex();
 			if (val == -1)
 			{
@@ -1381,7 +1405,7 @@ void Music::parseHFDHex()
 				error("Unknown HFD hex command.");
 				return;
 			}
-			trimChars(1);
+			skipChars(1);
 			i = getHex();
 			if (i == -1)
 			{
@@ -1409,7 +1433,7 @@ void Music::parseHFDHex()
 				error("Unknown HFD hex command.");
 				return;
 			}
-			trimChars(1);
+			skipChars(1);
 			i = getHex();
 			if (i == -1)
 			{
@@ -1424,7 +1448,7 @@ void Music::parseHFDHex()
 				error("Unknown HFD hex command.");
 				return;
 			}
-			trimChars(1);
+			skipChars(1);
 			i = getHex();
 			if (i == -1)
 			{
@@ -1439,7 +1463,7 @@ void Music::parseHFDHex()
 				error("Unknown HFD hex command.");
 				return;
 			}
-			trimChars(1);
+			skipChars(1);
 			i = getHex();
 			if (i == -1)
 			{
@@ -1454,7 +1478,7 @@ void Music::parseHFDHex()
 				error("Unknown HFD hex command.");
 				return;
 			}
-			trimChars(1);
+			skipChars(1);
 			i = getHex();
 			if (i == -1)
 			{
@@ -1476,7 +1500,7 @@ void Music::parseHFDHex()
 					error("Unknown HFD hex command.");
 					return;
 				}
-				trimChars(1);
+				skipChars(1);
 				i = getHex();
 				if (i == -1)
 				{
@@ -1516,7 +1540,7 @@ static bool nextNoteIsForDD;
 
 void Music::parseHexCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	i = getHex();
 	if (i == -1 || i > 0xFF)
 	{
@@ -1559,7 +1583,7 @@ void Music::parseHexCommand()
 				skipSpaces();
 				if (text.front() != '$')
 					error("Unknown hex command.");		// // //
-					trimChars(1);
+					skipChars(1);
 				j = getHex();
 				if (j == -1 || i > 0xFF)
 					error("Error parsing hex command.");		// // //
@@ -1970,7 +1994,7 @@ void Music::parseHexCommand()
 					}
 					else if (text.front() == '<' || text.front() == '>')
 					{
-						trimChars(1);
+						skipChars(1);
 					}
 					else
 						break;
@@ -2043,7 +2067,7 @@ void Music::parseHexCommand()
 void Music::parseNote()
 {
 	j = text.front();
-	trimChars(1);
+	skipChars(1);
 
 	if (inRemoteDefinition)
 		error("Remote definitions cannot contain note data!");
@@ -2119,7 +2143,7 @@ void Music::parseNote()
 		std::string temptext = text;		// // //
 
 		if (j != 0 && (text.front() == '^' || (i == 0xC7 && text.front() == 'r')))
-			trimChars(1);
+			skipChars(1);
 
 		j += getNoteLength(getInt());
 		skipSpaces();
@@ -2196,13 +2220,13 @@ void Music::parseNote()
 }
 void Music::parseHDirective()
 {
-	trimChars(1);
+	skipChars(1);
 	//bool negative = false;
 
 	//if (text.front() == '-') 
 	//{
 	//	negative = true;
-	//	trimChars(1);
+	//	skipChars(1);
 	//}
 	try
 	{
@@ -2220,7 +2244,7 @@ void Music::parseHDirective()
 }
 void Music::parseNCommand()
 {
-	trimChars(1);
+	skipChars(1);
 	i = getHex();
 	if (i < 0 || i > 0x1F)
 		error("Invlid value for the n command.  Value must be in hex and between 0 and 1F.");		// // //
@@ -2294,7 +2318,7 @@ void Music::parseSpecialDirective()
 		parseInstrumentDefinitions();
 	else if (trimDirective("samples")) {		// // //
 		parseSampleDefinitions();
-		trimChars(1);
+		skipChars(1);
 	}
 	else if (trimDirective("pad"))		// // //
 		parsePadDefinition();
@@ -2327,12 +2351,12 @@ void Music::parseSpecialDirective()
 		;
 	else if (strnicmp(text.c_str(), "amk=", 4) == 0)
 	{
-		trimChars(4);		// // //
+		skipChars(4);		// // //
 		getInt();
 	}
 	else if (strnicmp(text.c_str(), "halvetempo", 10) == 0)
 	{
-		trimChars(10);		// // //
+		skipChars(10);		// // //
 		if (channelDefined == true)
 			error("#halvetempo must be used before any and all channels.");		// // //
 		tempoRatio *= 2;
@@ -2347,12 +2371,7 @@ void Music::parseSpecialDirective()
 
 void Music::parseReplacementDirective()
 {
-	// // //
-	trimChars(1);
-
-	int quotedStringLength = 0;
-
-	std::string s = getQuotedString(text, 0, quotedStringLength);		// // //
+	std::string s = getQuotedString();		// // //
 
 	i = s.find('=');
 
@@ -2361,8 +2380,6 @@ void Music::parseReplacementDirective()
 
 	std::string findStr = s.substr(0, i);
 	std::string replStr = s.substr(i + 1);
-
-	trimChars(quotedStringLength + 1);		// // //
 
 	// // //
 	if (!findStr.empty())
@@ -2436,26 +2453,21 @@ void Music::parseInstrumentDefinitions()
 	parseState state = lookingForOpenBrace;
 
 	skipSpaces();
-
-	if (text.front() != '{')
+	if (!trimChar('{'))		// // //
 		fatalError("Could not find opening curly brace in instrument definition.");
-	trimChars(1);		// // //
 
 	skipSpaces();
 	while (text.front() != '}')
 	{
-		if (text.front() != '"' && text.front() != '@'&& text.front() != 'n')
-			error("Error parsing instrument definition.");
 		bool isName, isNoise;
-		if (text.front() == '"') isName = true, isNoise = false;
-		else if (text.front() == '@') isName = false, isNoise = false;
-		else if (text.front() == 'n') isName = false, isNoise = true;
-		else
-		{
-			trimChars(1);
+		switch (trimChar("\"@n")) {		// // //
+		case '"': isName = true; isNoise = false; break;
+		case '@': isName = false; isNoise = false; break;
+		case 'n': isName = false; isNoise = true; break;
+		default:
 			fatalError("Error parsing instrument definition.");
 		}
-		trimChars(1);
+
 		if (isName)
 		{
 			std::string brrName;
@@ -2463,9 +2475,9 @@ void Music::parseInstrumentDefinitions()
 			{
 				if (text.empty()) fatalError("Error parsing sample portion of the instrument definition.");
 				brrName += text.front();
-				trimChars(1);		// // //
+				skipChars(1);		// // //
 			}
-			trimChars(1);
+			skipChars(1);
 			i = -1;
 			brrName = basepath + brrName;
 			int gs = getSample(brrName, this);
@@ -2515,7 +2527,7 @@ void Music::parseInstrumentDefinitions()
 		{
 			skipSpaces();
 			if (text.front() != '$') fatalError("Error parsing instrument definition; there were too few bytes following the sample (there must be 6).");
-			trimChars(1);		// // //
+			skipChars(1);		// // //
 			i = getHex();
 			if (i == -1 || i > 0xFF) fatalError("Error parsing instrument definition.");
 			instrumentData.push_back(i);
@@ -2523,7 +2535,7 @@ void Music::parseInstrumentDefinitions()
 		skipSpaces();
 
 	}
-	trimChars(1);
+	skipChars(1);
 	return;
 
 	/*	//unsigned char temp;
@@ -2553,7 +2565,7 @@ void Music::parseInstrumentDefinitions()
 	{
 	if (count != 0)
 	error("Invalid number of arguments for instrument.  Total number of bytes must be a multiple of 6.");
-	trimChars(1);
+	skipChars(1);
 	return;
 	}
 
@@ -2567,7 +2579,7 @@ void Music::parseInstrumentDefinitions()
 	count++;
 	break;
 	}
-	trimChars(1);
+	skipChars(1);
 	}*/
 }
 
@@ -2577,7 +2589,7 @@ void Music::parseSampleDefinitions()
 
 	if (text.front() != '{')
 		fatalError("Unexpected character in sample group definition.  Expected \"{\".");
-	trimChars(1);		// // //
+	skipChars(1);		// // //
 
 	while (text.front() != '}')
 	{
@@ -2589,9 +2601,7 @@ void Music::parseSampleDefinitions()
 
 		if (text.front() == '\"')
 		{
-			trimChars(1);
-			int quotedStringLength = 0;
-			std::string tempstr = basepath + getQuotedString(text, 0, quotedStringLength);		// // //
+			std::string tempstr = basepath + getQuotedString();		// // //
 			std::string extension;
 			auto tmppos = tempstr.find_last_of(".");
 			if (tmppos == -1)
@@ -2603,18 +2613,16 @@ void Music::parseSampleDefinitions()
 				addSample(tempstr, this, false);
 			else
 				fatalError("The filename for the sample was invalid.  Only \".brr\" and \".bnk\" are allowed.");		// // //
-
-				trimChars(quotedStringLength + 1);		// // //
 		}
 		else if (text.front() == '#')
 		{
-			trimChars(1);
+			skipChars(1);
 			std::string tempstr;
 			while (isspace(text.front()) == false)
 			{
 				if (text.empty()) goto EOFTooEarly;		// // //
 				tempstr += text.front();
-				trimChars(1);
+				skipChars(1);
 			}
 
 			addSampleGroup(tempstr, this);
@@ -2635,7 +2643,7 @@ void Music::parsePadDefinition()
 	skipSpaces();
 	if (text.front() != '$')
 		error("Error parsing padding directive.");		// // //
-		trimChars(1);
+		skipChars(1);
 	i = getHex(true);
 	if (i == -1)
 		error("Error parsing padding directive.");		// // //
@@ -2653,21 +2661,12 @@ void Music::parseLouderCommand()
 void Music::parsePath()
 {
 	skipSpaces();
-
-	if (text.front() != '\"')
-		error("Unexpected symbol found in path command.  Expected a quoted string.");
-
-	trimChars(1);
-	int quotedStringLength = 0;
-
-	basepath = "./" + getQuotedString(text, 0, quotedStringLength) + "/";		// // //
-
-	trimChars(quotedStringLength + 1);		// // //
+	basepath = "./" + getQuotedString() + "/";		// // //
 }
 
 int Music::getInt()
 {
-	//if (text.front() == '$') { trimChars(1); return getHex(); }	// Allow for things such as t$20 instead of t32.
+	//if (text.front() == '$') { skipChars(1); return getHex(); }	// Allow for things such as t$20 instead of t32.
 	// Actually, can't do it.
 	// Consider this:
 	// l8r$ED$00$00
@@ -2683,7 +2682,7 @@ int Music::getInt()
 	{
 		d++;
 		i = (i * 10) + text.front() - '0';
-		trimChars(1);
+		skipChars(1);
 	}
 
 	if (d == 0) return -1; else return i;
@@ -2700,14 +2699,14 @@ int Music::getIntWithNegative()
 	if (text.front() == '-')
 	{
 		n = true;
-		trimChars(1);
+		skipChars(1);
 	}
 
 	while (!text.empty() && text.front() >= '0' && text.front() <= '9')		// // //
 	{
 		d++;
 		i = (i * 10) + text.front() - '0';
-		trimChars(1);
+		skipChars(1);
 	}
 
 	if (d == 0)
@@ -2756,7 +2755,7 @@ int Music::getHex(bool anyLength)
 		else if ('A' <= text.front() && text.front() <= 'F') j = text.front() - 0x37;
 		else if ('a' <= text.front() && text.front() <= 'f') j = text.front() - 0x57;
 		else break;
-		trimChars(1);
+		skipChars(1);
 		d++;
 		i = (i * 16) + j;
 	}
@@ -2771,8 +2770,8 @@ int Music::getPitch(int i)
 
 	i = pitches[i - 0x61] + (octave - 1) * 12 + 0x80;
 
-	if (text.front() == '+') { i++; trimChars(1); }
-	else if (text.front() == '-') { i--; trimChars(1); }
+	if (text.front() == '+') { i++; skipChars(1); }
+	else if (text.front() == '-') { i--; skipChars(1); }
 
 	/*if (i < 0x80)
 	return -1;
@@ -2788,7 +2787,7 @@ int Music::getNoteLength(int i)
 
 	if (i == -1 && text.front() == '=')
 	{
-		trimChars(1);
+		skipChars(1);
 		i = getInt();
 		if (i == -1) //error("Error parsing note.");
 		{
@@ -2810,7 +2809,7 @@ int Music::getNoteLength(int i)
 	{
 		frac = frac / 2;
 		i += frac;
-		trimChars(1);
+		skipChars(1);
 		times++;
 		if (times == 2 && songTargetProgram == 1) break;	// AM4 only allows two dots for whatever reason.
 	}
@@ -2818,6 +2817,37 @@ int Music::getNoteLength(int i)
 	if (triplet)
 		i = (int)floor(((double)i * 2.0 / 3.0) + 0.5);
 	return i;
+}
+
+// // //
+std::string Music::getQuotedString() {
+	if (!trimChar('\"'))
+		error("Unexpected symbol found in path command.  Expected a quoted string.");
+
+	std::string tempstr;
+
+	while (true) {
+		if (text.empty())
+			printError("Unexpected end of file found.", false);
+
+		if (trimChar('\"'))
+			break;
+
+		char ch = text.front();
+		skipChars(1);
+		if (ch == '\\') {
+			if (trimChar('\"'))
+				tempstr += '\"';
+			else {
+				printError(R"(Error: The only escape sequence allowed is "\"".)", false);		// // //
+				return tempstr;
+			}
+		}
+		else
+			tempstr += ch;
+	}
+
+	return tempstr;
 }
 
 // // //
@@ -3266,22 +3296,21 @@ void Music::parseEndif()
 void Music::parseSPCInfo()
 {
 	skipSpaces();
-	if (text.front() != '{')
+	if (!trimChar('{'))
 		error("Could not find opening brace in SPC info command.");
 
-	trimChars(1);
+	skipChars(1);
 	skipSpaces();
 
 	while (text.front() != '}')
 	{
-		if (text.front() != '#')
+		if (!trimChar('#'))		// // //
 			error("Unexpected symbol found in SPC info command.  Expected \'#\'.");
-		trimChars(1);
 		std::string typeName;
 
 		while (!isspace(text.front())) {		// // //
 			typeName += text.front();
-			trimChars(1);
+			skipChars(1);
 		}
 
 		if (typeName != "author" && typeName != "comment" && typeName != "title" && typeName != "game" && typeName != "length")
@@ -3291,12 +3320,7 @@ void Music::parseSPCInfo()
 
 		skipSpaces();
 
-		if (text.front() != '\"')
-			error("Unexpected symbol found in SPC info command.  Expected a quoted string.");
-
-		trimChars(1);
-		int quotedStringLength = 0;
-		std::string parameter = getQuotedString(text, 0, quotedStringLength);		// // //
+		std::string parameter = getQuotedString();		// // //
 
 		if (typeName == "author")
 			author = parameter;
@@ -3336,8 +3360,6 @@ void Music::parseSPCInfo()
 			}
 		}
 
-		trimChars(quotedStringLength + 1);		// // //
-
 		skipSpaces();
 	}
 
@@ -3362,7 +3384,7 @@ void Music::parseSPCInfo()
 		printWarning((std::string)("\"Title\" field was too long.  Truncating to \"") + title + "\".");
 	}
 
-	trimChars(1);		// // //
+	skipChars(1);		// // //
 }
 
 void Music::handleNormalLoopEnter()

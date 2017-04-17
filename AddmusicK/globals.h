@@ -100,7 +100,7 @@ bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError 
 void openFile(const File &fileName, std::vector<byte> &vector);
 void openTextFile(const File &fileName, std::string &string);
 
-std::string getQuotedString(const std::string &string, int startPos, int &rawLength);
+// // //
 
 #define hex2 std::setw(2) << std::setfill('0') << std::uppercase << std::hex
 #define hex4 std::setw(4) << std::setfill('0') << std::uppercase << std::hex

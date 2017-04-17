@@ -160,8 +160,10 @@ private:
 
 	void append(byte value);		// // //
 	bool trim(std::string_view str);		// // //
+	char trimChar(char c);		// // //
+	char trimChar(std::string_view clist);		// // //
 	bool trimDirective(std::string_view str);		// // //
-	void trimChars(size_t count);		// // //
+	void skipChars(size_t count);		// // //
 	void skipSpaces();		// // //
 	[[noreturn]] void fatalError(const std::string &str);		// // //
 	
@@ -178,6 +180,7 @@ private:
 	int getHex(bool anyLength = false);
 	int getPitch(int j);
 	int getNoteLength(int);
+	std::string getQuotedString();		// // //
 
 	bool guessLength;
 	int resizedChannel;

@@ -118,6 +118,9 @@ void printError(const std::string &error, bool isFatal, const std::string &fileN
 	fputc('\n', stderr);
 	//puts((oss.str() + error).c_str());
 	//putchar('\n');
+#ifdef _DEBUG		// // //
+	_CrtDbgBreak();
+#endif
 	if (isFatal) quit(1);
 }
 
@@ -615,36 +618,7 @@ int getSample(const File &name, Music *music)
 	return -1;
 }
 
-std::string getQuotedString(const std::string &string, int startPos, int &rawLength)
-{
-	std::string tempstr;
-	rawLength = startPos;
-	while (string[startPos] != '\"')
-	{
-		if (startPos > string.length())
-			printError("Unexpected end of file found.", false);
-
-		if (string[startPos] == '\\')
-		{
-			if (string[startPos+1] == '"')
-			{
-				tempstr += '"';
-				startPos++;
-			}
-			else
-			{
-				printError("Error: The only escape sequence allowed is \"\\\"\".", false);	// ""\"\\\"\".""? What?
-				return tempstr;
-			}
-		}
-		else
-			tempstr += string[startPos];
-
-		startPos++;
-	}
-	rawLength = startPos - rawLength;
-	return tempstr;
-}
+// // //
 
 #define error(str) printError(str, true, filename, line)
 
