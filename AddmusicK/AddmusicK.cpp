@@ -233,8 +233,9 @@ int main(int argc, char* argv[])
 			if (highestGlobalSong + i >= 256)
 				printError("Error: The total number of requested music files to compile exceeded 255.", true);
 			musics[highestGlobalSong + 1 + i].exists = true;
+			// // //
 			musics[highestGlobalSong + 1 + i].name = textFilesToCompile[i];
-			openTextFile((std::string("music/") + musics[i + highestGlobalSong].name), musics[i + highestGlobalSong].text);
+			openTextFile((std::string("music/") + musics[i + highestGlobalSong].getFileName()), musics[i + highestGlobalSong].text);
 		}
 	}
 
@@ -1298,7 +1299,8 @@ void fixMusicPointers()
 
 				if (checkPos > 0x10000)
 				{
-					std::cerr << musics[i].name << ": Echo buffer exceeded total space in ARAM by 0x" << hex4 << checkPos - 0x10000 << " bytes." << std::dec << std::endl;
+					// // //
+					std::cerr << musics[i].getFileName() << ": Echo buffer exceeded total space in ARAM by 0x" << hex4 << checkPos - 0x10000 << " bytes." << std::dec << std::endl;
 					quit(1);
 				}
 			}
@@ -1415,7 +1417,7 @@ void generateSPCs()
 
 	time_t recentMod = 0;			// If any main program modifications were made, we need to update all SPCs.
 	for (int i = 1; i <= highestGlobalSong; i++)
-		recentMod = std::max(recentMod, getTimeStamp((File)("music/" + musics[i].name)));
+		recentMod = std::max(recentMod, getTimeStamp((File)("music/" + musics[i].getFileName())));		// // //
 	
 	recentMod = std::max(recentMod, getTimeStamp((File)"asm/main.asm"));
 	recentMod = std::max(recentMod, getTimeStamp((File)"asm/commands.asm"));
@@ -1570,7 +1572,7 @@ void generateSPCs()
 
 				std::string pathlessSongName;
 				if (mode == 0)
-					pathlessSongName = musics[i].name;
+					pathlessSongName = musics[i].getFileName();		// // //
 				else if (mode == 1)
 					pathlessSongName = soundEffects[0][i].name;
 				else if (mode == 2)
@@ -1970,7 +1972,7 @@ void checkMainTimeStamps()			// Disabled for now, as this only works if the ROM 
 	}
 
 	for (int i = 1; i <= highestGlobalSong; i++)
-		mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)("music/" + musics[i].name)));
+		mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)("music/" + musics[i].getFileName())));		// // //
 	
 	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"asm/main.asm"));
 	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"asm/commands.asm"));

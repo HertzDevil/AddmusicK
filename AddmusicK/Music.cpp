@@ -3525,3 +3525,8 @@ int Music::multiplyByTempoRatio(int value)
 
 	return temp;
 }
+
+// // //
+const std::string &Music::getFileName() const {
+	return name;
+}

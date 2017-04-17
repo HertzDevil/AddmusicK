@@ -41,6 +41,7 @@ public:
 	bool nextHexIsArpeggioNoteLength;	
 
 	std::string name;
+	const std::string &getFileName() const;
 	std::string pathlessSongName;
 	std::vector<byte> data[9];
 	std::vector<unsigned short> loopLocations[9];	// With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
