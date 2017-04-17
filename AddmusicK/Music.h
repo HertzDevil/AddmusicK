@@ -180,7 +180,8 @@ private:
 
 	void parseSPCInfo();
 
-	void append(byte value);		// // //
+	template <typename... Args>		// // //
+	void append(Args&&... value);
 	bool trim(std::string_view str);		// // //
 	bool trimChar(char c);		// // //
 	char trimChar(std::string_view clist);		// // //

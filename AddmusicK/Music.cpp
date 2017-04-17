@@ -94,8 +94,12 @@ std::string current;
 
 
 // // //
-void Music::append(byte value) {
-	tracks[channel].data.push_back(value);		// // //
+template <typename... Args>
+void Music::append(Args&&... value) {
+	using swallow = int[];
+	(void)swallow {
+		0, (tracks[channel].data.push_back(static_cast<byte>(std::forward<Args>(value))), 0)...
+	};
 }
 
 // // //
@@ -412,9 +416,7 @@ void Music::compile()
 			if (currentHex == 0xE6 && songTargetProgram == TargetType::AM4)		// // //
 			{
 				tracks[channel].data.back() = 0xE5;		// // //
-				append(0);
-				append(0);
-				append(0);
+				append(0, 0, 0);
 				hexLeft = 0;
 			}
 			else
@@ -575,8 +577,7 @@ void Music::parseGlobalVolumeCommand()
 	if (i == -1) error("Error parsing global volume (\"w\") command.");		// // //
 	if (i < 0 || i > 255) error("Illegal value for global volume (\"w\") command.");		// // //
 
-		append(0xE0);
-	append(i);
+	append(0xE0, i);		// // //
 }
 void Music::parseVolumeCommand()
 {
@@ -586,8 +587,7 @@ void Music::parseVolumeCommand()
 	if (i == -1) error("Error parsing volume (\"v\") command.");		// // //
 	if (i < 0 || i > 255) error("Illegal value for global volume (\"v\") command.");		// // //
 
-		append(0xE7);
-	append(i);
+	append(0xE7, i);		// // //
 }
 void Music::parseQuantizationCommand()
 {
@@ -633,8 +633,7 @@ void Music::parsePanCommand()
 			pan |= (i << 6);
 	}
 
-	append(0xDB);
-	append(pan);
+	append(0xDB, pan);		// // //
 }
 void Music::parseIntroDirective()
 {
@@ -692,9 +691,7 @@ void Music::parseTempoCommand()
 		tempoChanges.push_back(std::pair<double, int>(tracks[channel].channelLength, tempo));		// // //
 	}
 
-
-	append(0xE2);
-	append(tempo);
+	append(0xE2, tempo);		// // //
 
 }
 void Music::parseTransposeDirective()
@@ -782,8 +779,7 @@ void Music::parseInstrumentCommand()
 			tracks[channel].ignoreTuning = false;
 		}
 
-		append(0xDA);
-		append(i);
+		append(0xDA, i);		// // //
 	}
 
 	if (i < 30)
@@ -873,11 +869,7 @@ void Music::parseSampleLoadCommand()
 	if (optimizeSampleUsage)
 		usedSamples[i] = true;
 
-	append(0xF3);
-	append(i);
-	append(j);
-
-
+	append(0xF3, i, j);		// // //
 }
 
 void Music::parseLabelLoopCommand()
@@ -946,11 +938,7 @@ void Music::parseLabelLoopCommand()
 			}
 			append(0xFC);
 			tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
-
-			append(loopPointers[i] & 0xFF);
-			append(loopPointers[i] >> 8);
-			append(j);
-			append(k);
+			append(loopPointers[i] & 0xFF, loopPointers[i] >> 8, j, k);
 			return;
 		}
 		else								// We're outside of a channel, this is a remote call definition.
@@ -1019,10 +1007,7 @@ void Music::parseLabelLoopCommand()
 
 		append(0xE9);
 		tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
-
-		append(loopPointers[i] & 0xFF);
-		append(loopPointers[i] >> 8);
-		append(j);
+		append(loopPointers[i] & 0xFF, loopPointers[i] >> 8, j);
 
 		loopLabel = 0;
 	}
@@ -1049,8 +1034,7 @@ void Music::parseLoopCommand()
 
 		handleSuperLoopEnter();
 
-		append(0xE6);
-		append(0x00);
+		append(0xE6, 0x00);		// // //
 		return;
 	}
 	else if (channel == 8)
@@ -1113,8 +1097,7 @@ void Music::parseLoopEndCommand()
 
 		handleSuperLoopExit(i);
 
-		append(0xE6);
-		append(i - 1);
+		append(0xE6, i - 1);		// // //
 		return;
 	}
 	else if (channel != 8) error("Loop end found outside of a loop.");
@@ -1135,9 +1118,7 @@ void Music::parseLoopEndCommand()
 	{
 		append(0xE9);
 		tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
-		append(prevLoop & 0xFF);
-		append(prevLoop >> 8);
-		append(i);
+		append(prevLoop & 0xFF, prevLoop >> 8, i);
 	}
 	inRemoteDefinition = false;
 	loopLabel = 0;
@@ -1165,9 +1146,7 @@ void Music::parseStarLoopCommand()
 
 	append(0xE9);
 	tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
-	append(prevLoop & 0xFF);
-	append(prevLoop >> 8);
-	append(i);
+	append(prevLoop & 0xFF, prevLoop >> 8, i);
 }
 void Music::parseVibratoCommand()
 {
@@ -1193,20 +1172,14 @@ void Music::parseVibratoCommand()
 		if (t2 < 0 || t2 > 255) error("Illegal value for vibrato rate.");
 		if (t3 < 0 || t3 > 255) error("Illegal value for vibrato extent.");
 
-		append(0xDE);
-		append(divideByTempoRatio(t1, false));
-		append(multiplyByTempoRatio(t2));
-		append(t3);
+		append(0xDE, divideByTempoRatio(t1, false), multiplyByTempoRatio(t2), t3);		// // //
 	}
 	else			// The user has not specified the delay.
 	{
 		if (t1 < 0 || t1 > 255) error("Illegal value for vibrato rate.");
 		if (t2 < 0 || t2 > 255) error("Illegal value for vibrato extent.");
 
-		append(0xDE);
-		append(00);
-		append(multiplyByTempoRatio(t1));
-		append(t2);
+		append(0xDE, 0x00, multiplyByTempoRatio(t1), t2);		// // //
 	}
 
 }
@@ -1339,16 +1312,9 @@ void Music::parseHFDHex()
 			if (!(reg == 0x6D || reg == 0x7D))	// Do not write the HFD header hex bytes.
 			{
 				if (reg == 0x6C)			// Noise command gets special treatment.
-				{
-					append(0xF8);
-					append(val);
-				}
+					append(0xF8, val);		// // //
 				else
-				{
-					append(0xF6);
-					append(reg);
-					append(val);
-				}
+					append(0xF6, reg, val);		// // //
 			}
 			else
 			{
@@ -1372,9 +1338,7 @@ void Music::parseHFDHex()
 				return;
 			}
 
-			append(0xFA);
-			append(0x02);
-			append(i);
+			append(0xFA, 0x02, i);		// // //
 			hexLeft = 0;
 		}
 		else if ((i == 0x83) && convert)
@@ -1481,11 +1445,7 @@ void Music::parseHFDHex()
 		{
 			currentHex = 0xED;
 			hexLeft = hexLengths[currentHex - 0xDA] - 1 - 1;
-			append(0xED);
-			if (convert)
-				append(i);
-			else
-				append(i);
+			append(0xED, i);		// // //
 		}
 	}
 	else
@@ -1551,8 +1511,7 @@ void Music::parseHexCommand()
 				else
 					hexLeft = j + 1;
 				nextHexIsArpeggioNoteLength = true;
-				append(i);
-				append(j);
+				append(i, j);
 				return;
 			}
 			else if (i == 0xE5 && ::songTargetProgram == TargetType::AM4)		// // //
@@ -1586,10 +1545,7 @@ void Music::parseHexCommand()
 					remoteGainConversion[remoteGainConversion.size() - 1].push_back(0x00);
 					append(0xFC);
 					remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
-					append(0x00);
-					append(0x00);
-					append(0xFF);
-					append(0x00);
+					append(0x00, 0x00, 0xFF, 0x00);
 
 					// Then add in the first part of a "apply gain before a note ends" call.
 					currentHex = 0xFC;
@@ -1597,9 +1553,7 @@ void Music::parseHexCommand()
 					remoteGainConversion.push_back(std::vector<byte>());
 					append(0xFC);
 					remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
-					append(0x00);
-					append(0x00);
-					append(0x02);
+					append(0x00, 0x00, 0x02);
 
 					remoteGainConversion[remoteGainConversion.size() - 1].push_back(0xFA);
 					remoteGainConversion[remoteGainConversion.size() - 1].push_back(0x01);
@@ -1618,9 +1572,7 @@ void Music::parseHexCommand()
 					remoteGainConversion.push_back(std::vector<byte>());
 					append(0xFC);
 					remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
-					append(0x00);
-					append(0x00);
-					append(0x05);
+					append(0x00, 0x00, 0x05);
 					//append(lastFAGainValue[channelToCheck]);
 
 					remoteGainConversion[remoteGainConversion.size() - 1].push_back(0xFA);
@@ -1657,8 +1609,7 @@ void Music::parseHexCommand()
 
 					if (optimizeSampleUsage)
 						usedSamples[i - 0x80] = true;
-					append(0xF3);
-					append(i - 0x80);
+					append(0xF3, i - 0x80);		// // //
 					return;
 				}
 				else
@@ -1724,10 +1675,7 @@ void Music::parseHexCommand()
 
 						append(0xFC);
 						remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
-						append(0x00);
-						append(0x00);
-						append(0x00);
-						append(0x00);
+						append(0x00, 0x00, 0x00, 0x00);
 					}
 					else
 					{
@@ -1754,10 +1702,7 @@ void Music::parseHexCommand()
 						// And finally the remote call data.
 						append(0xFC);
 						remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
-						append(0x00);
-						append(0x00);
-						append(0x03);
-						append(0x00);
+						append(0x00, 0x00, 0x03, 0x00);
 					}
 
 					// Either way, FC gets turned off.
@@ -1822,11 +1767,7 @@ void Music::parseHexCommand()
 
 						append(0xFC);
 						remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
-						append(0x00);
-						append(0x00);
-						append(0xFF);
-						append(0x00);
-
+						append(0x00, 0x00, 0xFF, 0x00);
 
 						// Then add the "set gain" remote call.
 						remoteGainConversion.push_back(std::vector<byte>());
@@ -1838,10 +1779,7 @@ void Music::parseHexCommand()
 						// And finally the remote call data.
 						append(0xFC);
 						remoteGainPositions[channel].push_back(tracks[channel].data.size());		 // // //
-						append(0x00);
-						append(0x00);
-						append(0x03);
-						append(0x00);
+						append(0x00, 0x00, 0x03, 0x00);
 					}
 					else
 					{
@@ -1858,10 +1796,7 @@ void Music::parseHexCommand()
 						// And finally the remote call data.
 						append(0xFC);
 						remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
-						append(0x00);
-						append(0x00);
-						append(0x05);
-						append(tracks[channelToCheck].lastFCDelayValue);
+						append(0x00, 0x00, 0x05, tracks[channelToCheck].lastFCDelayValue);
 						//append(0x00);
 					}
 
@@ -1874,10 +1809,7 @@ void Music::parseHexCommand()
 					remoteGainConversion.push_back(std::vector<byte>());
 					append(0xFC);
 					remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
-					append(0x00);
-					append(0x00);
-					append(0x00);
-					append(0x00);
+					append(0x00, 0x00, 0x00, 0x00);
 
 					tracks[channelToCheck].usingFA = false;
 
@@ -2078,11 +2010,7 @@ void Music::parseNote()
 	if (inPitchSlide)
 	{
 		inPitchSlide = false;
-		append(0xDD);
-		append(0x00);
-		append(prevNoteLength);
-		append(i);
-
+		append(0xDD, 0x00, prevNoteLength, i);		// // //
 	}
 
 	if (nextNoteIsForDD)
@@ -2156,7 +2084,8 @@ void Music::parseNote()
 
 		if (j > 0)
 		{
-			if (j != divideByTempoRatio(0x60, true)) append(j);
+			if (j != divideByTempoRatio(0x60, true))
+				append(j);
 			append(0xC6);
 		}
 		prevNoteLength = j;
@@ -2209,8 +2138,7 @@ void Music::parseNCommand()
 	if (i < 0 || i > 0x1F)
 		error("Invlid value for the n command.  Value must be in hex and between 0 and 1F.");		// // //
 
-		append(0xF8);
-	append(i);
+	append(0xF8, i);		// // //
 }
 
 void Music::parseOptionDirective()
@@ -2223,31 +2151,20 @@ void Music::parseOptionDirective()
 
 	skipSpaces();
 
-	if (trimDirective("smwvtable")) {		// // //
-		if (usingSMWVTable == false)
-		{
-			append(0xFA);
-			append(0x06);
-			append(0x00);
+	if (trimDirective("smwvtable"))		// // //
+		if (!usingSMWVTable) {
+			append(0xFA, 0x06, 0x00);		// // //
 			usingSMWVTable = true;
 		}
 		else
-		{
 			printWarning("This song is already using the SMW V Table. This command is just wasting three bytes...", name, line);
-		}
-	}
 	else if (trimDirective("nspcvtable")) {		// // //
-		append(0xFA);
-		append(0x06);
-		append(0x01);
+		append(0xFA, 0x06, 0x01);		// // //
 		usingSMWVTable = false;
-
 		printWarning("This song uses the N-SPC V by default. This command is just wasting two bytes...", name, line);
 	}
-	else if (trimDirective("tempoimmunity")) {		// // //
-		append(0xF4);
-		append(0x07);
-	}
+	else if (trimDirective("tempoimmunity"))		// // //
+		append(0xF4, 0x07);		// // //
 	else if (trimDirective("noloop"))		// // //
 		doesntLoop = true;
 	else if (trimDirective("dividetempo")) {		// // //
@@ -2299,10 +2216,8 @@ void Music::parseSpecialDirective()
 			printWarning("#louder is redundant in #amk 2 and above.");
 		parseLouderCommand();
 	}
-	else if (trimDirective("tempoimmunity")) {		// // //
-		append(0xF4);
-		append(0x07);
-	}
+	else if (trimDirective("tempoimmunity"))		// // //
+		append(0xF4, 0x07);		// // //
 	else if (trimDirective("path"))		// // //
 		parsePath();
 	else if (trimDirective("am4"))		// // //
@@ -2614,8 +2529,7 @@ void Music::parsePadDefinition()
 
 void Music::parseLouderCommand()
 {
-	append(0xF4);
-	append(0x08);
+	append(0xF4, 0x08);		// // //
 }
 
 void Music::parsePath()
