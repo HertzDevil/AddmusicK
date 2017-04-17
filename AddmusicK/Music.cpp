@@ -38,7 +38,10 @@ static bool passedIntro[8];
 
 static bool ignoreTuning[9];	// Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
 
-static int songTargetProgram;	// 0 = indeterminate/unknown/AMK, 1 = AM4, 2 = AMM.
+// // //
+static enum class TargetType {
+	AMK, AM4, AMM, Unknown = AMK,
+} songTargetProgram;
 static int targetAMKVersion;
 
 static int loopLabel = 0;
@@ -251,7 +254,7 @@ void Music::init()
 	seconds = 0;
 
 
-	songTargetProgram = 0;
+	songTargetProgram = TargetType::AMK;		// // //
 	hTranspose = 0;
 	usingHTranspose = false;
 	line = 1;
@@ -355,14 +358,14 @@ void Music::init()
 
 	if (v == -1)
 	{
-		songTargetProgram = 1;
+		songTargetProgram = TargetType::AM4;		// // //
 		//songVersionIdentified = true;
 		targetAMKVersion = 0;
 	}
 
 	else if (v == -2)
 	{
-		songTargetProgram = 2;
+		songTargetProgram = TargetType::AMM;		// // //
 		//songVersionIdentified = true;
 		targetAMKVersion = 0;
 	}
@@ -425,7 +428,7 @@ void Music::init()
 	
 	for (int z = 0; z < 9; z++)
 	{
-		if (songTargetProgram == 1)		// AM4 fix for tuning[] related stuff.
+		if (songTargetProgram == TargetType::AM4)		// // // AM4 fix for tuning[] related stuff.
 			ignoreTuning[z] = true;
 		else
 			ignoreTuning[z] = false;
@@ -445,7 +448,7 @@ void Music::compile()
 
 		if (hexLeft != 0 && !isspace(tolower(text.front())) && tolower(text.front()) != '$' && text.front() != '\n')
 		{
-			if (currentHex == 0xE6 && songTargetProgram == 1)
+			if (currentHex == 0xE6 && songTargetProgram == TargetType::AM4)		// // //
 			{
 				data[channel][data[channel].size() - 1] = 0xE5;
 				append(0);
@@ -511,7 +514,7 @@ void Music::compile()
 
 void Music::parseComment()
 {
-	if (songTargetProgram == 2)
+	if (songTargetProgram == TargetType::AMM)		// // //
 	{
 
 		skipChars(1);
@@ -818,7 +821,7 @@ void Music::parseInstrumentCommand()
 				error("This custom instrument has not been defined yet.");		// // //
 		}
 
-		if (songTargetProgram == 1)
+		if (songTargetProgram == TargetType::AM4)		// // //
 		{
 			ignoreTuning[channel] = false;
 		}
@@ -1107,7 +1110,7 @@ void Music::parseLoopCommand()
 	channel = 8;					// So we have to back up the current channel.
 	prevNoteLength = -1;
 	instrument[8] = instrument[prevChannel];
-	if (songTargetProgram == 1) ignoreTuning[8] = ignoreTuning[prevChannel];		// More AM4 tuning stuff.  Related to the line above it.
+	if (songTargetProgram == TargetType::AM4) ignoreTuning[8] = ignoreTuning[prevChannel];		// // // More AM4 tuning stuff.  Related to the line above it.
 
 	if (loopLabel > 0)
 	{
@@ -1393,7 +1396,7 @@ void Music::parseHFDHex()
 			}
 			else
 			{
-				songTargetProgram = 1;		// The HFD header bytes indicate this as being an AM4 song, so it gets AM4 treatment.
+				songTargetProgram = TargetType::AM4;		// // // The HFD header bytes indicate this as being an AM4 song, so it gets AM4 treatment.
 			}
 			hexLeft = 0;
 		}
@@ -1573,7 +1576,7 @@ void Music::parseHexCommand()
 			{
 				error("Unknown hex command.");
 			}
-			else if (i == 0xED && songTargetProgram == 1)
+			else if (i == 0xED && songTargetProgram == TargetType::AM4)		// // //
 			{
 				parseHFDHex();
 				return;
@@ -1596,7 +1599,7 @@ void Music::parseHexCommand()
 				append(j);
 				return;
 			}
-			else if (i == 0xE5 && ::songTargetProgram == 1)
+			else if (i == 0xE5 && ::songTargetProgram == TargetType::AM4)		// // //
 			{
 				// Don't append yet.  We need to look at the next byte to determine whether to use 0xF3 or 0xE5.
 				hexLeft = 3;
@@ -1687,7 +1690,7 @@ void Music::parseHexCommand()
 			hexLeft -= 1;
 			// If we're on the last hex value for $E5 and this isn't an AMK song, then do some special stuff regarding tremolo.
 			// AMK doesn't use $E5 for the tremolo command or sample loading, so it has to emulate them.
-			if (hexLeft == 2 && currentHex == 0xE5 && songTargetProgram == 1/*validateTremolo*/)
+			if (hexLeft == 2 && currentHex == 0xE5 && songTargetProgram == TargetType::AM4/*validateTremolo*/)		// // //
 			{
 				//validateTremolo = false;
 				if (i >= 0x80)
@@ -1712,7 +1715,7 @@ void Music::parseHexCommand()
 				error("$FA $05 in #amk 2 or above has been replaced with remote code.");		// // //
 
 			// Print error for AM4 songs that attempt to use an invalid FIR filter.  They both A) won't sound like their originals and B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
-			if (hexLeft == 0 && currentHex == 0xF1 && songTargetProgram == 1)
+			if (hexLeft == 0 && currentHex == 0xF1 && songTargetProgram == TargetType::AM4)		// // //
 			{
 				if (i > 1)
 				{
@@ -1722,7 +1725,7 @@ void Music::parseHexCommand()
 				}
 			}
 
-			if (hexLeft == 0 && currentHex == 0xE4 && songTargetProgram == 1)	// AM4 seems to do something strange with $E4?
+			if (hexLeft == 0 && currentHex == 0xE4 && songTargetProgram == TargetType::AM4)	// // // AM4 seems to do something strange with $E4?
 			{
 				i++;
 				i &= 0xFF;
@@ -1937,7 +1940,7 @@ void Music::parseHexCommand()
 				echoBufferSize = std::max(echoBufferSize, i);
 			}
 
-			if (currentHex == 0xDA && songTargetProgram == 1)			// If this was the instrument command
+			if (currentHex == 0xDA && songTargetProgram == TargetType::AM4)		// // // If this was the instrument command
 			{									// And it was >= 0x13
 				if (i >= 0x13)							// Then change it to a custom instrument.
 					i = i - 0x13 + 30;
@@ -2072,7 +2075,8 @@ void Music::parseNote()
 	if (inRemoteDefinition)
 		error("Remote definitions cannot contain note data!");
 
-	if (songTargetProgram == 0 && channelDefined == false && inRemoteDefinition == false)
+	// // //
+	if (songTargetProgram == TargetType::AMK && channelDefined == false && inRemoteDefinition == false)
 		error("Note data must be inside a channel!");
 
 	if (j == 'r')
@@ -2747,7 +2751,7 @@ int Music::getHex(bool anyLength)
 
 	while (!text.empty())		// // //
 	{
-		if (d >= 2 && songTargetProgram == 1) break;
+		if (d >= 2 && songTargetProgram == TargetType::AM4) break;		// // //
 		if (d >= 2 && anyLength == false)
 			break;
 
@@ -2811,7 +2815,7 @@ int Music::getNoteLength(int i)
 		i += frac;
 		skipChars(1);
 		times++;
-		if (times == 2 && songTargetProgram == 1) break;	// AM4 only allows two dots for whatever reason.
+		if (times == 2 && songTargetProgram == TargetType::AM4) break;	// // // AM4 only allows two dots for whatever reason.
 	}
 	//}
 	if (triplet)
