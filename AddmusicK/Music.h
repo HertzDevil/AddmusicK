@@ -43,11 +43,8 @@ public:
 	std::string name;
 	const std::string &getFileName() const;
 	std::string pathlessSongName;
-	std::vector<byte> data[9];
-	std::vector<unsigned short> loopLocations[9];	// With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
 	bool playOnce;
 	bool hasIntro;
-	unsigned short phrasePointers[8][2];
 	unsigned short loopPointers[0x10000];
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
 	std::string text;
@@ -161,7 +158,7 @@ private:
 
 	void append(byte value);		// // //
 	bool trim(std::string_view str);		// // //
-	char trimChar(char c);		// // //
+	bool trimChar(char c);		// // //
 	char trimChar(std::string_view clist);		// // //
 	bool trimDirective(std::string_view str);		// // //
 	void skipChars(size_t count);		// // //
@@ -186,7 +183,6 @@ private:
 	bool guessLength;
 	int resizedChannel;
 	
-	double channelLengths[8];				// How many ticks are in each channel.
 	double loopLengths[0x10000];				// How many ticks are in each loop.
 	double normalLoopLength;				// How many ticks were in the most previously declared normal loop.
 	double superLoopLength;					// How many ticks were in the most previously declared super loop.

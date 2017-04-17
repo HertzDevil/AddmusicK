@@ -22,21 +22,14 @@
 } while (false)
 
 static int line, channel, prevChannel, octave, prevNoteLength, defaultNoteLength;
-static int instrument[9];
 static bool inDefineBlock;
 
 static unsigned int prevLoop;
 static int i, j;
-static bool noMusic[8][2];
-static int q[9];
-static bool updateQ[9];
 static bool hasIntro;
 static bool doesntLoop;
 static bool triplet;
 static bool inPitchSlide;
-static bool passedIntro[8];
-
-static bool ignoreTuning[9];	// Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
 
 // // //
 static enum class TargetType {
@@ -96,12 +89,31 @@ std::string current;
 //static bool songVersionIdentified;
 //static int hTranspose = 0;00
 
-static bool usingFA[9];
-static bool usingFC[9];
-static int lastFAGainValue[9];
-//static int lastFADelayValue[8];
-static int lastFCGainValue[9];
-static int lastFCDelayValue[9];
+
+
+// // // eventually replace this with AMKd::Music::Track
+struct Track
+{
+	std::vector<byte> data;
+	std::vector<unsigned short> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
+
+	double channelLength = 0.; // How many ticks are in each channel.
+	int q = 0x7F;
+	int instrument = 0;
+	int lastFAGainValue = 0;
+	//int lastFADelayValue = 0;
+	int lastFCGainValue = 0;
+	int lastFCDelayValue = 0;
+
+	unsigned short phrasePointers[2] = {0, 0}; // first 8 only
+	bool noMusic[2] = {false, false}; // first 8 only
+	bool passedIntro = false; // first 8 only
+	bool updateQ = true;
+	bool usingFA = false;
+	bool usingFC = false;
+	bool ignoreTuning = false; // Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
+};
+static Track tracks[9];
 
 
 
@@ -269,25 +281,10 @@ void Music::init()
 
 	inDefineBlock = false;
 
-	for (int z = 0; z < 8; z++)
-	{
-		noMusic[z][0] = false;
-		noMusic[z][1] = false;
-		passedIntro[z] = false;
-		phrasePointers[z][0] = 0;
-		phrasePointers[z][1] = 0;
-	}
-
-	for (int z = 0; z < 9; z++)
-	{
-		q[z] = 0x7F;
-		instrument[z] = 0;
-		updateQ[z] = true;
-		usingFA[z] = false;
-		usingFC[z] = false;
-		lastFAGainValue[z] = 0;
-		lastFCGainValue[z] = 0;
-		lastFCDelayValue[z] = 0;
+	// // //
+	for (int z = 0; z < 9; ++z) {
+		tracks[z] = Track { };
+		tracks[z].ignoreTuning = (songTargetProgram == TargetType::AM4); // AM4 fix for tuning[] related stuff.
 	}
 
 	hasIntro = false;
@@ -314,10 +311,7 @@ void Music::init()
 	for (int z = 0; z < 0x10000; z++)
 		loopPointers[z] = ~0;
 
-	if (text[0] == char(0xEF) && text[1] == char(0xBB) && text[2] == char(0xBF))
-	{
-		text.erase(text.begin(), text.begin() + 3);
-	}
+	trim("\xEF\xBB\xBF");		// // // utf-8 bom
 
 	unsigned int p = text.find(";title=");
 	if (p != -1)
@@ -425,14 +419,8 @@ void Music::init()
 	}
 	else
 		resizedChannel = -1;
-	
-	for (int z = 0; z < 9; z++)
-	{
-		if (songTargetProgram == TargetType::AM4)		// // // AM4 fix for tuning[] related stuff.
-			ignoreTuning[z] = true;
-		else
-			ignoreTuning[z] = false;
-	}
+
+	// // //
 }
 
 void Music::compile()
