@@ -11,6 +11,8 @@
 #include <locale>		// // //
 
 #include "Utility/Trie.h"		// // //
+#include <functional>
+
 //#include "Preprocessor.h"
 
 
@@ -119,7 +121,7 @@ static Track tracks[9];
 
 // // //
 void Music::append(byte value) {
-	data[channel].push_back(value);
+	tracks[channel].data.push_back(value);		// // //
 }
 
 // // //
@@ -257,8 +259,7 @@ void Music::init()
 	superLoopLength = normalLoopLength = 0;
 
 	baseLoopIsNormal = baseLoopIsSuper = extraLoopIsNormal = extraLoopIsSuper = false;
-	for (i = 0; i < 8; i++)
-		channelLengths[i] = 0;
+	// // //
 	for (i = 0; i < 10000; i++)
 		loopLengths[i] = 0;
 
@@ -401,21 +402,21 @@ void Music::init()
 			resizeSize += 3;
 
 		if (text.find("#0") != -1)
-			data[0].resize(resizeSize), resizedChannel = 0;
+			tracks[0].data.resize(resizeSize), resizedChannel = 0;		// // //
 		else if (text.find("#1") != -1)
-			data[1].resize(resizeSize), resizedChannel = 1;
+			tracks[1].data.resize(resizeSize), resizedChannel = 1;
 		else if (text.find("#2") != -1)
-			data[2].resize(resizeSize), resizedChannel = 2;
+			tracks[2].data.resize(resizeSize), resizedChannel = 2;
 		else if (text.find("#3") != -1)
-			data[3].resize(resizeSize), resizedChannel = 3;
+			tracks[3].data.resize(resizeSize), resizedChannel = 3;
 		else if (text.find("#4") != -1)
-			data[4].resize(resizeSize), resizedChannel = 4;
+			tracks[4].data.resize(resizeSize), resizedChannel = 4;
 		else if (text.find("#5") != -1)
-			data[5].resize(resizeSize), resizedChannel = 5;
+			tracks[5].data.resize(resizeSize), resizedChannel = 5;
 		else if (text.find("#6") != -1)
-			data[6].resize(resizeSize), resizedChannel = 6;
+			tracks[6].data.resize(resizeSize), resizedChannel = 6;
 		else if (text.find("#7") != -1)
-			data[7].resize(resizeSize), resizedChannel = 7;
+			tracks[7].data.resize(resizeSize), resizedChannel = 7;
 	}
 	else
 		resizedChannel = -1;
@@ -438,7 +439,7 @@ void Music::compile()
 		{
 			if (currentHex == 0xE6 && songTargetProgram == TargetType::AM4)		// // //
 			{
-				data[channel][data[channel].size() - 1] = 0xE5;
+				tracks[channel].data.back() = 0xE5;		// // //
 				append(0);
 				append(0);
 				append(0);
@@ -549,8 +550,8 @@ void Music::parseQMarkDirective()
 	switch (i)
 	{
 	case 0: doesntLoop = true; break;
-	case 1: noMusic[channel][0] = true; break;
-	case 2: noMusic[channel][1] = true; break;
+	case 1: tracks[channel].noMusic[0] = true; break;		// // //
+	case 2: tracks[channel].noMusic[1] = true; break;
 	}
 }
 void Music::parseExMarkDirective()
@@ -571,8 +572,8 @@ void Music::parseChannelDirective()
 	if (i < 0 || i > 7) error("Illegal value for channel directive.");		// // //
 
 		channel = i;
-	q[8] = q[channel];
-	updateQ[8] = updateQ[channel];
+	tracks[8].q = tracks[channel].q;		// // //
+	tracks[8].updateQ = tracks[channel].updateQ;
 	prevNoteLength = -1;
 
 	hTranspose = 0;
@@ -625,17 +626,12 @@ void Music::parseQuantizationCommand()
 
 	if (channel == 8)
 	{
-		q[prevChannel] = i;
-		updateQ[prevChannel] = true;
-	}
-	else
-	{
-		q[channel] = i;
-		updateQ[channel] = true;
+		tracks[prevChannel].q = i;		// // //
+		tracks[prevChannel].updateQ = true;
 	}
 
-	q[8] = i;
-	updateQ[8] = true;
+	tracks[channel].q = i;
+	tracks[channel].updateQ = true;
 }
 void Music::parsePanCommand()
 {
@@ -673,7 +669,7 @@ void Music::parseIntroDirective()
 	if (channel == 8) error("Intro directive found within a loop.");		// // //
 
 	if (hasIntro == false)
-		tempoChanges.push_back(std::pair<double, int>(channelLengths[channel], -((int)tempo)));
+		tempoChanges.push_back(std::pair<double, int>(tracks[channel].channelLength, -((int)tempo)));		// // //
 	else
 	{
 		for (size_t z = 0; z < tempoChanges.size(); z++)
@@ -687,10 +683,10 @@ void Music::parseIntroDirective()
 
 	hasIntro = true;
 	skipChars(1);
-	phrasePointers[channel][1] = data[channel].size();
+	tracks[channel].phrasePointers[1] = tracks[channel].data.size();		// // //
 	prevNoteLength = -1;
 	hasIntro = true;
-	introLength = channelLengths[channel];
+	introLength = tracks[channel].channelLength;		// // //
 }
 void Music::parseT()
 {
@@ -721,7 +717,7 @@ void Music::parseTempoCommand()
 	}
 	else
 	{
-		tempoChanges.push_back(std::pair<double, int>(channelLengths[channel], tempo));
+		tempoChanges.push_back(std::pair<double, int>(tracks[channel].channelLength, tempo));		// // //
 	}
 
 
@@ -811,7 +807,7 @@ void Music::parseInstrumentCommand()
 
 		if (songTargetProgram == TargetType::AM4)		// // //
 		{
-			ignoreTuning[channel] = false;
+			tracks[channel].ignoreTuning = false;
 		}
 
 		append(0xDA);
@@ -824,9 +820,9 @@ void Music::parseInstrumentCommand()
 
 	//hTranspose = 0;
 	//usingHTranspose = false;
-	instrument[channel] = i;
+	tracks[channel].instrument = i;		// // //
 	//if (htranspose[i] == true)
-	//transposeMap[instrument[channel]] = ::tmpTrans[instrument[channel]];
+	//transposeMap[tracks[channe].instrument] = ::tmpTrans[tracks[channe].instrument];
 }
 
 void Music::parseOpenParenCommand()
@@ -977,7 +973,7 @@ void Music::parseLabelLoopCommand()
 				error("Remote code cannot be defined within a channel.");		// // //
 			}
 			append(0xFC);
-			loopLocations[channel].push_back(data[channel].size());
+			tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
 
 			append(loopPointers[i] & 0xFF);
 			append(loopPointers[i] >> 8);
@@ -1024,8 +1020,8 @@ void Music::parseLabelLoopCommand()
 
 		skipChars(1);
 
-	updateQ[channel] = true;
-	updateQ[8] = true;
+	tracks[channel].updateQ = true;
+	tracks[8].updateQ = true;
 	prevNoteLength = -1;
 
 	if (text.front() == '[')				// If this is a loop definition...
@@ -1050,7 +1046,7 @@ void Music::parseLabelLoopCommand()
 		handleNormalLoopRemoteCall(j);
 
 		append(0xE9);
-		loopLocations[channel].push_back(data[channel].size());
+		tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
 
 		append(loopPointers[i] & 0xFF);
 		append(loopPointers[i] >> 8);
@@ -1064,8 +1060,8 @@ void Music::parseLoopCommand()
 {
 	// // //
 	if (channel < 8)
-		updateQ[channel] = true;
-	updateQ[8] = true;
+		tracks[channel].updateQ = true;
+	tracks[8].updateQ = true;
 	prevNoteLength = -1;
 
 	if (text[1] == '[')			// This is an $E6 loop.
@@ -1091,14 +1087,14 @@ void Music::parseLoopCommand()
 	}
 	skipChars(1);		// // //
 
-	prevLoop = data[8].size();
+	prevLoop = tracks[8].data.size();
 
 
 	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
 	channel = 8;					// So we have to back up the current channel.
 	prevNoteLength = -1;
-	instrument[8] = instrument[prevChannel];
-	if (songTargetProgram == TargetType::AM4) ignoreTuning[8] = ignoreTuning[prevChannel];		// // // More AM4 tuning stuff.  Related to the line above it.
+	tracks[8].instrument = tracks[prevChannel].instrument;		// // //
+	if (songTargetProgram == TargetType::AM4) tracks[8].ignoreTuning = tracks[prevChannel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
 
 	if (loopLabel > 0)
 	{
@@ -1119,9 +1115,9 @@ void Music::parseLoopEndCommand()
 {
 	skipChars(1);
 	if (channel < 8)
-		updateQ[channel] = true;
+		tracks[channel].updateQ = true;		// // //
 
-	updateQ[8] = true;
+	tracks[8].updateQ = true;
 	prevNoteLength = -1;
 	if (text.front() == ']')
 	{
@@ -1166,7 +1162,7 @@ void Music::parseLoopEndCommand()
 	if (!inRemoteDefinition)
 	{
 		append(0xE9);
-		loopLocations[channel].push_back(data[channel].size());
+		tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
 		append(prevLoop & 0xFF);
 		append(prevLoop >> 8);
 		append(i);
@@ -1181,8 +1177,8 @@ void Music::parseStarLoopCommand()
 
 	if (channel == 8)  error("Nested loops are not allowed.");		// // //
 
-		updateQ[channel] = true;
-	updateQ[8] = true;
+	tracks[channel].updateQ = true;
+	tracks[8].updateQ = true;
 	prevNoteLength = -1;
 
 	i = getInt();
@@ -1196,7 +1192,7 @@ void Music::parseStarLoopCommand()
 	handleNormalLoopRemoteCall(i);
 
 	append(0xE9);
-	loopLocations[channel].push_back(data[channel].size());
+	tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
 	append(prevLoop & 0xFF);
 	append(prevLoop >> 8);
 	append(i);
@@ -1605,10 +1601,10 @@ void Music::parseHexCommand()
 				
 
 
-				usingFC[channelToCheck] = true;
+				tracks[channelToCheck].usingFC = true;		// // //
 
 				// If we're just using the FC command and not the FA command as well,
-				if (usingFA[channelToCheck] == false)
+				if (!tracks[channelToCheck].usingFA)
 				{
 
 					// Then add the "restore instrument command"
@@ -1617,7 +1613,7 @@ void Music::parseHexCommand()
 					remoteGainConversion[remoteGainConversion.size() - 1].push_back(0x09);
 					remoteGainConversion[remoteGainConversion.size() - 1].push_back(0x00);
 					append(0xFC);
-					remoteGainPositions[channel].push_back(data[channel].size());
+					remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
 					append(0x00);
 					append(0x00);
 					append(0xFF);
@@ -1628,7 +1624,7 @@ void Music::parseHexCommand()
 					hexLeft = 2;
 					remoteGainConversion.push_back(std::vector<byte>());
 					append(0xFC);
-					remoteGainPositions[channel].push_back(data[channel].size());
+					remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
 					append(0x00);
 					append(0x00);
 					append(0x02);
@@ -1649,7 +1645,7 @@ void Music::parseHexCommand()
 					hexLeft = 2;
 					remoteGainConversion.push_back(std::vector<byte>());
 					append(0xFC);
-					remoteGainPositions[channel].push_back(data[channel].size());
+					remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
 					append(0x00);
 					append(0x00);
 					append(0x05);
@@ -1733,7 +1729,7 @@ void Music::parseHexCommand()
 				
 				if (i == 0)							// If i is zero, we have to undo a bunch of stuff.
 				{
-					if (usingFA[channelToCheck] == false)			// But only if this is a "pure" FC command.
+					if (!tracks[channelToCheck].usingFA)		// // // But only if this is a "pure" FC command.
 					{
 
 						remoteGainConversion.pop_back();
@@ -1741,21 +1737,21 @@ void Music::parseHexCommand()
 						remoteGainPositions[channel].pop_back();
 						remoteGainPositions[channel].pop_back();
 
-						data[channel].pop_back();
-						data[channel].pop_back();
-						data[channel].pop_back();
-						data[channel].pop_back();
-						data[channel].pop_back();
-						data[channel].pop_back();
-						data[channel].pop_back();
-						data[channel].pop_back();
-						data[channel].pop_back();
+						tracks[channel].data.pop_back();		// // //
+						tracks[channel].data.pop_back();
+						tracks[channel].data.pop_back();
+						tracks[channel].data.pop_back();
+						tracks[channel].data.pop_back();
+						tracks[channel].data.pop_back();
+						tracks[channel].data.pop_back();
+						tracks[channel].data.pop_back();
+						tracks[channel].data.pop_back();
 
 
 						remoteGainConversion.push_back(std::vector<byte>());
 
 						append(0xFC);
-						remoteGainPositions[channel].push_back(data[channel].size());
+						remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
 						append(0x00);
 						append(0x00);
 						append(0x00);
@@ -1770,14 +1766,14 @@ void Music::parseHexCommand()
 						remoteGainConversion.pop_back();
 						remoteGainPositions[channel].pop_back();
 
-						data[channel].pop_back();
-						data[channel].pop_back();
-						data[channel].pop_back();
-						data[channel].pop_back();
+						tracks[channel].data.pop_back();		// // //
+						tracks[channel].data.pop_back();
+						tracks[channel].data.pop_back();
+						tracks[channel].data.pop_back();
 
 
 						// Then add the "set gain" remote call.
-						remoteGainConversion.push_back(std::vector<byte>());
+//						remoteGainConversion.push_back(std::vector<byte> {0xFA, 0x01, (byte)i, 0x00});		// // //
 						remoteGainConversion[remoteGainConversion.size() - 1].push_back(0xFA);
 						remoteGainConversion[remoteGainConversion.size() - 1].push_back(0x01);
 						remoteGainConversion[remoteGainConversion.size() - 1].push_back(i);
@@ -1785,7 +1781,7 @@ void Music::parseHexCommand()
 
 						// And finally the remote call data.
 						append(0xFC);
-						remoteGainPositions[channel].push_back(data[channel].size());
+						remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
 						append(0x00);
 						append(0x00);
 						append(0x03);
@@ -1793,7 +1789,7 @@ void Music::parseHexCommand()
 					}
 
 					// Either way, FC gets turned off.
-					usingFC[channelToCheck] = false;
+					tracks[channelToCheck].usingFC = false;
 
 					//remoteGainConversion[remoteGainConversion.size() - 1].push_back(0xFA);
 					//remoteGainConversion[remoteGainConversion.size() - 1].push_back(0x01);
@@ -1801,7 +1797,7 @@ void Music::parseHexCommand()
 				else
 				{
 					i = divideByTempoRatio(i, false);
-					lastFCDelayValue[channelToCheck] = i;
+					tracks[channelToCheck].lastFCDelayValue = i;		// // //
 					append(i);
 				}
 
@@ -1818,7 +1814,7 @@ void Music::parseHexCommand()
 					else
 						channelToCheck = channel;
 
-					lastFCGainValue[channelToCheck] = i;
+					tracks[channelToCheck].lastFCGainValue = i;		// // //
 					remoteGainConversion[remoteGainConversion.size() - 1].push_back(i);
 					remoteGainConversion[remoteGainConversion.size() - 1].push_back(0x00);
 				}
@@ -1826,11 +1822,11 @@ void Music::parseHexCommand()
 			}
 
 			// More code conversion.
-			if (hexLeft == 0 && currentHex == 0xFA && targetAMKVersion == 1 && data[channel][data[channel].size() - 1] == 0x05)
+			if (hexLeft == 0 && currentHex == 0xFA && targetAMKVersion == 1 && tracks[channel].data.back() == 0x05)
 			{
 				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-				data[channel].pop_back();					// Remove the last two bytes
-				data[channel].pop_back();					// (i.e. the $FA $05)
+				tracks[channel].data.pop_back();					// // // Remove the last two bytes
+				tracks[channel].data.pop_back();					// (i.e. the $FA $05)
 
 				int channelToCheck;
 				if (channel == 9)
@@ -1843,7 +1839,7 @@ void Music::parseHexCommand()
 
 
 					// Check if this channel is using FA and FC combined...
-					if (usingFC[channelToCheck] == false)
+					if (!tracks[channelToCheck].usingFC)		// // //
 					{
 
 						// Then add in a "restore instrument" remote call.
@@ -1853,7 +1849,7 @@ void Music::parseHexCommand()
 						remoteGainConversion[remoteGainConversion.size() - 1].push_back(0x00);
 
 						append(0xFC);
-						remoteGainPositions[channel].push_back(data[channel].size());
+						remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
 						append(0x00);
 						append(0x00);
 						append(0xFF);
@@ -1869,7 +1865,7 @@ void Music::parseHexCommand()
 
 						// And finally the remote call data.
 						append(0xFC);
-						remoteGainPositions[channel].push_back(data[channel].size());
+						remoteGainPositions[channel].push_back(tracks[channel].data.size());		 // // //
 						append(0x00);
 						append(0x00);
 						append(0x03);
@@ -1889,29 +1885,29 @@ void Music::parseHexCommand()
 
 						// And finally the remote call data.
 						append(0xFC);
-						remoteGainPositions[channel].push_back(data[channel].size());
+						remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
 						append(0x00);
 						append(0x00);
 						append(0x05);
-						append(lastFCDelayValue[channelToCheck]);
+						append(tracks[channelToCheck].lastFCDelayValue);
 						//append(0x00);
 					}
 
 					// Either way, we're using FA now.
-					usingFA[channelToCheck] = true;
+					tracks[channelToCheck].usingFA = true;
 
 				}
 				else
 				{
 					remoteGainConversion.push_back(std::vector<byte>());
 					append(0xFC);
-					remoteGainPositions[channel].push_back(data[channel].size());
+					remoteGainPositions[channel].push_back(tracks[channel].data.size());		// // //
 					append(0x00);
 					append(0x00);
 					append(0x00);
 					append(0x00);
 
-					usingFA[channelToCheck] = false;
+					tracks[channelToCheck].usingFA = false;
 
 				}
 				return;
@@ -1977,7 +1973,7 @@ void Music::parseHexCommand()
 					else if (text.front() == 'a' || text.front() == 'b' || text.front() == 'c' || text.front() == 'd' || text.front() == 'e' || text.front() == 'f' || text.front() == 'g' ||
 						 text.front() == 'A' || text.front() == 'B' || text.front() == 'C' || text.front() == 'D' || text.front() == 'E' || text.front() == 'F' || text.front() == 'G')
 					{
-						if (::updateQ[channel] == true)
+						if (tracks[channel].updateQ)		// // //
 							error("You cannot use a note as the last parameter of the $DD command if you've also\nused the qXX command just before it.");		// // //
 							hexLeft = 0;
 						nextNoteIsForDD = true;
@@ -2080,8 +2076,8 @@ void Music::parseNote()
 			i += hTranspose;
 		else
 		{
-			if (!ignoreTuning[channel])				// More AM4 tuning stuff
-				i -= transposeMap[instrument[channel]];
+			if (!tracks[channel].ignoreTuning)		// // // More AM4 tuning stuff
+				i -= transposeMap[tracks[channel].instrument];
 		}
 
 
@@ -2094,12 +2090,12 @@ void Music::parseNote()
 		{
 			error("Note's pitch was too high.");
 		}
-		else if (instrument[channel] >= 21 && instrument[channel] < 30 && i < 0xC6)
+		else if (tracks[channel].instrument >= 21 && tracks[channel].instrument < 30 && i < 0xC6)		// // //
 		{
-			i = 0xD0 + (instrument[channel] - 21);
+			i = 0xD0 + (tracks[channel].instrument - 21);
 
 			if ((channel == 6 || channel == 7 || (channel == 8 && (prevChannel == 6 || prevChannel == 7))) == false)	// If this is not a SFX channel,
-				instrument[channel] = 0xFF;										// Then don't force the drum pitch on every note.
+				tracks[channel].instrument = 0xFF;										// Then don't force the drum pitch on every note.
 		}
 	}
 
@@ -2172,11 +2168,11 @@ void Music::parseNote()
 	{
 		append(divideByTempoRatio(0x60, true));
 
-		if (updateQ[channel])
+		if (tracks[channel].updateQ)		// // //
 		{
-			append(q[channel]);
-			updateQ[channel] = false;
-			updateQ[8] = false;
+			append(tracks[channel].q);
+			tracks[channel].updateQ = false;
+			tracks[8].updateQ = false;
 			noteParamaterByteCount++;
 		}
 		append(i); j -= divideByTempoRatio(0x60, true);
@@ -2196,14 +2192,14 @@ void Music::parseNote()
 	}
 	else if (j > 0)
 	{
-		if (j != prevNoteLength || updateQ[channel])
+		if (j != prevNoteLength || tracks[channel].updateQ)		// // //
 			append(j);
 		prevNoteLength = j;
-		if (updateQ[channel])
+		if (tracks[channel].updateQ)
 		{
-			append(q[channel]);
-			updateQ[channel] = false;
-			updateQ[8] = false;
+			append(tracks[channel].q);
+			tracks[channel].updateQ = false;
+			tracks[8].updateQ = false;
 			noteParamaterByteCount++;
 		}
 		append(i);
@@ -2229,8 +2225,8 @@ void Music::parseHDirective()
 		error("Error parsing h transpose directive.");
 	}
 	//if (negative) i = -i;
-	//transposeMap[instrument[channel]] = -i;
-	//htranspose[instrument[channel]] = true;
+	//transposeMap[tracks[channe].instrument] = -i;		// // //
+	//htranspose[tracks[channe].instrument] = true;
 	hTranspose = i;
 	usingHTranspose = true;
 }
@@ -2848,8 +2844,8 @@ void Music::pointersFirstPass()
 {
 	if (errorCount) printError("There were errors when compiling the music file.  Compilation aborted.  Your ROM has not been modified.", true);
 
-	if (data[0].size() == 0 && data[1].size() == 0 && data[2].size() == 0 && data[3].size() == 0 && data[4].size() == 0 && data[5].size() == 0 && data[6].size() == 0 && data[7].size() == 0)
-		error("This song contained no musical data!");		// // //
+	if (std::all_of(tracks, tracks + 8, [] (const Track &t) { return t.data.empty(); }))		// // //
+		error("This song contained no musical data!");
 
 
 	if (targetAMKVersion == 1)			// Handle more conversion of the old $FC command to remote call.
@@ -2859,14 +2855,14 @@ void Music::pointersFirstPass()
 			for (unsigned int z = 0; z < remoteGainPositions[channel].size(); z++)
 			{
 				size_t dataIndex = remoteGainPositions[channel][z];
-				loopLocations[channel].push_back(remoteGainPositions[channel][z]);
+				tracks[channel].loopLocations.push_back(remoteGainPositions[channel][z]);		// // //
 
-				data[channel][dataIndex] = data[8].size() & 0xFF;
-				data[channel][dataIndex + 1] = data[8].size() >> 8;
+				tracks[channel].data[dataIndex] = tracks[8].data.size() & 0xFF;
+				tracks[channel].data[dataIndex + 1] = tracks[8].data.size() >> 8;
 
 				for (unsigned int y = 0; y < remoteGainConversion[z].size(); y++)
 				{
-					data[8].push_back(remoteGainConversion[z][y]);
+					tracks[8].data.push_back(remoteGainConversion[z][y]);
 				}
 			}
 		}
@@ -2875,24 +2871,22 @@ void Music::pointersFirstPass()
 
 	if (resizedChannel != -1)
 	{
-		data[resizedChannel][0] = 0xFA;
-		data[resizedChannel][1] = 0x04;
-		data[resizedChannel][2] = echoBufferSize;
+		auto &t = tracks[resizedChannel].data;		// // //
+
+		t[0] = 0xFA;
+		t[1] = 0x04;
+		t[2] = echoBufferSize;
 		if (targetAMKVersion > 1)
 		{
-			data[resizedChannel][3] = 0xFA;
-			data[resizedChannel][4] = 0x06;
-			data[resizedChannel][5] = 0x01;
+			t[3] = 0xFA;
+			t[4] = 0x06;
+			t[5] = 0x01;
 		}
 	}
 
-	for (int z = 0; z < 8; z++)
-	{
-		if (data[z].size() != 0)
-		{
-			channel = z;
-			append(0);
-		}
+	for (int z = 0; z < 8; z++) if (!tracks[z].data.empty()) {		// // //
+		channel = z;
+		append(0);
 	}
 
 
@@ -2922,32 +2916,12 @@ void Music::pointersFirstPass()
 	}
 
 	int binpos = 0;		// // //
-
-	if (data[0].size()) phrasePointers[0][0] = 0;
-	binpos = data[0].size();
-
-	if (data[1].size()) phrasePointers[1][0] = binpos;
-	binpos += data[1].size();
-
-	if (data[2].size()) phrasePointers[2][0] = binpos;
-	binpos += data[2].size();
-
-	if (data[3].size()) phrasePointers[3][0] = binpos;
-	binpos += data[3].size();
-
-	if (data[4].size()) phrasePointers[4][0] = binpos;
-	binpos += data[4].size();
-
-	if (data[5].size()) phrasePointers[5][0] = binpos;
-	binpos += data[5].size();
-
-	if (data[6].size()) phrasePointers[6][0] = binpos;
-	binpos += data[6].size();
-
-	if (data[7].size()) phrasePointers[7][0] = binpos;
-
-	for (i = 0; i < 8; i++)
-		phrasePointers[i][1] += phrasePointers[i][0];
+	for (int i = 0; i < 8; ++i) {
+		if (!tracks[i].data.empty())
+			tracks[i].phrasePointers[0] = binpos;
+		tracks[i].phrasePointers[1] += tracks[i].phrasePointers[0];
+		binpos += tracks[i].data.size();
+	}
 
 	playOnce = doesntLoop;
 
@@ -2999,44 +2973,21 @@ void Music::pointersFirstPass()
 	}
 
 	add += instrumentData.size();
-	allPointersAndInstrs[0 + add] = data[0].size() != 0 ? (phrasePointers[0][0] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-	allPointersAndInstrs[1 + add] = data[0].size() != 0 ? (phrasePointers[0][0] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-	allPointersAndInstrs[2 + add] = data[1].size() != 0 ? (phrasePointers[1][0] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-	allPointersAndInstrs[3 + add] = data[1].size() != 0 ? (phrasePointers[1][0] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-	allPointersAndInstrs[4 + add] = data[2].size() != 0 ? (phrasePointers[2][0] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-	allPointersAndInstrs[5 + add] = data[2].size() != 0 ? (phrasePointers[2][0] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-	allPointersAndInstrs[6 + add] = data[3].size() != 0 ? (phrasePointers[3][0] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-	allPointersAndInstrs[7 + add] = data[3].size() != 0 ? (phrasePointers[3][0] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-	allPointersAndInstrs[8 + add] = data[4].size() != 0 ? (phrasePointers[4][0] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-	allPointersAndInstrs[9 + add] = data[4].size() != 0 ? (phrasePointers[4][0] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-	allPointersAndInstrs[10 + add] = data[5].size() != 0 ? (phrasePointers[5][0] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-	allPointersAndInstrs[11 + add] = data[5].size() != 0 ? (phrasePointers[5][0] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-	allPointersAndInstrs[12 + add] = data[6].size() != 0 ? (phrasePointers[6][0] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-	allPointersAndInstrs[13 + add] = data[6].size() != 0 ? (phrasePointers[6][0] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-	allPointersAndInstrs[14 + add] = data[7].size() != 0 ? (phrasePointers[7][0] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-	allPointersAndInstrs[15 + add] = data[7].size() != 0 ? (phrasePointers[7][0] + spaceForPointersAndInstrs) >> 8 : 0xFF;
+	for (int i = 0; i < 8; ++i) {		// // //
+		allPointersAndInstrs[i * 2 + 0 + add] = tracks[i].data.empty() ? 0xFB : ((tracks[i].phrasePointers[0] + spaceForPointersAndInstrs) & 0xFF);
+		allPointersAndInstrs[i * 2 + 1 + add] = tracks[i].data.empty() ? 0xFF : ((tracks[i].phrasePointers[0] + spaceForPointersAndInstrs) >> 8);
+	}
 
 	if (hasIntro)
 	{
-		allPointersAndInstrs[16 + add] = data[0].size() != 0 ? (phrasePointers[0][1] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-		allPointersAndInstrs[17 + add] = data[0].size() != 0 ? (phrasePointers[0][1] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-		allPointersAndInstrs[18 + add] = data[1].size() != 0 ? (phrasePointers[1][1] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-		allPointersAndInstrs[19 + add] = data[1].size() != 0 ? (phrasePointers[1][1] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-		allPointersAndInstrs[20 + add] = data[2].size() != 0 ? (phrasePointers[2][1] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-		allPointersAndInstrs[21 + add] = data[2].size() != 0 ? (phrasePointers[2][1] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-		allPointersAndInstrs[22 + add] = data[3].size() != 0 ? (phrasePointers[3][1] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-		allPointersAndInstrs[23 + add] = data[3].size() != 0 ? (phrasePointers[3][1] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-		allPointersAndInstrs[24 + add] = data[4].size() != 0 ? (phrasePointers[4][1] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-		allPointersAndInstrs[25 + add] = data[4].size() != 0 ? (phrasePointers[4][1] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-		allPointersAndInstrs[26 + add] = data[5].size() != 0 ? (phrasePointers[5][1] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-		allPointersAndInstrs[27 + add] = data[5].size() != 0 ? (phrasePointers[5][1] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-		allPointersAndInstrs[28 + add] = data[6].size() != 0 ? (phrasePointers[6][1] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-		allPointersAndInstrs[29 + add] = data[6].size() != 0 ? (phrasePointers[6][1] + spaceForPointersAndInstrs) >> 8 : 0xFF;
-		allPointersAndInstrs[30 + add] = data[7].size() != 0 ? (phrasePointers[7][1] + spaceForPointersAndInstrs) & 0xFF : 0xFB;
-		allPointersAndInstrs[31 + add] = data[7].size() != 0 ? (phrasePointers[7][1] + spaceForPointersAndInstrs) >> 8 : 0xFF;
+		for (int i = 0; i < 8; ++i) {		// // //
+			allPointersAndInstrs[i * 2 + 16 + add] = tracks[i].data.empty() ? 0xFB : ((tracks[i].phrasePointers[1] + spaceForPointersAndInstrs) & 0xFF);
+			allPointersAndInstrs[i * 2 + 17 + add] = tracks[i].data.empty() ? 0xFF : ((tracks[i].phrasePointers[1] + spaceForPointersAndInstrs) >> 8);
+		}
 	}
 
-	totalSize = data[0].size() + data[1].size() + data[2].size() + data[3].size() + data[4].size() + data[5].size() + data[6].size() + data[7].size() + data[8].size() + spaceForPointersAndInstrs;
+	totalSize = spaceForPointersAndInstrs;
+	std::for_each(std::cbegin(tracks), std::cend(tracks), [&] (const Track &t) { totalSize += t.data.size(); });		// // //
 
 
 
@@ -3044,8 +2995,8 @@ void Music::pointersFirstPass()
 	unsigned int totalLength;
 	mainLength = -1;
 	for (i = 0; i < 8; i++)
-	if (channelLengths[i] != 0)
-		mainLength = std::min(mainLength, (unsigned int)channelLengths[i]);
+		if (tracks[i].channelLength != 0)		// // //
+			mainLength = std::min(mainLength, (unsigned int)tracks[i].channelLength);
 	if (mainLength == -1)
 		error("This song doesn't seem to have any data.");		// // //
 
@@ -3114,9 +3065,13 @@ void Music::pointersFirstPass()
 	//{
 	if (verbose)
 	{
-		printf("\t#0: 0x%03X #1: 0x%03X #2: 0x%03X #3: 0x%03X Ptrs+Instrs: 0x%03X\n\t#4: 0x%03X #5: 0x%03X #6: 0x%03X #7: 0x%03X Loop:        0x%03X \n", (unsigned int)data[0].size(), (unsigned int)data[1].size(), (unsigned int)data[2].size(), (unsigned int)data[3].size(), spaceForPointersAndInstrs, (unsigned int)data[4].size(), (unsigned int)data[5].size(), (unsigned int)data[6].size(), (unsigned int)data[7].size(), (unsigned int)data[8].size());
-
-		printf("Space used by echo: 0x%04X bytes.  Space used by samples: 0x%04X bytes.\n\n", echoBufferSize << 11, spaceUsedBySamples);
+		// // //
+		printf("\t#0: 0x%03X #1: 0x%03X #2: 0x%03X #3: 0x%03X Ptrs+Instrs: 0x%03X\n"
+			   "\t#4: 0x%03X #5: 0x%03X #6: 0x%03X #7: 0x%03X Loop:        0x%03X\n"
+			   "Space used by echo: 0x%04X bytes.  Space used by samples: 0x%04X bytes.\n\n",
+			   tracks[0].data.size(), tracks[1].data.size(), tracks[2].data.size(), tracks[3].data.size(), spaceForPointersAndInstrs,
+			   tracks[4].data.size(), tracks[5].data.size(), tracks[6].data.size(), tracks[7].data.size(), tracks[8].data.size(),
+			   echoBufferSize << 11, spaceUsedBySamples);
 	}
 	//}
 	if (totalSize > minSize && minSize > 0)
@@ -3124,31 +3079,26 @@ void Music::pointersFirstPass()
 
 	std::stringstream statStrStream;
 
-	statStrStream << "CHANNEL 0 SIZE:				0x" << hex4 << data[0].size() << "\n";
-	statStrStream << "CHANNEL 1 SIZE:				0x" << hex4 << data[1].size() << "\n";
-	statStrStream << "CHANNEL 2 SIZE:				0x" << hex4 << data[2].size() << "\n";
-	statStrStream << "CHANNEL 3 SIZE:				0x" << hex4 << data[3].size() << "\n";
-	statStrStream << "CHANNEL 4 SIZE:				0x" << hex4 << data[4].size() << "\n";
-	statStrStream << "CHANNEL 5 SIZE:				0x" << hex4 << data[5].size() << "\n";
-	statStrStream << "CHANNEL 6 SIZE:				0x" << hex4 << data[6].size() << "\n";
-	statStrStream << "CHANNEL 7 SIZE:				0x" << hex4 << data[7].size() << "\n";
-	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << data[8].size() << "\n";
+	for (int i = 0; i < 8; ++i)		// // //
+		statStrStream << "CHANNEL " << ('0' + i) << " SIZE:				0x" << hex4 << tracks[i].data.size() << "\n";
+	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << tracks[8].data.size() << "\n";
 	statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << spaceForPointersAndInstrs << "\n";
 	statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
 	statStrStream << "ECHO SIZE:				0x" << hex4 << (echoBufferSize << 11) << "\n";
-	statStrStream << "SONG TOTAL DATA SIZE:			0x" << hex4 << data[0].size() + data[1].size() + data[2].size() + data[3].size() + data[4].size() + data[5].size() + data[6].size() + data[7].size() + data[8].size() + spaceForPointersAndInstrs << "\n";
+
+	int totalSize = spaceForPointersAndInstrs;		// // //
+	std::for_each(std::cbegin(tracks), std::cend(tracks), [&] (const Track &x) { totalSize += x.data.size(); });
+	statStrStream << "SONG TOTAL DATA SIZE:			0x" << hex4 << totalSize << "\n";
+
 	if (index > highestGlobalSong)
 		statStrStream << "FREE ARAM (APPROXIMATE):		0x" << hex4 << 0x10000 - (echoBufferSize << 11) - spaceUsedBySamples - totalSize - programUploadPos << "\n\n";
 	else
 		statStrStream << "FREE ARAM (APPROXIMATE):		UNKNOWN\n\n";
-	statStrStream << "CHANNEL 0 TICKS:			0x" << hex4 << channelLengths[0] << "\n";
-	statStrStream << "CHANNEL 1 TICKS:			0x" << hex4 << channelLengths[1] << "\n";
-	statStrStream << "CHANNEL 2 TICKS:			0x" << hex4 << channelLengths[2] << "\n";
-	statStrStream << "CHANNEL 3 TICKS:			0x" << hex4 << channelLengths[3] << "\n";
-	statStrStream << "CHANNEL 4 TICKS:			0x" << hex4 << channelLengths[4] << "\n";
-	statStrStream << "CHANNEL 5 TICKS:			0x" << hex4 << channelLengths[5] << "\n";
-	statStrStream << "CHANNEL 6 TICKS:			0x" << hex4 << channelLengths[6] << "\n";
-	statStrStream << "CHANNEL 7 TICKS:			0x" << hex4 << channelLengths[7] << "\n\n";
+
+	for (int i = 0; i < 8; ++i)		// // //
+		statStrStream << "CHANNEL " << ('0' + i) << " TICKS:			0x" << hex4 << tracks[i].channelLength << "\n";
+	statStrStream << '\n';
+
 	if (knowsLength)
 	{
 		statStrStream << "SONG INTRO LENGTH IN SECONDS:		" << std::dec << introSeconds << "\n";
@@ -3430,7 +3380,7 @@ void Music::handleNormalLoopExit(int loopCount)
 	{
 		baseLoopIsNormal = false;
 		baseLoopIsSuper = false;
-		channelLengths[channel] += normalLoopLength * loopCount;
+		tracks[channel].channelLength += normalLoopLength * loopCount;		// // //
 	}
 
 	if (loopLabel > 0)
@@ -3452,7 +3402,7 @@ void Music::handleSuperLoopExit(int loopCount)
 	{
 		baseLoopIsNormal = false;
 		baseLoopIsSuper = false;
-		channelLengths[channel] += superLoopLength * loopCount;
+		tracks[channel].channelLength += superLoopLength * loopCount;		// // //
 	}
 }
 
@@ -3485,7 +3435,7 @@ void Music::addNoteLength(double ticks)
 	}
 	else
 	{
-		channelLengths[channel] += ticks;
+		tracks[channel].channelLength += ticks;		// // //
 	}
 }
 
