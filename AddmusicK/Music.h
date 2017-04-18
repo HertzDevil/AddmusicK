@@ -40,6 +40,7 @@ struct Track
 	bool usingFA = false;
 	bool usingFC = false;
 	bool ignoreTuning = false; // Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
+	bool isDefiningLoop = false;		// // //
 };
 
 // // //
@@ -201,6 +202,7 @@ private:
 	int getInt(const std::string &str, int &p);
 	int getIntWithNegative();
 	int getHex(bool anyLength = false);
+	bool getHexByte(int &out);		// // //
 	int getPitch(int j);
 	int getNoteLength(int);
 	std::string getQuotedString();		// // //

@@ -11,6 +11,7 @@ Assume that only AddmusicK will be modified and the 4 other projects in the solu
 - [x] Replace `boost::filesystem` with `std::experimental::filesystem`
 - [ ] Remove VS-exclusive bloat
 - [ ] Decompose pretty much everything in `Music.cpp`
+- [ ] Bring in the `Chunk` classes I wrote a while ago (originally for 0CC-FT)
 - [ ] Makefiles (maybe)
 
 #### Compiler stuffs
@@ -22,7 +23,7 @@ Assume that only AddmusicK will be modified and the 4 other projects in the solu
 
 #### MML stuffs
 
-- [ ] Separate `o`/`l`/`q` states for each track
+- [ ] Separate `o`/`l`/`h`/`q` states for each track
 - [ ] Key signature support
 - [ ] Legible names for all commands
 - [ ] Track multiplexing (e.g. `#0123`)
@@ -33,6 +34,5 @@ Assume that only AddmusicK will be modified and the 4 other projects in the solu
 
 - [ ] Hex validation, there is no reason to once all commands have names
 - [ ] Lexical substitution macros, they must occur at the token level
-- [ ] Some of the whitespace requirements
-- [ ] Case-insensitivity
+- [ ] Whitespace requirements, missing post-conditions, case-insensitivity etc.
 - [ ] If this really gets used by people in the future, drop support for everything below `#amk 2`
