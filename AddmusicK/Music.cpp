@@ -239,8 +239,6 @@ void Music::init() {
 
 	baseLoopIsNormal = baseLoopIsSuper = extraLoopIsNormal = extraLoopIsSuper = false;
 	// // //
-	for (i = 0; i < 0x10000; i++)
-		loopLengths[i] = 0;
 
 	inE6Loop = false;
 	seconds = 0;
@@ -283,9 +281,6 @@ void Music::init() {
 
 	for (int z = 0; z < 16; z++)	// Add some spaces to the end.
 		text += ' ';
-
-	for (int z = 0; z < 0x10000; z++)
-		loopPointers[z] = ~0;
 
 	trim("\xEF\xBB\xBF");		// // // utf-8 bom
 
@@ -825,6 +820,8 @@ void Music::parseLabelLoopCommand() {
 			if (trimChar('['))		// // //
 				error("Remote code cannot be defined within a channel.");
 			tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
+			if (loopPointers.find(i) == loopPointers.cend())		// // //
+				loopPointers.insert({i, -1});
 			append(AMKd::Binary::CmdType::Callback, loopPointers[i] & 0xFF, loopPointers[i] >> 8, j, k);
 			return;
 		}
@@ -872,7 +869,9 @@ void Music::parseLabelLoopCommand() {
 
 		prevNoteLength = -1;
 
-		if ((unsigned short)loopPointers[loopLabel] == (unsigned short)-1) error("Label not yet defined.");
+		auto it = loopPointers.find(loopLabel);		// // //
+		if (it == loopPointers.cend())
+			error("Label not yet defined.");
 		j = getInt();
 		if (j == -1) j = 1;
 		if (j < 1 || j > 255) {
@@ -883,7 +882,7 @@ void Music::parseLabelLoopCommand() {
 		handleNormalLoopRemoteCall(j);
 
 		tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
-		append(AMKd::Binary::CmdType::Loop, loopPointers[i] & 0xFF, loopPointers[i] >> 8, j);
+		append(AMKd::Binary::CmdType::Loop, it->second & 0xFF, it->second >> 8, j);
 
 		loopLabel = 0;
 	}
@@ -921,11 +920,8 @@ void Music::parseLoopCommand() {
 	if (songTargetProgram == TargetType::AM4)
 		tracks[CHANNELS].ignoreTuning = tracks[prevChannel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
 
-	if (loopLabel > 0) {
-		if ((signed short)loopPointers[loopLabel] != -1) {
-			error("Label redefinition.");
-		}
-	}
+	if (loopLabel > 0 && loopPointers.find(loopLabel) != loopPointers.cend())		// // //
+		error("Label redefinition.");
 
 	if (loopLabel > 0)
 		loopPointers[loopLabel] = prevLoop;
@@ -2252,13 +2248,13 @@ void Music::pointersFirstPass() {
 		error("This song contained no musical data!");
 
 	if (targetAMKVersion == 1)			// Handle more conversion of the old $FC command to remote call.
-		for (channel = 0; channel <= CHANNELS; channel++) {
-			for (unsigned int z = 0, n = remoteGainPositions[channel].size(); z < n; ++z) {
-				size_t dataIndex = remoteGainPositions[channel][z];
-				tracks[channel].loopLocations.push_back(dataIndex);		// // //
+		for (int ch = 0; ch <= CHANNELS; ++ch) {
+			for (unsigned int z = 0, n = remoteGainPositions[ch].size(); z < n; ++z) {
+				size_t dataIndex = remoteGainPositions[ch][z];
+				tracks[ch].loopLocations.push_back(dataIndex);		// // //
 
-				tracks[channel].data[dataIndex] = tracks[CHANNELS].data.size() & 0xFF;
-				tracks[channel].data[dataIndex + 1] = tracks[CHANNELS].data.size() >> 8;
+				tracks[ch].data[dataIndex] = tracks[CHANNELS].data.size() & 0xFF;
+				tracks[ch].data[dataIndex + 1] = tracks[CHANNELS].data.size() >> 8;
 
 				tracks[CHANNELS].data.insert(tracks[CHANNELS].data.end(), remoteGainConversion[z].cbegin(), remoteGainConversion[z].cend());		// // //
 			}
@@ -2277,10 +2273,8 @@ void Music::pointersFirstPass() {
 		}
 	}
 
-	for (int z = 0; z < CHANNELS; z++) if (!tracks[z].data.empty()) {		// // //
-		channel = z;
-		append(AMKd::Binary::CmdType::End);
-	}
+	for (int z = 0; z < CHANNELS; z++) if (!tracks[z].data.empty())		// // //
+		tracks[z].data.push_back(AMKd::Binary::CmdType::End);
 
 	if (mySamples.empty())		// // // If no sample groups were provided...
 		addSampleGroup("default", this);		// // //

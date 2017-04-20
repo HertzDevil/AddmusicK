@@ -71,7 +71,7 @@ public:
 	std::string pathlessSongName;
 	bool playOnce;
 	bool hasIntro;
-	unsigned short loopPointers[0x10000];
+	std::map<int, uint16_t> loopPointers;		// // //
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
 	std::string text;
 	int totalSize;
@@ -212,7 +212,7 @@ private:
 	bool guessLength;
 	int resizedChannel;
 	
-	double loopLengths[0x10000];				// How many ticks are in each loop.
+	std::map<int, double> loopLengths;		// // // How many ticks are in each loop.
 	double normalLoopLength;				// How many ticks were in the most previously declared normal loop.
 	double superLoopLength;					// How many ticks were in the most previously declared super loop.
 	std::vector<std::pair<double, int>> tempoChanges;	// Where any changes in tempo occur. A negative tempo marks the beginning of the main loop, if an intro exists.
