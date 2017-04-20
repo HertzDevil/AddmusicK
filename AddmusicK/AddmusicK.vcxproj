@@ -150,6 +150,7 @@
     <ClInclude Include="asardll.h" />
     <ClInclude Include="BankDefine.h" />
     <ClInclude Include="D:\C++\lodepng\lodepng.h" />
+    <ClInclude Include="Binary\Defines.h" />
     <ClInclude Include="Directory.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="MML\Lexer.h" />

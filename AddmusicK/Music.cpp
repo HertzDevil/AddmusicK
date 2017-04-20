@@ -92,8 +92,10 @@ std::string current;
 //static bool songVersionIdentified;
 //static int hTranspose = 0;00
 
-#define SWALLOW(x) if (false); else \
-	(void)(int[]) {0, ((x), 0)...}
+#define SWALLOW(x) do { \
+		using _swallow = int[]; \
+		(void)_swallow {0, ((x), 0)...}; \
+	} while (false)
 
 
 
@@ -1761,10 +1763,8 @@ void Music::parseOptionDirective() {
 void Music::parseSpecialDirective() {
 	if (trimDirective("instruments"))		// // //
 		parseInstrumentDefinitions();
-	else if (trimDirective("samples")) {		// // //
+	else if (trimDirective("samples"))		// // //
 		parseSampleDefinitions();
-		skipChars(1);
-	}
 	else if (trimDirective("pad"))		// // //
 		parsePadDefinition();
 	else if (trimDirective("define"))		// // //
@@ -2012,14 +2012,11 @@ void Music::parseSampleDefinitions() {
 
 	if (!trimChar('{'))		// // //
 		fatalError("Unexpected character in sample group definition.  Expected \"{\".");
-	skipChars(1);		// // //
 
-	while (text.front() != '}') {
-		if (text.empty())
-			EOFTooEarly:												// Oh, laziness.
-		fatalError("Unexpected end of file found while parsing sample group definition.");
-
+	while (true) {		// // //
 		skipSpaces();
+		if (text.empty())
+			fatalError("Unexpected end of file found while parsing sample group definition.");
 
 		if (text.front() == '\"') {
 			std::string tempstr = basepath + getQuotedString();		// // //
@@ -2035,22 +2032,23 @@ void Music::parseSampleDefinitions() {
 			else
 				fatalError("The filename for the sample was invalid.  Only \".brr\" and \".bnk\" are allowed.");		// // //
 		}
-		else if (text.front() == '#') {
-			skipChars(1);
+		else if (trimChar('#')) {
 			std::string tempstr;
-			while (isspace(text.front()) == false) {
-				if (text.empty()) goto EOFTooEarly;		// // //
+			while (true) {
+				if (text.empty())		// // //
+					fatalError("Unexpected end of file found while parsing sample group definition.");
+				if (isspace(text.front()))
+					break;
 				tempstr += text.front();
 				skipChars(1);
 			}
 
 			addSampleGroup(tempstr, this);
 		}
-		else if (text.front() == '}')
-			break;
-		else if (isspace(text.front()) == false) {
+		else if (trimChar('}'))
+			return;
+		else
 			fatalError("Unexpected character found in sample group definition.");
-		}
 	}
 }
 
@@ -2288,10 +2286,8 @@ void Music::pointersFirstPass() {
 		append(0);
 	}
 
-	if (mySamples.empty()) {		// // // If no sample groups were provided...
-		text = "{#default }";		// This is a dumb, cheap trick, but...eh.
-		parseSampleDefinitions();
-	}
+	if (mySamples.empty())		// // // If no sample groups were provided...
+		addSampleGroup("default", this);		// // //
 
 	if (game.empty())
 		game = "Super Mario World (custom)";
