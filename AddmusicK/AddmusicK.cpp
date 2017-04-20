@@ -1140,35 +1140,29 @@ void fixMusicPointers()
 
 			int temp = musics[i].allPointersAndInstrs[j] | musics[i].allPointersAndInstrs[j+1] << 8;
 
-			if (temp == 0xFFFF)		// 0xFFFF = swap with 0x0000.
-			{
+			if (temp == 0xFFFF) {		// 0xFFFF = swap with 0x0000.
 				musics[i].allPointersAndInstrs[j] = 0;
 				musics[i].allPointersAndInstrs[j+1] = 0;
 				untilJump = 1;
 			}
-			else if (temp == 0xFFFE)	// 0xFFFE = swap with 0x00FF.
-			{
+			else if (temp == 0xFFFE) {	// 0xFFFE = swap with 0x00FF.
 				musics[i].allPointersAndInstrs[j] = 0xFF;
 				musics[i].allPointersAndInstrs[j+1] = 0;
 				untilJump = 2;
 			}
-			else if (temp == 0xFFFD)	// 0xFFFD = swap with the song's position (its first track pointer).
-			{
+			else if (temp == 0xFFFD) {	// 0xFFFD = swap with the song's position (its first track pointer).
 				musics[i].allPointersAndInstrs[j] = (musics[i].posInARAM + 2) & 0xFF;
 				musics[i].allPointersAndInstrs[j+1] = (musics[i].posInARAM + 2) >> 8;
 			}
-			else if (temp == 0xFFFC)	// 0xFFFC = swap with the song's position + 2 (its second track pointer).
-			{
+			else if (temp == 0xFFFC) {	// 0xFFFC = swap with the song's position + 2 (its second track pointer).
 				musics[i].allPointersAndInstrs[j] = musics[i].posInARAM & 0xFF;
 				musics[i].allPointersAndInstrs[j+1] = musics[i].posInARAM >> 8;
 			}
-			else if (temp == 0xFFFB)	// 0xFFFB = swap with 0x0000, but don't set untilSkip.
-			{
+			else if (temp == 0xFFFB) {	// 0xFFFB = swap with 0x0000, but don't set untilSkip.
 				musics[i].allPointersAndInstrs[j] = 0;
 				musics[i].allPointersAndInstrs[j+1] = 0;
 			}
-			else
-			{
+			else {
 				temp += musics[i].posInARAM;
 				musics[i].allPointersAndInstrs[j] = temp & 0xFF;
 				musics[i].allPointersAndInstrs[j+1] = temp >> 8;
@@ -1177,16 +1171,15 @@ void fixMusicPointers()
 		}
 
 		int normalChannelsSize = 0;		// // //
-		for (int j = 0; j < 8; ++j)
+		for (int j = 0; j < CHANNELS; ++j)
 			normalChannelsSize += musics[i].tracks[j].data.size();
 
 		for (Track &t : musics[i].tracks) {		// // //
-			for (unsigned int k = 0; k < t.loopLocations.size(); k++)
-			{
-				int temp = (t.data[t.loopLocations[k]] & 0xFF) | (t.data[t.loopLocations[k] + 1] << 8);
+			for (unsigned short x : t.loopLocations) {
+				int temp = (t.data[x] & 0xFF) | (t.data[x + 1] << 8);
 				temp += musics[i].posInARAM + normalChannelsSize + musics[i].spaceForPointersAndInstrs;
-				t.data[t.loopLocations[k]] = temp & 0xFF;
-				t.data[t.loopLocations[k] + 1] = temp >> 8;
+				t.data[x] = temp & 0xFF;
+				t.data[x + 1] = temp >> 8;
 			}
 		}
 

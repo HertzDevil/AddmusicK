@@ -11,6 +11,7 @@
 #include <locale>		// // //
 
 #include "Utility/Trie.h"		// // //
+#include "Binary/Defines.h"		// // //
 #include <functional>
 
 //#include "Preprocessor.h"
@@ -68,7 +69,7 @@ static int loopNestLevel;		// How deep we're "loop nested".
 // If this is 1 and we're in an $E6 loop, then $E6 loops are disallowed and normal loops are allowed.
 // If this is 2, then no new loops are allowed.
 
-//static unsigned int lengths[8];		// How long each channel is.
+//static unsigned int lengths[CHANNELS];		// How long each channel is.
 
 static unsigned int tempo;
 //static bool onlyHadOneTempo;
@@ -238,7 +239,7 @@ void Music::init() {
 
 	baseLoopIsNormal = baseLoopIsSuper = extraLoopIsNormal = extraLoopIsSuper = false;
 	// // //
-	for (i = 0; i < 10000; i++)
+	for (i = 0; i < 0x10000; i++)
 		loopLengths[i] = 0;
 
 	inE6Loop = false;
@@ -398,6 +399,7 @@ void Music::compile() {
 #ifdef _DEBUG
 		current = text;
 #endif
+		skipSpaces();		// // //
 		if (!doReplacement(text))		// // //
 			fatalError("Infinite lexical macro substitution.");
 
@@ -406,10 +408,10 @@ void Music::compile() {
 			break;
 
 		if (hexLeft != 0 && text.front() != '$') {
-			if (currentHex == 0xE6 && songTargetProgram == TargetType::AM4) {		// // //
+			if (songTargetProgram == TargetType::AM4 && currentHex == AMKd::Binary::CmdType::Subloop) {		// // //
 				// tremolo off
 				tracks[channel].data.pop_back();
-				append(0xE5, 0x00, 0x00, 0x00);
+				append(AMKd::Binary::CmdType::Tremolo, 0x00, 0x00, 0x00);
 				hexLeft = 0;
 			}
 			else
@@ -417,42 +419,39 @@ void Music::compile() {
 		}
 
 		switch (tolower(text.front())) {
-		case '?': skipChars(1); parseQMarkDirective();	break;
-			//case '!': skipChars(1); parseExMarkDirective();	break;
-		case '#': skipChars(1); parseChannelDirective();	break;
-		case 'l': skipChars(1); parseLDirective();		break;
-		case 'w': skipChars(1); parseGlobalVolumeCommand();	break;
-		case 'v': skipChars(1); parseVolumeCommand();		break;
-		case 'q': skipChars(1); parseQuantizationCommand();	break;
-		case 'y': skipChars(1); parsePanCommand();		break;
-		case '/': skipChars(1); parseIntroDirective();	break;
-		case 't': skipChars(1); parseT();			break;
-		case 'o': skipChars(1); parseOctaveDirective();	break;
-		case '@': skipChars(1); parseInstrumentCommand();	break;
-		case '(': skipChars(1); parseOpenParenCommand();	break;
-		case '[': skipChars(1); parseLoopCommand();		break;
-		case ']': skipChars(1); parseLoopEndCommand();	break;
-		case '*': skipChars(1); parseStarLoopCommand();	break;
-		case 'p': skipChars(1); parseVibratoCommand();	break;
+		case '?': skipChars(1); parseQMarkDirective();			break;
+//		case '!': skipChars(1); parseExMarkDirective();			break;
+		case '#': skipChars(1); parseChannelDirective();		break;
+		case 'l': skipChars(1); parseLDirective();				break;
+		case 'w': skipChars(1); parseGlobalVolumeCommand();		break;
+		case 'v': skipChars(1); parseVolumeCommand();			break;
+		case 'q': skipChars(1); parseQuantizationCommand();		break;
+		case 'y': skipChars(1); parsePanCommand();				break;
+		case '/': skipChars(1); parseIntroDirective();			break;
+		case 't': skipChars(1); parseT();						break;
+		case 'o': skipChars(1); parseOctaveDirective();			break;
+		case '@': skipChars(1); parseInstrumentCommand();		break;
+		case '(': skipChars(1); parseOpenParenCommand();		break;
+		case '[': skipChars(1); parseLoopCommand();				break;
+		case ']': skipChars(1); parseLoopEndCommand();			break;
+		case '*': skipChars(1); parseStarLoopCommand();			break;
+		case 'p': skipChars(1); parseVibratoCommand();			break;
 		case '{': skipChars(1); parseTripletOpenDirective();	break;
 		case '}': skipChars(1); parseTripletCloseDirective();	break;
 		case '>': skipChars(1); parseRaiseOctaveDirective();	break;
 		case '<': skipChars(1); parseLowerOctaveDirective();	break;
-		case '&': skipChars(1); parsePitchSlideCommand();	break;
-		case '$': skipChars(1); parseHexCommand();		break;
-		case 'h': skipChars(1); parseHDirective();		break;
-		case 'n': skipChars(1); parseNCommand();		break;
-		case '\"': parseReplacementDirective();	break;
-		case '\n': skipChars(1); line++;		break;
-		case '|': skipChars(1); hexLeft = 0;		break;
+		case '&': skipChars(1); parsePitchSlideCommand();		break;
+		case '$': skipChars(1); parseHexCommand();				break;
+		case 'h': skipChars(1); parseHDirective();				break;
+		case 'n': skipChars(1); parseNCommand();				break;
+		case '\"': parseReplacementDirective();					break;
+		case '|': skipChars(1); hexLeft = 0;					break;
 		case 'c': case 'd': case 'e': case 'f': case 'g': case 'a': case 'b': case 'r': case '^':
-			parseNote();			break;
-		case ';':
-			parseComment();			break;		// Needed for comments in quotes
+			parseNote();										break;
+		case ';': skipChars(1); parseComment();					break;		// Needed for comments in quotes
 		default:
-			if (!isspace(text.front()))
-				std::cerr << "File " << name << ", line " << line
-					<< ": Unexpected character \"" << text.front() << "\" found." << std::endl;
+			std::cerr << "File " << name << ", line " << line
+				<< ": Unexpected character \"" << text.front() << "\" found." << std::endl;
 			skipChars(1); break;
 		}
 	}
@@ -462,7 +461,6 @@ void Music::compile() {
 
 void Music::parseComment() {
 	if (songTargetProgram == TargetType::AMM) {		// // //
-		skipChars(1);
 		while (!text.empty()) {		// // //
 			if (text.front() == '\n')
 				break;
@@ -470,10 +468,8 @@ void Music::parseComment() {
 		}
 		line++;
 	}
-	else {
-		skipChars(1);
+	else
 		error("Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2.");		// // //
-	}
 }
 
 void Music::printChannelDataNonVerbose(int totalSize) {
@@ -512,17 +508,17 @@ void Music::parseChannelDirective() {
 
 	i = getInt();
 	if (i == -1) error("Error parsing channel directive.");		// // //
-	if (i < 0 || i > 7) error("Illegal value for channel directive.");		// // //
+	if (i < 0 || i >= CHANNELS) error("Illegal value for channel directive.");		// // //
 
 	channel = i;
-	tracks[8].q = tracks[channel].q;		// // //
-	tracks[8].updateQ = tracks[channel].updateQ;
+	tracks[CHANNELS].q = tracks[channel].q;		// // //
+	tracks[CHANNELS].updateQ = tracks[channel].updateQ;
 	prevNoteLength = -1;
 
 	hTranspose = 0;
 	usingHTranspose = false;
 	channelDefined = true;
-	/*for (int u = 0; u < 18; u++)
+	/*for (int u = 0; u < CHANNELS * 2; u++)
 	{
 	if (htranspose[u])			// Undo what the h directive did.
 	transposeMap[u] = tmpTrans[u];
@@ -544,7 +540,7 @@ void Music::parseGlobalVolumeCommand() {
 	if (i == -1) error("Error parsing global volume (\"w\") command.");		// // //
 	if (i < 0 || i > 255) error("Illegal value for global volume (\"w\") command.");		// // //
 
-	append(0xE0, i);		// // //
+	append(AMKd::Binary::CmdType::VolGlobal, i);		// // //
 }
 
 void Music::parseVolumeCommand() {
@@ -553,7 +549,7 @@ void Music::parseVolumeCommand() {
 	if (i == -1) error("Error parsing volume (\"v\") command.");		// // //
 	if (i < 0 || i > 255) error("Illegal value for global volume (\"v\") command.");		// // //
 
-	append(0xE7, i);		// // //
+	append(AMKd::Binary::CmdType::Vol, i);		// // //
 }
 
 void Music::parseQuantizationCommand() {
@@ -561,7 +557,7 @@ void Music::parseQuantizationCommand() {
 	if (i == -1) error("Error parsing quantization (\"q\") command.");		// // //
 	if (i < 1 || i > 0x7F) error("Error parsing quantization (\"q\") command.");		// // //
 
-	if (channel == 8) {
+	if (channel == CHANNELS) {
 		tracks[prevChannel].q = i;		// // //
 		tracks[prevChannel].updateQ = true;
 	}
@@ -593,18 +589,19 @@ void Music::parsePanCommand() {
 		pan |= (i << 6);
 	}
 
-	append(0xDB, pan);		// // //
+	append(AMKd::Binary::CmdType::Pan, pan);		// // //
 }
 
 void Music::parseIntroDirective() {
-	if (channel == 8) error("Intro directive found within a loop.");		// // //
+	if (channel == CHANNELS)
+		error("Intro directive found within a loop.");		// // //
 
 	if (hasIntro == false)
 		tempoChanges.emplace_back(tracks[channel].channelLength, -static_cast<int>(tempo));		// // //
-	else
-		for (size_t z = 0; z < tempoChanges.size(); z++)
-			if (tempoChanges[z].second < 0)
-				tempoChanges[z].second = -((int)tempo);
+	else		// // //
+		for (auto &x : tempoChanges)
+			if (x.second < 0)
+				x.second = -((int)tempo);
 
 	hasIntro = true;
 	tracks[channel].phrasePointers[1] = tracks[channel].data.size();		// // //
@@ -636,12 +633,12 @@ void Music::parseTempoCommand() {
 	tempo = i;
 	tempoDefined = true;
 
-	if (channel == 8 || inE6Loop)								// Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
+	if (channel == CHANNELS || inE6Loop)								// Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
 		guessLength = false;
 	else
 		tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
 
-	append(0xE2, tempo);		// // //
+	append(AMKd::Binary::CmdType::Tempo, tempo);		// // //
 }
 
 void Music::parseTransposeDirective() {
@@ -710,7 +707,7 @@ void Music::parseInstrumentCommand() {
 		if (songTargetProgram == TargetType::AM4)		// // //
 			tracks[channel].ignoreTuning = false;
 
-		append(0xDA, i);		// // //
+		append(AMKd::Binary::CmdType::Inst, i);		// // //
 	}
 
 	if (i < 30)
@@ -774,7 +771,7 @@ void Music::parseSampleLoadCommand() {
 	if (optimizeSampleUsage)
 		usedSamples[i] = true;
 
-	append(0xF3, i, j);		// // //
+	append(AMKd::Binary::CmdType::SampleLoad, i, j);		// // //
 }
 
 void Music::parseLabelLoopCommand() {
@@ -827,9 +824,8 @@ void Music::parseLabelLoopCommand() {
 
 			if (trimChar('['))		// // //
 				error("Remote code cannot be defined within a channel.");
-			append(0xFC);
-			tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
-			append(loopPointers[i] & 0xFF, loopPointers[i] >> 8, j, k);
+			tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
+			append(AMKd::Binary::CmdType::Callback, loopPointers[i] & 0xFF, loopPointers[i] >> 8, j, k);
 			return;
 		}
 		else								// We're outside of a channel, this is a remote call definition.
@@ -852,7 +848,8 @@ void Music::parseLabelLoopCommand() {
 			return;
 		}
 	}
-	if (channel == 8) error("Nested loops are not allowed.");		// // //
+	if (channel == CHANNELS)
+		error("Nested loops are not allowed.");		// // //
 	i = getInt();
 	if (i == -1) error("Error parsing label loop.");		// // //
 	i++;						// Needed to allow for songs that used label 0.
@@ -863,7 +860,7 @@ void Music::parseLabelLoopCommand() {
 		error("Error parsing label loop.");
 
 	tracks[channel].updateQ = true;
-	tracks[8].updateQ = true;
+	tracks[CHANNELS].updateQ = true;
 	prevNoteLength = -1;
 
 	if (text.front() == '[') {				// If this is a loop definition...
@@ -885,18 +882,17 @@ void Music::parseLabelLoopCommand() {
 
 		handleNormalLoopRemoteCall(j);
 
-		append(0xE9);
-		tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
-		append(loopPointers[i] & 0xFF, loopPointers[i] >> 8, j);
+		tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
+		append(AMKd::Binary::CmdType::Loop, loopPointers[i] & 0xFF, loopPointers[i] >> 8, j);
 
 		loopLabel = 0;
 	}
 }
 
 void Music::parseLoopCommand() {
-	if (channel < 8)
+	if (channel < CHANNELS)		// // //
 		tracks[channel].updateQ = true;
-	tracks[8].updateQ = true;
+	tracks[CHANNELS].updateQ = true;
 	prevNoteLength = -1;
 
 	if (trimChar('[')) {		// // // This is an $E6 loop.
@@ -910,19 +906,20 @@ void Music::parseLoopCommand() {
 
 		handleSuperLoopEnter();
 
-		append(0xE6, 0x00);		// // //
+		append(AMKd::Binary::CmdType::Subloop, 0x00);		// // //
 		return;
 	}
-	else if (channel == 8)
+	else if (channel == CHANNELS)
 		error("You cannot nest standard [ ] loops.");
 
-	prevLoop = tracks[8].data.size();
+	prevLoop = tracks[CHANNELS].data.size();		// // //
 
 	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
-	channel = 8;					// So we have to back up the current channel.
+	channel = CHANNELS;					// So we have to back up the current channel.
 	prevNoteLength = -1;
-	tracks[8].instrument = tracks[prevChannel].instrument;		// // //
-	if (songTargetProgram == TargetType::AM4) tracks[8].ignoreTuning = tracks[prevChannel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
+	tracks[CHANNELS].instrument = tracks[prevChannel].instrument;		// // //
+	if (songTargetProgram == TargetType::AM4)
+		tracks[CHANNELS].ignoreTuning = tracks[prevChannel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
 
 	if (loopLabel > 0) {
 		if ((signed short)loopPointers[loopLabel] != -1) {
@@ -937,10 +934,10 @@ void Music::parseLoopCommand() {
 }
 
 void Music::parseLoopEndCommand() {
-	if (channel < 8)
+	if (channel < CHANNELS)
 		tracks[channel].updateQ = true;		// // //
 
-	tracks[8].updateQ = true;
+	tracks[CHANNELS].updateQ = true;
 	prevNoteLength = -1;
 	if (trimChar(']')) {		// // //
 		if (trimChar(']'))
@@ -962,10 +959,11 @@ void Music::parseLoopEndCommand() {
 
 		handleSuperLoopExit(i);
 
-		append(0xE6, i - 1);		// // //
+		append(AMKd::Binary::CmdType::Subloop, i - 1);		// // //
 		return;
 	}
-	else if (channel != 8) error("Loop end found outside of a loop.");
+	else if (channel != CHANNELS)
+		error("Loop end found outside of a loop.");
 	i = getInt();
 	if (i != -1 && inRemoteDefinition)
 		error("Remote code definitions cannot repeat.");		// // //
@@ -980,9 +978,8 @@ void Music::parseLoopEndCommand() {
 	handleNormalLoopExit(i);
 
 	if (!inRemoteDefinition) {
-		append(0xE9);
-		tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
-		append(prevLoop & 0xFF, prevLoop >> 8, i);
+		tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
+		append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, i);
 	}
 	inRemoteDefinition = false;
 	loopLabel = 0;
@@ -990,10 +987,11 @@ void Music::parseLoopEndCommand() {
 }
 
 void Music::parseStarLoopCommand() {
-	if (channel == 8)  error("Nested loops are not allowed.");		// // //
+	if (channel == CHANNELS)
+		error("Nested loops are not allowed.");		// // //
 
 	tracks[channel].updateQ = true;
-	tracks[8].updateQ = true;
+	tracks[CHANNELS].updateQ = true;
 	prevNoteLength = -1;
 
 	i = getInt();
@@ -1005,9 +1003,8 @@ void Music::parseStarLoopCommand() {
 
 	handleNormalLoopRemoteCall(i);
 
-	append(0xE9);
-	tracks[channel].loopLocations.push_back(tracks[channel].data.size());		// // //
-	append(prevLoop & 0xFF, prevLoop >> 8, i);
+	tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
+	append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, i);
 }
 
 void Music::parseVibratoCommand() {
@@ -1030,13 +1027,13 @@ void Music::parseVibratoCommand() {
 		if (t2 < 0 || t2 > 255) error("Illegal value for vibrato rate.");
 		if (t3 < 0 || t3 > 255) error("Illegal value for vibrato extent.");
 
-		append(0xDE, divideByTempoRatio(t1, false), multiplyByTempoRatio(t2), t3);		// // //
+		append(AMKd::Binary::CmdType::Vibrato, divideByTempoRatio(t1, false), multiplyByTempoRatio(t2), t3);		// // //
 	}
 	else {			// The user has not specified the delay.
 		if (t1 < 0 || t1 > 255) error("Illegal value for vibrato rate.");
 		if (t2 < 0 || t2 > 255) error("Illegal value for vibrato extent.");
 
-		append(0xDE, 0x00, multiplyByTempoRatio(t1), t2);		// // //
+		append(AMKd::Binary::CmdType::Vibrato, 0x00, multiplyByTempoRatio(t1), t2);		// // //
 	}
 }
 
@@ -1109,16 +1106,16 @@ void Music::parseHFDHex() {
 
 			if (!(reg == 0x6D || reg == 0x7D))	// Do not write the HFD header hex bytes.
 				if (reg == 0x6C)			// Noise command gets special treatment.
-					append(0xF8, val);		// // //
+					append(AMKd::Binary::CmdType::Noise, val);		// // //
 				else
-					append(0xF6, reg, val);		// // //
+					append(AMKd::Binary::CmdType::DSP, reg, val);		// // //
 			else
 				songTargetProgram = TargetType::AM4;		// // // The HFD header bytes indicate this as being an AM4 song, so it gets AM4 treatment.
 		} break;
 		case 0x81:
 			if (!getHexByte(i))		// // //
 				error("Error while parsing HFD hex command.");
-			append(0xFA, 0x02, i);		// // //
+			append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Transpose, i);		// // //
 			break;
 		case 0x82:
 		{
@@ -1137,7 +1134,7 @@ void Music::parseHFDHex() {
 			for (++bytes; bytes > 0; --bytes) {		// // //
 				if (!getHexByte(i))
 					error("Error while parsing HFD hex command.");
-				// append(0xF7, i, addr >> 8, addr & 0xFF);		// // // Don't do this stuff; we won't know what we're overwriting.
+				// append(AMKd::Binary::CmdType::ARAM, i, addr >> 8, addr & 0xFF);		// // // Don't do this stuff; we won't know what we're overwriting.
 				++addr;
 			}
 		} break;
@@ -1150,9 +1147,9 @@ void Music::parseHFDHex() {
 		return;
 	}
 
-	currentHex = 0xED;
-	hexLeft = hexLengths[currentHex - 0xDA] - 1 - 1;
-	append(0xED, i);		// // //
+	currentHex = AMKd::Binary::CmdType::Envelope;
+	hexLeft = hexLengths[currentHex - AMKd::Binary::CmdType::Inst] - 1 - 1;
+	append(AMKd::Binary::CmdType::Envelope, i);		// // //
 }
 
 //static bool validateTremolo;
@@ -1176,20 +1173,23 @@ void Music::parseHexCommand() {
 		currentHex = i;
 
 		switch (currentHex) {		// // //
-		case 0xE5:
+		case AMKd::Binary::CmdType::TempoFade:
+			guessLength = false; // NOPE.  Nope nope nope nope nope nope nope nope nope nope.
+			break;
+		case AMKd::Binary::CmdType::Tremolo:
 			if (songTargetProgram == TargetType::AM4) {
 				// Don't append yet.  We need to look at the next byte to determine whether to use 0xF3 or 0xE5.
 				hexLeft = 3;
 				return;
 			}
 			break;
-		case 0xED:
+		case AMKd::Binary::CmdType::Envelope:
 			if (songTargetProgram == TargetType::AM4) {
 				parseHFDHex();
 				return;
 			}
 			break;
-		case 0xFB:
+		case AMKd::Binary::CmdType::Arpeggio:
 			if (!getHexByte(j))		// // //
 				error("Error parsing hex command.");
 			if (j >= 0x80)
@@ -1199,28 +1199,29 @@ void Music::parseHexCommand() {
 			nextHexIsArpeggioNoteLength = true;
 			append(currentHex, j);
 			return;
-		case 0xFC:
+		case AMKd::Binary::CmdType::Callback:
 			if (targetAMKVersion > 1)
 				error("$FC has been replaced with remote code in #amk 2 and above.");		// // //
 			else if (targetAMKVersion == 1) {
 				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 					// Add in a "restore instrument" remote call.
-				int channelToCheck = channel == 8 ? prevChannel : channelToCheck = channel;		// // //
+				int channelToCheck = channel == CHANNELS ? prevChannel : channelToCheck = channel;		// // //
 				tracks[channelToCheck].usingFC = true;		// // //
 
 				// If we're just using the FC command and not the FA command as well,
 				if (!tracks[channelToCheck].usingFA) {
 					// Then add the "restore instrument command"
-					remoteGainConversion.push_back(std::vector<byte> {0xF4, 0x09, 0x00});		// // //
+					remoteGainConversion.push_back(std::vector<byte> {
+						AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00
+					});		// // //
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);
-					append(0xFC, 0x00, 0x00, 0xFF, 0x00);
+					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00);
 
 					// Then add in the first part of a "apply gain before a note ends" call.
-					currentHex = 0xFC;
 					hexLeft = 2;
-					remoteGainConversion.push_back(std::vector<byte> {0xFA, 0x01});
+					remoteGainConversion.push_back(std::vector<byte> {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain});
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);
-					append(0xFC, 0x00, 0x00, 0x02);
+					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Release);
 
 					// We won't know the gain and delays until later.
 				}
@@ -1230,11 +1231,10 @@ void Music::parseHexCommand() {
 					// But that's annoying if the commands are separated, so maybe some other time.
 					// Shh.  Don't tell anyone.
 
-					currentHex = 0xFC;
 					hexLeft = 2;
-					remoteGainConversion.push_back(std::vector<byte> {0xFA, 0x01});		// // //
+					remoteGainConversion.push_back(std::vector<byte> {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain});		// // //
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-					append(0xFC, 0x00, 0x00, 0x05);
+					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05);
 					//append(lastFAGainValue[channelToCheck]);
 				}
 				return;
@@ -1242,7 +1242,7 @@ void Music::parseHexCommand() {
 		case 0xFD: case 0xFE: case 0xFF:
 			error("Unknown hex command.");
 		default:
-			if (currentHex < 0xDA && manualNoteWarning) {
+			if (currentHex < AMKd::Binary::CmdType::Inst && manualNoteWarning) {
 				if (targetAMKVersion == 0) {
 					printWarning("Warning: A hex command was found that will act as a note instead of a special\n"
 								 "effect. If this is a song you're using from someone else, you can most likely\n"
@@ -1253,17 +1253,14 @@ void Music::parseHexCommand() {
 				}
 				error("Unknown hex command.");
 			}
-
-			hexLeft = hexLengths[currentHex - 0xDA] - 1;
-			if (currentHex == 0xE3)
-				guessLength = false;						// NOPE.  Nope nope nope nope nope nope nope nope nope nope.
 		}
+		hexLeft = hexLengths[currentHex - AMKd::Binary::CmdType::Inst] - 1;
 	}
 	else {
 		hexLeft -= 1;
 		// If we're on the last hex value for $E5 and this isn't an AMK song, then do some special stuff regarding tremolo.
 		// AMK doesn't use $E5 for the tremolo command or sample loading, so it has to emulate them.
-		if (hexLeft == 2 && currentHex == 0xE5 && songTargetProgram == TargetType::AM4/*validateTremolo*/) {		// // //
+		if (hexLeft == 2 && currentHex == AMKd::Binary::CmdType::Tremolo && songTargetProgram == TargetType::AM4/*validateTremolo*/) {		// // //
 			//validateTremolo = false;
 			if (i >= 0x80) {
 				hexLeft--;
@@ -1272,18 +1269,18 @@ void Music::parseHexCommand() {
 
 				if (optimizeSampleUsage)
 					usedSamples[i - 0x80] = true;
-				append(0xF3, i - 0x80);		// // //
+				append(AMKd::Binary::CmdType::SampleLoad, i - 0x80);		// // //
 				return;
 			}
 			else
-				append(0xE5);
+				append(AMKd::Binary::CmdType::Tremolo);
 		}
 
-		if (hexLeft == 1 && targetAMKVersion > 1 && currentHex == 0xFA && i == 0x05)
+		if (hexLeft == 1 && targetAMKVersion > 1 && currentHex == AMKd::Binary::CmdType::ExtFA && i == 0x05)
 			error("$FA $05 in #amk 2 or above has been replaced with remote code.");		// // //
 
 		// Print error for AM4 songs that attempt to use an invalid FIR filter.  They both A) won't sound like their originals and B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
-		if (hexLeft == 0 && currentHex == 0xF1 && songTargetProgram == TargetType::AM4)		// // //
+		if (hexLeft == 0 && currentHex == AMKd::Binary::CmdType::Echo2 && songTargetProgram == TargetType::AM4)		// // //
 		{
 			if (i > 1) {
 				char buffer[255];
@@ -1292,14 +1289,14 @@ void Music::parseHexCommand() {
 			}
 		}
 
-		if (hexLeft == 0 && currentHex == 0xE4 && songTargetProgram == TargetType::AM4)	// // // AM4 seems to do something strange with $E4?
+		if (hexLeft == 0 && currentHex == AMKd::Binary::CmdType::TrspGlobal && songTargetProgram == TargetType::AM4)	// // // AM4 seems to do something strange with $E4?
 		{
 			i++;
 			i &= 0xFF;
 		}
 
 		// Do conversion for the old remote gain command.
-		if (hexLeft == 1 && currentHex == 0xFC && targetAMKVersion == 1) {
+		if (hexLeft == 1 && currentHex == AMKd::Binary::CmdType::Callback && targetAMKVersion == 1) {
 			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 
 			int channelToCheck;
@@ -1330,7 +1327,7 @@ void Music::parseHexCommand() {
 					remoteGainConversion.push_back(std::vector<byte>());
 
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-					append(0xFC, 0x00, 0x00, 0x00, 0x00);
+					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00);
 				}
 				else {
 					// If we're using FA and FC, then we need to "restore" the FA data.
@@ -1345,18 +1342,20 @@ void Music::parseHexCommand() {
 					tracks[channel].data.pop_back();
 
 					// Then add the "set gain" remote call.
-					remoteGainConversion.push_back(std::vector<byte> {0xFA, 0x01, static_cast<byte>(i), 0x00});		// // //
+					remoteGainConversion.push_back(std::vector<byte> {
+						AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<byte>(i), 0x00
+					});		// // //
 
 					// And finally the remote call data.
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-					append(0xFC, 0x00, 0x00, 0x03, 0x00);
+					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00);
 				}
 
 				// Either way, FC gets turned off.
 				tracks[channelToCheck].usingFC = false;
 
-				//remoteGainConversion.back().push_back(0xFA);
-				//remoteGainConversion.back().push_back(0x01);
+				//remoteGainConversion.back().push_back(AMKd::Binary::CmdType::ExtFA);
+				//remoteGainConversion.back().push_back(AMKd::Binary::CmdOptionFA::Gain);
 			}
 			else {
 				i = divideByTempoRatio(i, false);
@@ -1365,15 +1364,11 @@ void Music::parseHexCommand() {
 			}
 			return;
 		}
-		else if (hexLeft == 0 && currentHex == 0xFC && targetAMKVersion == 1) {
+		else if (hexLeft == 0 && currentHex == AMKd::Binary::CmdType::Callback && targetAMKVersion == 1) {
 			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 			// // //
 			if (!remoteGainConversion.back().empty()) {			// If the size was zero, then it has no data anyway.  Used for the 0 event type.
-				int channelToCheck;			// Only saves two bytes, though.
-				if (channel == 9)
-					channelToCheck = prevChannel;
-				else
-					channelToCheck = channel;
+				int channelToCheck = channel == CHANNELS ? prevChannel : channel;			// Only saves two bytes, though.
 
 				tracks[channelToCheck].lastFCGainValue = i;		// // //
 				remoteGainConversion.back().push_back(i);
@@ -1383,43 +1378,45 @@ void Music::parseHexCommand() {
 		}
 
 		// More code conversion.
-		if (hexLeft == 0 && currentHex == 0xFA && targetAMKVersion == 1 && tracks[channel].data.back() == 0x05) {
+		if (hexLeft == 0 && currentHex == AMKd::Binary::CmdType::ExtFA && targetAMKVersion == 1 && tracks[channel].data.back() == 0x05) {
 			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 			tracks[channel].data.pop_back();					// // // Remove the last two bytes
 			tracks[channel].data.pop_back();					// (i.e. the $FA $05)
 
-			int channelToCheck;
-			if (channel == 9)
-				channelToCheck = prevChannel;
-			else
-				channelToCheck = channel;
+			int channelToCheck = channel == CHANNELS ? prevChannel : channel;
 
 			if (i != 0) {
 				// Check if this channel is using FA and FC combined...
 				if (!tracks[channelToCheck].usingFC)		// // //
 				{
 					// Then add in a "restore instrument" remote call.
-					remoteGainConversion.push_back(std::vector<byte> {0xF4, 0x09, 0x00});
+					remoteGainConversion.push_back(std::vector<byte> {
+						AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00
+					});
 
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);
-					append(0xFC, 0x00, 0x00, 0xFF, 0x00);
+					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00);
 
 					// Then add the "set gain" remote call.
-					remoteGainConversion.push_back(std::vector<byte> {0xFA, 0x01, static_cast<byte>(i), 0x00});
+					remoteGainConversion.push_back(std::vector<byte> {
+						AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<byte>(i), 0x00
+					});
 
 					// And finally the remote call data.
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		 // // //
-					append(0xFC, 0x00, 0x00, 0x03, 0x00);
+					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00);
 				}
 				else {
 					// Otherwise, add in a "2 5 combination" command.
 
 					// Then add the "set gain" remote call.
-					remoteGainConversion.push_back(std::vector<byte> {0xFA, 0x01, static_cast<byte>(i), 0x00});
+					remoteGainConversion.push_back(std::vector<byte> {
+						AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<byte>(i), 0x00
+					});
 
 					// And finally the remote call data.
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-					append(0xFC, 0x00, 0x00, 0x05, tracks[channelToCheck].lastFCDelayValue);
+					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05, tracks[channelToCheck].lastFCDelayValue);
 					//append(0x00);
 				}
 
@@ -1429,20 +1426,20 @@ void Music::parseHexCommand() {
 			else {
 				remoteGainConversion.push_back(std::vector<byte>());
 				remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-				append(0xFC, 0x00, 0x00, 0x00, 0x00);
+				append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00);
 				tracks[channelToCheck].usingFA = false;
 			}
 			return;
 		}
 
-		if (hexLeft == 1 && currentHex == 0xF3)
+		if (hexLeft == 1 && currentHex == AMKd::Binary::CmdType::SampleLoad)
 			if (optimizeSampleUsage)
 				usedSamples[i] = true;
 
-		if (hexLeft == 2 && currentHex == 0xF1)
+		if (hexLeft == 2 && currentHex == AMKd::Binary::CmdType::Echo2)
 			echoBufferSize = std::max(echoBufferSize, i);
 
-		if (currentHex == 0xDA && songTargetProgram == TargetType::AM4)		// // // If this was the instrument command
+		if (currentHex == AMKd::Binary::CmdType::Inst && songTargetProgram == TargetType::AM4)		// // // If this was the instrument command
 		{									// And it was >= 0x13
 			if (i >= 0x13)							// Then change it to a custom instrument.
 				i = i - 0x13 + 30;
@@ -1451,7 +1448,7 @@ void Music::parseHexCommand() {
 				usedSamples[instrumentData[(i - 30) * 5]] = true;
 		}
 
-		if (hexLeft == 0 && currentHex == 0xE6) {
+		if (hexLeft == 0 && currentHex == AMKd::Binary::CmdType::Subloop) {
 			if (i == 0) {
 				if (inE6Loop)
 					error("Cannot nest $E6 loops within other $E6 loops.");
@@ -1466,11 +1463,11 @@ void Music::parseHexCommand() {
 			}
 		}
 
-		if (hexLeft == 0 && currentHex == 0xF4)
-			if (i == 0x00 || i == 0x06)
+		if (hexLeft == 0 && currentHex == AMKd::Binary::CmdType::ExtF4)		// // //
+			if (i == AMKd::Binary::CmdOptionF4::YoshiCh5 || i == AMKd::Binary::CmdOptionF4::Yoshi)
 				hasYoshiDrums = true;
 
-		if (hexLeft == 1 && currentHex == 0xDD) {			// Hack allowing the $DD command to accept a note as a parameter.
+		if (hexLeft == 1 && currentHex == AMKd::Binary::CmdType::Portamento) {			// Hack allowing the $DD command to accept a note as a parameter.
 			std::string backUpText = text;		// // //
 			bool finished = false;
 			while (!finished) {
@@ -1495,45 +1492,45 @@ void Music::parseHexCommand() {
 		}
 
 		// Pan fade tempo adjustment
-		if (currentHex == 0xDC && hexLeft == 1) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::PanFade && hexLeft == 1) i = divideByTempoRatio(i, false);
 
 		// Pitch bend tempo adjustment
-		if (currentHex == 0xDD && hexLeft == 2) i = divideByTempoRatio(i, false);
-		if (currentHex == 0xDD && hexLeft == 1) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::Portamento && hexLeft == 2) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::Portamento && hexLeft == 1) i = divideByTempoRatio(i, false);
 
 		// Vibrato tempo adjustment
-		if (currentHex == 0xDE && hexLeft == 2) i = divideByTempoRatio(i, false);
-		if (currentHex == 0xDE && hexLeft == 1) i = multiplyByTempoRatio(i);
+		if (currentHex == AMKd::Binary::CmdType::Vibrato && hexLeft == 2) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::Vibrato && hexLeft == 1) i = multiplyByTempoRatio(i);
 
 		// Global volume fade tempo adjustment
-		if (currentHex == 0xE1 && hexLeft == 1) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::VolGlobalFade && hexLeft == 1) i = divideByTempoRatio(i, false);
 
 		// Tempo tempo adjustment (?!)
-		if (currentHex == 0xE2 && hexLeft == 0) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::Tempo && hexLeft == 0) i = divideByTempoRatio(i, false);
 
 		// Tempo fade tempo adjustment
-		if (currentHex == 0xE3 && hexLeft == 1) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::TempoFade && hexLeft == 1) i = divideByTempoRatio(i, false);
 
 		// Tremolo tempo adjustment
-		if (currentHex == 0xE5 && hexLeft == 2) i = divideByTempoRatio(i, false);
-		if (currentHex == 0xE5 && hexLeft == 1) i = multiplyByTempoRatio(i);
+		if (currentHex == AMKd::Binary::CmdType::Tremolo && hexLeft == 2) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::Tremolo && hexLeft == 1) i = multiplyByTempoRatio(i);
 
 		// Volume fade tempo adjustment
-		if (currentHex == 0xE8 && hexLeft == 1) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::VolFade && hexLeft == 1) i = divideByTempoRatio(i, false);
 
 		// Vibrato fade tempo adjustment
-		if (currentHex == 0xEA && hexLeft == 0) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::VibratoFade && hexLeft == 0) i = divideByTempoRatio(i, false);
 
 		// Pitch envelope release tempo adjustment
-		if (currentHex == 0xEB && hexLeft == 2) i = divideByTempoRatio(i, false);
-		if (currentHex == 0xEB && hexLeft == 1) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::BendAway && hexLeft == 2) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::BendAway && hexLeft == 1) i = divideByTempoRatio(i, false);
 
 		// Pitch envelope attack tempo adjustment
-		if (currentHex == 0xEC && hexLeft == 2) i = divideByTempoRatio(i, false);
-		if (currentHex == 0xEC && hexLeft == 1) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::BendTo && hexLeft == 2) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::BendTo && hexLeft == 1) i = divideByTempoRatio(i, false);
 
 		// Echo fade tempo adjustment
-		if (currentHex == 0xF2 && hexLeft == 2) i = divideByTempoRatio(i, false);
+		if (currentHex == AMKd::Binary::CmdType::EchoFade && hexLeft == 2) i = divideByTempoRatio(i, false);
 
 		// Arpeggio (etc.) tempo adjustment
 		if (nextHexIsArpeggioNoteLength == true) { i = divideByTempoRatio(i, false); nextHexIsArpeggioNoteLength = false; }
@@ -1564,9 +1561,9 @@ void Music::parseNote() {
 		error("Note data must be inside a channel!");
 
 	if (j == 'r')
-		i = 0xC7;
+		i = AMKd::Binary::CmdType::Rest;		// // //
 	else if (j == '^')
-		i = 0xC6;
+		i = AMKd::Binary::CmdType::Tie;
 	else {
 		//am4silence++;
 		i = getPitch(j);
@@ -1580,23 +1577,22 @@ void Music::parseNote() {
 
 		if (i < 0) {
 			error("Note's pitch was too low.");		// // //
-			i = 0xC7;
+			i = AMKd::Binary::CmdType::Rest;
 		}
-		else if (i >= 0xC6) {
+		else if (i >= AMKd::Binary::CmdType::Tie)
 			error("Note's pitch was too high.");
-		}
-		else if (tracks[channel].instrument >= 21 && tracks[channel].instrument < 30 && i < 0xC6)		// // //
+		else if (tracks[channel].instrument >= 21 && tracks[channel].instrument < 30)		// // //
 		{
 			i = 0xD0 + (tracks[channel].instrument - 21);
 
-			if ((channel == 6 || channel == 7 || (channel == 8 && (prevChannel == 6 || prevChannel == 7))) == false)	// If this is not a SFX channel,
+			if ((channel == 6 || channel == 7 || (channel == CHANNELS && (prevChannel == 6 || prevChannel == 7))) == false)	// If this is not a SFX channel,
 				tracks[channel].instrument = 0xFF;										// Then don't force the drum pitch on every note.
 		}
 	}
 
 	if (inPitchSlide) {
 		inPitchSlide = false;
-		append(0xDD, 0x00, prevNoteLength, i);		// // //
+		append(AMKd::Binary::CmdType::Portamento, 0x00, prevNoteLength, i);		// // //
 	}
 
 	if (nextNoteIsForDD) {
@@ -1614,7 +1610,7 @@ void Music::parseNote() {
 		int tempsize = j;	// If there's a pitch bend up ahead, we need to not optimize the last tie.
 		std::string temptext = text;		// // //
 
-		if (j != 0 && (text.front() == '^' || (i == 0xC7 && text.front() == 'r')))
+		if (j != 0 && (text.front() == '^' || (i == AMKd::Binary::CmdType::Rest && text.front() == 'r')))
 			skipChars(1);
 
 		j += getNoteLength(getInt());
@@ -1629,7 +1625,7 @@ void Music::parseNote() {
 
 		if (text.empty())		// // //
 			break;
-	} while (text.front() == '^' || (i == 0xC7 && text.front() == 'r'));
+	} while (text.front() == '^' || (i == AMKd::Binary::CmdType::Rest && text.front() == 'r'));
 
 	/*if (normalLoopInsideE6Loop)
 	tempLoopLength += j;
@@ -1637,7 +1633,7 @@ void Music::parseNote() {
 	e6LoopLength += j;
 	else if (::inE6Loop)
 	e6LoopLength += j;
-	else if (channel == 8)
+	else if (channel == CHANNELS)
 	tempLoopLength += j;
 	else
 	lengths[channel] += j;*/
@@ -1654,20 +1650,20 @@ void Music::parseNote() {
 		{
 			append(tracks[channel].q);
 			tracks[channel].updateQ = false;
-			tracks[8].updateQ = false;
+			tracks[CHANNELS].updateQ = false;
 			noteParamaterByteCount++;
 		}
 		append(i); j -= divideByTempoRatio(0x60, true);
 
 		while (j > divideByTempoRatio(0x60, true)) {
-			append(0xC6);
+			append(AMKd::Binary::CmdType::Tie);		// // //
 			j -= divideByTempoRatio(0x60, true);
 		}
 
 		if (j > 0) {
 			if (j != divideByTempoRatio(0x60, true))
 				append(j);
-			append(0xC6);
+			append(AMKd::Binary::CmdType::Tie);		// // //
 		}
 		prevNoteLength = j;
 		return;
@@ -1679,7 +1675,7 @@ void Music::parseNote() {
 		if (tracks[channel].updateQ) {
 			append(tracks[channel].q);
 			tracks[channel].updateQ = false;
-			tracks[8].updateQ = false;
+			tracks[CHANNELS].updateQ = false;		// // //
 			noteParamaterByteCount++;
 		}
 		append(i);
@@ -1713,7 +1709,7 @@ void Music::parseNCommand() {
 	if (i < 0 || i > 0x1F)
 		error("Invlid value for the n command.  Value must be in hex and between 0 and 1F.");		// // //
 
-	append(0xF8, i);		// // //
+	append(AMKd::Binary::CmdType::Noise, i);		// // //
 }
 
 void Music::parseOptionDirective() {
@@ -1727,18 +1723,18 @@ void Music::parseOptionDirective() {
 
 	if (trimDirective("smwvtable"))		// // //
 		if (!usingSMWVTable) {
-			append(0xFA, 0x06, 0x00);		// // //
+			append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, 0x00);		// // //
 			usingSMWVTable = true;
 		}
 		else
 			printWarning("This song is already using the SMW V Table. This command is just wasting three bytes...", name, line);
 	else if (trimDirective("nspcvtable")) {		// // //
-		append(0xFA, 0x06, 0x01);		// // //
+		append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, 0x01);		// // //
 		usingSMWVTable = false;
 		printWarning("This song uses the N-SPC V by default. This command is just wasting two bytes...", name, line);
 	}
 	else if (trimDirective("tempoimmunity"))		// // //
-		append(0xF4, 0x07);		// // //
+		append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::TempoImmunity);		// // //
 	else if (trimDirective("noloop"))		// // //
 		doesntLoop = true;
 	else if (trimDirective("dividetempo")) {		// // //
@@ -1785,7 +1781,7 @@ void Music::parseSpecialDirective() {
 		parseLouderCommand();
 	}
 	else if (trimDirective("tempoimmunity"))		// // //
-		append(0xF4, 0x07);		// // //
+		append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::TempoImmunity);		// // //
 	else if (trimDirective("path"))		// // //
 		parsePath();
 	else if (trimDirective("am4"))		// // //
@@ -2066,7 +2062,7 @@ void Music::parsePadDefinition() {
 }
 
 void Music::parseLouderCommand() {
-	append(0xF4, 0x08);		// // //
+	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::VelocityTable);		// // //
 }
 
 void Music::parsePath() {
@@ -2252,38 +2248,38 @@ void Music::pointersFirstPass() {
 	if (errorCount)
 		printError("There were errors when compiling the music file.  Compilation aborted.  Your ROM has not been modified.", true);
 
-	if (std::all_of(tracks, tracks + 8, [] (const Track &t) { return t.data.empty(); }))		// // //
+	if (std::all_of(tracks, tracks + CHANNELS, [] (const Track &t) { return t.data.empty(); }))		// // //
 		error("This song contained no musical data!");
 
 	if (targetAMKVersion == 1)			// Handle more conversion of the old $FC command to remote call.
-		for (channel = 0; channel < 9; channel++) {
+		for (channel = 0; channel <= CHANNELS; channel++) {
 			for (unsigned int z = 0, n = remoteGainPositions[channel].size(); z < n; ++z) {
 				size_t dataIndex = remoteGainPositions[channel][z];
 				tracks[channel].loopLocations.push_back(dataIndex);		// // //
 
-				tracks[channel].data[dataIndex] = tracks[8].data.size() & 0xFF;
-				tracks[channel].data[dataIndex + 1] = tracks[8].data.size() >> 8;
+				tracks[channel].data[dataIndex] = tracks[CHANNELS].data.size() & 0xFF;
+				tracks[channel].data[dataIndex + 1] = tracks[CHANNELS].data.size() >> 8;
 
-				tracks[8].data.insert(tracks[8].data.end(), remoteGainConversion[z].cbegin(), remoteGainConversion[z].cend());		// // //
+				tracks[CHANNELS].data.insert(tracks[CHANNELS].data.end(), remoteGainConversion[z].cbegin(), remoteGainConversion[z].cend());		// // //
 			}
 		}
 
 	if (resizedChannel != -1) {
 		auto &t = tracks[resizedChannel].data;		// // //
 
-		t[0] = 0xFA;
-		t[1] = 0x04;
+		t[0] = AMKd::Binary::CmdType::ExtFA;
+		t[1] = AMKd::Binary::CmdOptionFA::EchoBuffer;
 		t[2] = echoBufferSize;
 		if (targetAMKVersion > 1) {
-			t[3] = 0xFA;
-			t[4] = 0x06;
+			t[3] = AMKd::Binary::CmdType::ExtFA;
+			t[4] = AMKd::Binary::CmdOptionFA::VolTable;
 			t[5] = 0x01;
 		}
 	}
 
-	for (int z = 0; z < 8; z++) if (!tracks[z].data.empty()) {		// // //
+	for (int z = 0; z < CHANNELS; z++) if (!tracks[z].data.empty()) {		// // //
 		channel = z;
-		append(0);
+		append(AMKd::Binary::CmdType::End);
 	}
 
 	if (mySamples.empty())		// // // If no sample groups were provided...
@@ -2305,7 +2301,7 @@ void Music::pointersFirstPass() {
 	}
 
 	int binpos = 0;		// // //
-	for (int i = 0; i < 8; ++i) {
+	for (int i = 0; i < CHANNELS; ++i) {
 		if (!tracks[i].data.empty())
 			tracks[i].phrasePointers[0] = binpos;
 		tracks[i].phrasePointers[1] += tracks[i].phrasePointers[0];
@@ -2357,14 +2353,14 @@ void Music::pointersFirstPass() {
 	}
 
 	add += instrumentData.size();
-	for (int i = 0; i < 8; ++i) {		// // //
+	for (int i = 0; i < CHANNELS; ++i) {		// // //
 		unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[0] + spaceForPointersAndInstrs);
 		allPointersAndInstrs[i * 2 + 0 + add] = adr & 0xFF;
 		allPointersAndInstrs[i * 2 + 1 + add] = adr >> 8;
 	}
 
 	if (hasIntro) {
-		for (int i = 0; i < 8; ++i) {		// // //
+		for (int i = 0; i < CHANNELS; ++i) {		// // //
 			unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[1] + spaceForPointersAndInstrs);
 			allPointersAndInstrs[i * 2 + 16 + add] = adr & 0xFF;
 			allPointersAndInstrs[i * 2 + 17 + add] = adr >> 8;
@@ -2377,7 +2373,7 @@ void Music::pointersFirstPass() {
 	//if (tempo == -1) tempo = 0x36;
 	unsigned int totalLength;
 	mainLength = -1;
-	for (i = 0; i < 8; i++)
+	for (i = 0; i < CHANNELS; i++)
 		if (tracks[i].channelLength != 0)		// // //
 			mainLength = std::min(mainLength, (unsigned int)tracks[i].channelLength);
 	if (mainLength == -1)
@@ -2437,7 +2433,7 @@ void Music::pointersFirstPass() {
 	else
 		printChannelDataNonVerbose(totalSize);
 
-	//for (int z = 0; z <= 8; z++)
+	//for (int z = 0; z <= CHANNELS; z++)
 	//{
 	if (verbose) {
 		// // //
@@ -2445,7 +2441,7 @@ void Music::pointersFirstPass() {
 			   "\t#4: 0x%03X #5: 0x%03X #6: 0x%03X #7: 0x%03X Loop:        0x%03X\n"
 			   "Space used by echo: 0x%04X bytes.  Space used by samples: 0x%04X bytes.\n\n",
 			   tracks[0].data.size(), tracks[1].data.size(), tracks[2].data.size(), tracks[3].data.size(), spaceForPointersAndInstrs,
-			   tracks[4].data.size(), tracks[5].data.size(), tracks[6].data.size(), tracks[7].data.size(), tracks[8].data.size(),
+			   tracks[4].data.size(), tracks[5].data.size(), tracks[6].data.size(), tracks[7].data.size(), tracks[CHANNELS].data.size(),
 			   echoBufferSize << 11, spaceUsedBySamples);
 	}
 	//}
@@ -2454,9 +2450,9 @@ void Music::pointersFirstPass() {
 
 	std::stringstream statStrStream;
 
-	for (int i = 0; i < 8; ++i)		// // //
+	for (int i = 0; i < CHANNELS; ++i)		// // //
 		statStrStream << "CHANNEL " << ('0' + i) << " SIZE:				0x" << hex4 << tracks[i].data.size() << "\n";
-	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << tracks[8].data.size() << "\n";
+	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << tracks[CHANNELS].data.size() << "\n";
 	statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << spaceForPointersAndInstrs << "\n";
 	statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
 	statStrStream << "ECHO SIZE:				0x" << hex4 << (echoBufferSize << 11) << "\n";
@@ -2470,7 +2466,7 @@ void Music::pointersFirstPass() {
 	else
 		statStrStream << "FREE ARAM (APPROXIMATE):		UNKNOWN\n\n";
 
-	for (int i = 0; i < 8; ++i)		// // //
+	for (int i = 0; i < CHANNELS; ++i)		// // //
 		statStrStream << "CHANNEL " << ('0' + i) << " TICKS:			0x" << hex4 << tracks[i].channelLength << "\n";
 	statStrStream << '\n';
 
@@ -2701,7 +2697,7 @@ void Music::handleNormalLoopEnter() {
 void Music::handleSuperLoopEnter() {
 	superLoopLength = 0;
 	inE6Loop = true;
-	if (channel == 8) {				// We're entering a super loop that's nested in a normal loop
+	if (channel == CHANNELS) {		// // // We're entering a super loop that's nested in a normal loop
 		baseLoopIsNormal = true;
 		baseLoopIsSuper = false;
 		extraLoopIsNormal = false;

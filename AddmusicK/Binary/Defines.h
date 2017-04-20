@@ -47,6 +47,7 @@ SCOPED_ENUM_START(CmdType, uint8_t)
 	ExtF4         = 0xF4,
 	FIR           = 0xF5,
 	DSP           = 0xF6,
+	ARAM          = 0xF7,
 	Noise         = 0xF8,
 	DataSend      = 0xF9,
 	ExtFA         = 0xFA,
@@ -72,6 +73,7 @@ SCOPED_ENUM_START(CmdOptionFA, uint8_t)
 	Transpose  = 0x02,
 	Amplify    = 0x03,
 	EchoBuffer = 0x04,
+	VolTable   = 0x06,		// // // not in manual
 SCOPED_ENUM_END()
 
 SCOPED_ENUM_START(CmdOptionFC, uint8_t)
