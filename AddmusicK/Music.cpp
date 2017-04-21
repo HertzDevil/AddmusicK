@@ -343,9 +343,6 @@ void Music::init() {
 			return;
 		}
 
-#if PARSER_VERSION != 2
-#error You forgot to update the #amk syntax.  Aren't you glad you at least remembered to put in this warning?
-#endif
 		/*			targetAMKVersion = 0;
 		if (backup.find('\r') != -1)
 		backup = backup.insert(backup.length(), "\r\n\r\n#amk=1\r\n");		// Automatically assume that this is a song written for AMK.
@@ -600,10 +597,10 @@ void Music::parseIntroDirective() {
 				x.second = -((int)tempo);
 
 	hasIntro = true;
-	tracks[channel].phrasePointers[1] = tracks[channel].data.size();		// // //
+	tracks[channel].phrasePointers[1] = static_cast<uint16_t>(tracks[channel].data.size());		// // //
 	prevNoteLength = -1;
 	hasIntro = true;
-	introLength = tracks[channel].channelLength;		// // //
+	introLength = static_cast<unsigned>(tracks[channel].channelLength);		// // //
 }
 
 void Music::parseT() {
@@ -695,7 +692,7 @@ void Music::parseInstrumentCommand() {
 		if (optimizeSampleUsage)
 			if (i < 30)
 				usedSamples[instrToSample[i]] = true;
-			else if ((i - 30) * 6 < instrumentData.size())
+			else if ((i - 30) * 6 < static_cast<int>(instrumentData.size()))		// // //
 				usedSamples[instrumentData[(i - 30) * 6]] = true;
 			else
 				error("This custom instrument has not been defined yet.");		// // //
@@ -820,7 +817,7 @@ void Music::parseLabelLoopCommand() {
 
 			if (trimChar('['))		// // //
 				error("Remote code cannot be defined within a channel.");
-			tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
+			tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
 			if (loopPointers.find(i) == loopPointers.cend())		// // //
 				loopPointers.insert({i, -1});
 			append(AMKd::Binary::CmdType::Callback, loopPointers[i] & 0xFF, loopPointers[i] >> 8, j, k);
@@ -882,7 +879,7 @@ void Music::parseLabelLoopCommand() {
 
 		handleNormalLoopRemoteCall(j);
 
-		tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
+		tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
 		append(AMKd::Binary::CmdType::Loop, it->second & 0xFF, it->second >> 8, j);
 
 		loopLabel = 0;
@@ -975,7 +972,7 @@ void Music::parseLoopEndCommand() {
 	handleNormalLoopExit(i);
 
 	if (!inRemoteDefinition) {
-		tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
+		tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
 		append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, i);
 	}
 	inRemoteDefinition = false;
@@ -1000,7 +997,7 @@ void Music::parseStarLoopCommand() {
 
 	handleNormalLoopRemoteCall(i);
 
-	tracks[channel].loopLocations.push_back(tracks[channel].data.size() + 1);		// // //
+	tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
 	append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, i);
 }
 
@@ -1276,12 +1273,14 @@ void Music::parseHexCommand() {
 		if (hexLeft == 1 && targetAMKVersion > 1 && currentHex == AMKd::Binary::CmdType::ExtFA && i == 0x05)
 			error("$FA $05 in #amk 2 or above has been replaced with remote code.");		// // //
 
-		// Print error for AM4 songs that attempt to use an invalid FIR filter.  They both A) won't sound like their originals and B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
+		// Print error for AM4 songs that attempt to use an invalid FIR filter.  They both
+		// A) won't sound like their originals and
+		// B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
 		if (hexLeft == 0 && currentHex == AMKd::Binary::CmdType::Echo2 && songTargetProgram == TargetType::AM4)		// // //
 		{
 			if (i > 1) {
-				char buffer[255];
-				sprintf(buffer, "$%02X", i);
+				char buffer[4];		// // //
+				sprintf_s(buffer, "$%02X", i);
 				error(buffer + (std::string)" is not a valid FIR filter for the $F1 command. Must be either $00 or $01.");		// // //
 			}
 		}
@@ -1910,15 +1909,10 @@ void Music::parseInstrumentDefinitions() {
 			i = -1;
 			brrName = basepath + brrName;
 			int gs = getSample(brrName, this);
-			for (j = 0; j < mySamples.size(); j++) {
-				if (mySamples[j] == gs) {
-					i = j;
-					break;
-				}
-			}
-
-			if (i == -1)
+			auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(brrName, this));		// // //
+			if (it == mySamples.cend())
 				fatalError("The specified sample was not included in this song.");		// // //
+			i = std::distance(mySamples.cbegin(), it);
 		}
 		else if (isNoise) {
 			i = getHex();
@@ -2115,7 +2109,7 @@ int Music::getInt(const std::string &str, int &p) {
 	int i = 0;
 	int d = 0;
 
-	while (p < str.size() && str[p] >= '0' && str[p] <= '9') {
+	while (p < static_cast<int>(str.size()) && str[p] >= '0' && str[p] <= '9') {		// // //
 		d++;
 		i = (i * 10) + str[p] - '0';
 		p++;
@@ -2252,10 +2246,10 @@ void Music::pointersFirstPass() {
 		for (int ch = 0; ch <= CHANNELS; ++ch) {
 			for (unsigned int z = 0, n = remoteGainPositions[ch].size(); z < n; ++z) {
 				size_t dataIndex = remoteGainPositions[ch][z];
-				tracks[ch].loopLocations.push_back(dataIndex);		// // //
+				tracks[ch].loopLocations.push_back(static_cast<uint16_t>(dataIndex));		// // //
 
-				tracks[ch].data[dataIndex] = tracks[CHANNELS].data.size() & 0xFF;
-				tracks[ch].data[dataIndex + 1] = tracks[CHANNELS].data.size() >> 8;
+				tracks[ch].data[dataIndex] = static_cast<uint8_t>(tracks[CHANNELS].data.size() & 0xFF);
+				tracks[ch].data[dataIndex + 1] = static_cast<uint8_t>(tracks[CHANNELS].data.size() >> 8);
 
 				tracks[CHANNELS].data.insert(tracks[CHANNELS].data.end(), remoteGainConversion[z].cbegin(), remoteGainConversion[z].cend());		// // //
 			}
@@ -2290,9 +2284,9 @@ void Music::pointersFirstPass() {
 			emptySampleIndex = getSample("EMPTY.brr", this);
 		}
 
-		for (i = 0; i < mySamples.size(); i++)
-			if (usedSamples[i] == false && samples[mySamples[i]].important == false)
-				mySamples[i] = emptySampleIndex;
+		for (size_t z = 0, n = mySamples.size(); z < n; ++z)		// // //
+			if (usedSamples[z] == false && samples[mySamples[z]].important == false)
+				mySamples[z] = emptySampleIndex;
 	}
 
 	int binpos = 0;		// // //
@@ -2320,11 +2314,11 @@ void Music::pointersFirstPass() {
 	int add = (hasIntro ? 2 : 0) + (doesntLoop ? 0 : 2) + 4;
 
 	//memcpy(allPointersAndInstrs.data() + add, instrumentData.base, instrumentData.size());
-	for (i = 0; i < instrumentData.size(); i++)
-		allPointersAndInstrs[i + add] = instrumentData[i];
+	for (size_t z = 0, n = instrumentData.size(); z < n; ++z)		// // //
+		allPointersAndInstrs[add + z] = instrumentData[z];
 
-	allPointersAndInstrs[0] = (add + instrumentData.size()) & 0xFF;
-	allPointersAndInstrs[1] = ((add + instrumentData.size()) >> 8) & 0xFF;
+	allPointersAndInstrs[0] = static_cast<uint8_t>((add + instrumentData.size()) & 0xFF);		// // //
+	allPointersAndInstrs[1] = static_cast<uint8_t>((add + instrumentData.size()) >> 8);
 
 	if (doesntLoop) {
 		allPointersAndInstrs[add - 2] = 0xFF;	// Will be re-evaluated to 0000 when the pointers are adjusted later.
@@ -2343,22 +2337,22 @@ void Music::pointersFirstPass() {
 		}
 	}
 	if (hasIntro) {
-		allPointersAndInstrs[2] = (add + instrumentData.size() + 16) & 0xFF;
-		allPointersAndInstrs[3] = (add + instrumentData.size() + 16) >> 8;
+		allPointersAndInstrs[2] = static_cast<uint8_t>((add + instrumentData.size() + 16) & 0xFF);		// // //
+		allPointersAndInstrs[3] = static_cast<uint8_t>((add + instrumentData.size() + 16) >> 8);
 	}
 
 	add += instrumentData.size();
 	for (int i = 0; i < CHANNELS; ++i) {		// // //
 		unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[0] + spaceForPointersAndInstrs);
-		allPointersAndInstrs[i * 2 + 0 + add] = adr & 0xFF;
-		allPointersAndInstrs[i * 2 + 1 + add] = adr >> 8;
+		allPointersAndInstrs[i * 2 + 0 + add] = static_cast<uint8_t>(adr & 0xFF);		// // //
+		allPointersAndInstrs[i * 2 + 1 + add] = static_cast<uint8_t>(adr >> 8);
 	}
 
 	if (hasIntro) {
 		for (int i = 0; i < CHANNELS; ++i) {		// // //
 			unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[1] + spaceForPointersAndInstrs);
-			allPointersAndInstrs[i * 2 + 16 + add] = adr & 0xFF;
-			allPointersAndInstrs[i * 2 + 17 + add] = adr >> 8;
+			allPointersAndInstrs[i * 2 + 16 + add] = static_cast<uint8_t>(adr & 0xFF);		// // //
+			allPointersAndInstrs[i * 2 + 17 + add] = static_cast<uint8_t>(adr >> 8);
 		}
 	}
 
@@ -2420,11 +2414,11 @@ void Music::pointersFirstPass() {
 	}
 
 	int spaceUsedBySamples = 0;
-	for (i = 0; i < mySamples.size(); i++)
-		spaceUsedBySamples += 4 + samples[mySamples[i]].data.size();	// The 4 accounts for the space used by the SRCN table.
+	for (const uint16_t x : mySamples)		// // //
+		spaceUsedBySamples += 4 + samples[x].data.size();	// The 4 accounts for the space used by the SRCN table.
 
 	if (verbose)
-		std::cout << name << " total size: 0x" << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << totalSize << " bytes" << std::dec << std::endl;
+		std::cout << name << " total size: 0x" << hex4 << totalSize << " bytes" << std::dec << std::endl;
 	else
 		printChannelDataNonVerbose(totalSize);
 
@@ -2441,7 +2435,7 @@ void Music::pointersFirstPass() {
 	}
 	//}
 	if (totalSize > minSize && minSize > 0)
-		std::cout << "File " << name << ", line " << line << ": Warning: Song was larger than it could pad out by 0x" << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << totalSize - minSize << " bytes." << std::dec << std::endl;
+		std::cout << "File " << name << ", line " << line << ": Warning: Song was larger than it could pad out by 0x" << hex4 << totalSize - minSize << " bytes." << std::dec << std::endl;
 
 	std::stringstream statStrStream;
 

@@ -1,10 +1,8 @@
-#define BOOST_LIB_DIAGNOSTIC
+#pragma once		// // //
+
 #ifdef _WIN32
 	#define _CRT_SECURE_NO_WARNINGS
 #endif
-
-#ifndef _GLOBALS_H
-#define _GLOBALS_H
 
 //#if defined(linux) && !defined(stricmp)
 //#error Please use -Dstrnicmp=strncasecmp on Unix-like systems.
@@ -20,21 +18,22 @@
 #define strnicmp strncasecmp
 #endif
 
-#define AMKVERSION 1
-#define AMKMINOR 0
-#define AMKREVISION 3
+// // //
+const int AMKVERSION = 1;
+const int AMKMINOR = 0;
+const int AMKREVISION = 3;
 
-#define PARSER_VERSION 2			// Used to keep track of incompatible changes to the parser
+const int PARSER_VERSION = 2;			// Used to keep track of incompatible changes to the parser
 
-#define DATA_VERSION 0				// Used to keep track of incompatible changes to any and all compiled data, either to the SNES or to the PC
+const int DATA_VERSION = 0;				// Used to keep track of incompatible changes to any and all compiled data, either to the SNES or to the PC
 
 // // //
 //class ROM;
 class Music;
 class SoundEffect;
-class Sample;
+struct Sample;
 class File;
-class SampleGroup;
+struct SampleGroup;
 
 //#include "ROM.h"
 #include "Music.h"
@@ -48,6 +47,7 @@ class SampleGroup;
 #include <fstream>
 #include <map>
 #include <cstdint>		// // //
+#include <iomanip>		// // //
 #include "Directory.h"
 #include "asardll.h"
 
@@ -102,10 +102,22 @@ void openFile(const File &fileName, std::vector<uint8_t> &vector);		// // //
 void openTextFile(const File &fileName, std::string &string);
 
 // // //
+class hex_formatter
+{
+	int width_;
+public:
+	explicit constexpr hex_formatter(int w) : width_(w) { }
+	template <typename Char, typename Traits>
+	friend std::basic_ostream<Char, Traits> &
+	operator<<(std::basic_ostream<Char, Traits> &os, const hex_formatter &f) {
+		os << std::setw(f.width_) << std::setfill('0') << std::uppercase << std::hex;
+		return os;
+	}
+};
 
-#define hex2 std::setw(2) << std::setfill('0') << std::uppercase << std::hex
-#define hex4 std::setw(4) << std::setfill('0') << std::uppercase << std::hex
-#define hex6 std::setw(6) << std::setfill('0') << std::uppercase << std::hex
+constexpr auto hex2 = hex_formatter(2);
+constexpr auto hex4 = hex_formatter(4);
+constexpr auto hex6 = hex_formatter(6);
 
 template <typename T>
 void writeFile(const File &fileName, const std::vector<T> &vector)
@@ -157,9 +169,4 @@ void preprocess(std::string &str, const std::string &filename, int &version);
 
 int strToInt(const std::string &str);
 
-//#define max(a, b) (a > b) ? a : b
-//#define min(a, b) (a < b) ? a : b
-
 time_t getTimeStamp(const File &file);
-
-#endif

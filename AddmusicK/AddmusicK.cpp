@@ -88,66 +88,73 @@ int main(int argc, char* argv[])
 			arguments.push_back(argv[i]);
 	}
 
-	for (int i = 0; i < arguments.size(); i++)
+	for (const auto &arg : arguments)		// // //
 	{
 		waitAtEnd = false;			// If the user entered a command line argument, chances are they don't need the "Press Any Key To Continue . . ." prompt.
-		if (arguments[i] == "-c")
+		if (arg == "-c")
 			convert = false;
-		else if (arguments[i] == "-e")
+		else if (arg == "-e")
 			checkEcho = false;
-		else if (arguments[i] == "-b")
+		else if (arg == "-b")
 			bankStart = 0x080000;
-		else if (arguments[i] == "-v")
+		else if (arg == "-v")
 			verbose = true;
-		else if (arguments[i] == "-a")
+		else if (arg == "-a")
 			aggressive = true;
-		else if (arguments[i] == "-d")
+		else if (arg == "-d")
 			dupCheck = false;
-		else if (arguments[i] == "-h")
+		else if (arg == "-h")
 			validateHex = false;
-		else if (arguments[i] == "-p")
+		else if (arg == "-p")
 			doNotPatch = true;
-		else if (arguments[i] == "-u")
+		else if (arg == "-u")
 			optimizeSampleUsage = false;
-		else if (arguments[i] == "-s")
+		else if (arg == "-s")
 			allowSA1 = false;
-		else if (arguments[i] == "-dumpsfx")
+		else if (arg == "-dumpsfx")
 			sfxDump = true;
-		else if (arguments[i] == "-visualize")
+		else if (arg == "-visualize")
 			visualizeSongs = true;
-		else if (arguments[i] == "-g")
+		else if (arg == "-g")
 			forceSPCGeneration = true;
-		else if (arguments[i] == "-noblock")
+		else if (arg == "-noblock")
 			forceNoContinuePrompt = true;
-		else if (arguments[i] == "-streamredirect")
-		{
+		else if (arg == "-streamredirect") {
 			redirectStandardStreams = true;
 			std::freopen("AddmusicK_stdout", "w+", stdout);
 			std::freopen("AddmusicK_stderr", "w+", stderr);
 		}
-		else if (arguments[i] == "-norom")
-		{
+		else if (arg == "-norom") {
 			if (ROMName.size() != 0)
 				printError("Error: -norom cannot be used after a filepath has already been used. Input your text files /after/ the -norom option.", true);
 			justSPCsPlease = true;
 		}
-		else if (ROMName.size() == 0 && arguments[i][0] != '-')
-		{
+		else if (ROMName.size() == 0 && arg[0] != '-') {
 			if (!justSPCsPlease)
-				ROMName = arguments[i];
+				ROMName = arg;
 			else
-				textFilesToCompile.push_back(arguments[i]);
+				textFilesToCompile.push_back(arg);
 		}
 		else
 		{
-			if (arguments[i] !=  "-?")
+			if (arg !=  "-?")
 			{
-				printf("Unknown argument \"%s\".", arguments[i].c_str());
+				printf("Unknown argument \"%s\".", arg.c_str());
 			}
 
-			puts("Options:\n\t-e: Turn off echo buffer checking.\n\t-c: Force off conversion from Addmusic 4.05 and AddmusicM\n\t-b: Do not attempt to save music data in bank 0x40 and above.\n\t-v: Turn verbosity on.  More information will be displayed using this.\n\t-a: Make free space finding more aggressive.\n\t-d: Turn off duplicate sample checking.\n\t-h: Turn off hex command validation.\n\t-p: Create a patch, but do not patch it to the ROM.\n\n\t-norom: Only generate SPC files, no ROM required.\t-?: Display this message.\n\n");
+			puts("Options:\n"		// // //
+				 "\t-e: Turn off echo buffer checking.\n"
+				 "\t-c: Force off conversion from Addmusic 4.05 and AddmusicM\n"
+				 "\t-b: Do not attempt to save music data in bank 0x40 and above.\n"
+				 "\t-v: Turn verbosity on.  More information will be displayed using this.\n"
+				 "\t-a: Make free space finding more aggressive.\n"
+				 "\t-d: Turn off duplicate sample checking.\n"
+				 "\t-h: Turn off hex command validation.\n"
+				 "\t-p: Create a patch, but do not patch it to the ROM.\n"
+				 "\t-norom: Only generate SPC files, no ROM required.\n"
+				 "\t-?: Display this message.\n\n");
 			
-			if (arguments[i] != "-?")
+			if (arg != "-?")
 			{
 				quit(1);
 			}
@@ -173,7 +180,9 @@ int main(int argc, char* argv[])
 	
 		std::string tempROMName = ROMName.cStr();
 		if (fileExists(tempROMName + ".smc") && fileExists(tempROMName + ".sfc"))
-			printError("Error: Ambiguity detected; there were two ROMs with the specified name (one\nwith a .smc extension and one with a .sfc extension). Either delete one or\ninclude the extension in your filename.", true);
+			printError("Error: Ambiguity detected; there were two ROMs with the specified name (one\n"
+					   "with a .smc extension and one with a .sfc extension). Either delete one or\n"
+					   "include the extension in your filename.", true);
 		else if (fileExists(tempROMName + ".smc"))
 			tempROMName += ".smc";
 		else if (fileExists(tempROMName + ".sfc"))
@@ -228,8 +237,7 @@ int main(int argc, char* argv[])
 			musics[i].exists = false;
 
 		
-		for (int i = 0; i < textFilesToCompile.size(); i++)
-		{
+		for (size_t i = 0, n = textFilesToCompile.size(); i < n; ++i) {		// // //
 			if (highestGlobalSong + i >= 256)
 				printError("Error: The total number of requested music files to compile exceeded 255.", true);
 			musics[highestGlobalSong + 1 + i].exists = true;
@@ -663,7 +671,8 @@ void loadSampleList()
 				else if (str[i] == '!')
 				{
 					if (bankDefines[bankDefines.size() - 1]->importants.size() == 0)
-						printError("Error parsing Addmusic_sample groups.txt: Importance specifier ('!') must come\nafter asample declaration, not before it.", true);
+						printError("Error parsing Addmusic_sample groups.txt: Importance specifier ('!') must come\n"
+								   "after asample declaration, not before it.", true);
 					bankDefines[bankDefines.size() - 1]->importants[bankDefines[bankDefines.size() - 1]->importants.size() - 1] = true;
 					i++;
 				}
@@ -944,11 +953,11 @@ void compileGlobalData()
 
 	if (verbose)
 	{
-		std::cout << "Total space used by 1DF9 sound effects: 0x" << std::hex << std::setw(4) << std::uppercase << std::setfill('0') << (DF9DataTotal + DF9Count * 2) << std::dec << std::endl;
-		std::cout << "Total space used by 1DFC sound effects: 0x" << std::hex << std::setw(4) << std::uppercase << std::setfill('0') << (DFCDataTotal + DFCCount * 2) << std::dec << std::endl;
+		std::cout << "Total space used by 1DF9 sound effects: 0x" << hex4 << (DF9DataTotal + DF9Count * 2) << std::dec << std::endl;
+		std::cout << "Total space used by 1DFC sound effects: 0x" << hex4 << (DFCDataTotal + DFCCount * 2) << std::dec << std::endl;
 	}
 
-	std::cout << "Total space used by all sound effects: 0x" << std::hex << std::setw(4) << std::uppercase << std::setfill('0') << (DF9DataTotal + DF9Count * 2 + DFCDataTotal + DFCCount * 2) << std::dec << std::endl;
+	std::cout << "Total space used by all sound effects: 0x" << hex4 << (DF9DataTotal + DF9Count * 2 + DFCDataTotal + DFCCount * 2) << std::dec << std::endl;
 	
 	DF9Pointers.erase(DF9Pointers.begin(), DF9Pointers.begin() + 1);
 	DFCPointers.erase(DFCPointers.begin(), DFCPointers.begin() + 1);
@@ -1007,7 +1016,7 @@ void compileGlobalData()
 
 	programSize = getFileSize("asm/main.bin");
 
-	std::cout << "Total size of main program + all sound effects: 0x" << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << programSize  << std::dec << std::endl;
+	std::cout << "Total size of main program + all sound effects: 0x" << hex4 << programSize  << std::dec << std::endl;
 
 }
 
@@ -1347,7 +1356,8 @@ void fixMusicPointers()
 
 	// Can't do this now since we can't get a sample correctly outside of a song.
 
-	/*if (defaultIndex != -1)
+	/*
+	if (defaultIndex != -1)
 	{
 		int groupSize = 0;
 		for (unsigned int i = 0; i < bankDefines[defaultIndex]->samples.size(); i++)
@@ -1372,8 +1382,9 @@ end1:
 		}
 
 		std::cout << "Total space in ARAM for local songs using #optimized: 0x" << hex4 << (0x10000 - programSize - 0x400 - groupSize) << " bytes." << std::dec << std::endl;
-	}*/
+	}
 end2:;
+	*/
 }
 
 void generateSPCs()
@@ -1385,7 +1396,6 @@ void generateSPCs()
 	std::vector<uint8_t> programData;		// // //
 	openFile("asm/SNES/bin/main.bin", programData);
 	programData.erase(programData.begin(), programData.begin() + 4);	// Erase the upload data.
-	unsigned int i;
 
 	unsigned int localPos;
 	
@@ -1437,7 +1447,7 @@ void generateSPCs()
 	for (int mode = 0; mode <= maxMode; mode++)
 	{
 
-		for (unsigned int i = 0; i < 256; i++)
+		for (int i = 0; i < 256; i++)		// // //
 		{
 			if (mode == 0 && musics[i].exists == false) continue;
 			if (mode == 1 && soundEffects[0][i].exists == false) continue;
@@ -1700,10 +1710,8 @@ void assembleSNESDriver2()
 	if (verbose)
 		std::cout << "Writing sample files..." << std::endl;
 
-	for (int i = 0; i < samples.size(); i++)
-	{
-		if (samples[i].exists)
-		{
+	for (size_t i = 0, n = samples.size(); i < n; ++i) {		// // //
+		if (samples[i].exists) {
 			const size_t ssize = samples[i].data.size();		// // //
 			std::vector<uint8_t> temp {
 				'S', 'T', 'A', 'R',
@@ -1923,10 +1931,13 @@ void tryToCleanAMMData()
 	if ((rom.size() % 0x8000 != 0 && rom[0x078200] == 0x53) || (rom.size() % 0x8000 == 0 && rom[0x078000] == 0x53))		// Since RATS tags only need to be in banks 0x10+, a tag here signals AMM usage.
 	{
 		if (rom.size() % 0x8000 == 0)
-			printError("AddmusicM ROMs can only be cleaned if they have a header. This does not\napply to any other aspect of the program.", true);
+			printError("AddmusicM ROMs can only be cleaned if they have a header. This does not\n"
+					   "apply to any other aspect of the program.", true);
 		
 		if (fileExists("INIT.asm") == false)
-			printError("AddmusicM was detected.  In order to remove it from this ROM, you must put\nAddmusicM's INIT.asm as well as xkasAnti and a clean ROM (named clean.smc) in\nthe same folder as this program. Then attempt to run this program once more.", true);
+			printError("AddmusicM was detected.  In order to remove it from this ROM, you must put\n"
+					   "AddmusicM's INIT.asm as well as xkasAnti and a clean ROM (named clean.smc) in\n"
+					   "the same folder as this program. Then attempt to run this program once more.", true);
 
 		std::cout << "AddmusicM detected.  Attempting to remove..." << std::endl;
 		execute( ((std::string)("perl addmusicMRemover.pl ")) + (std::string)ROMName);

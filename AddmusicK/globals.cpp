@@ -1,8 +1,6 @@
-#include <fstream>
+#include "globals.h"		// // //
 #include <sstream>
-#include <fstream>
 #include <iostream>
-#include <iomanip>
 #include <cstdlib>
 #include <cstring>
 #include <map>
@@ -12,7 +10,6 @@
 namespace fs = std::experimental::filesystem;
 
 #include "Directory.h"
-#include "globals.h"
 //ROM rom;
 std::vector<uint8_t> rom;		// // //
 
@@ -241,7 +238,7 @@ void insertValue(int value, int length, const std::string &find, std::string &st
 	pos += find.length();
 
 	std::stringstream ss;
-	ss << std::hex << std::uppercase << std::setfill('0') << std::setw(length) << value << std::dec;
+	ss << hex_formatter(length) << value << std::dec;		// // //
 	std::string tempStr = ss.str();
 	str.replace(pos+1, length, tempStr);
 }
@@ -464,49 +461,39 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 
 	if (dupCheck)
 	{
-		for (int i = 0; i < samples.size(); i++)
-		{
-			if (samples[i].name == newSample.name)
-			{
-				music->mySamples.push_back(i);
+		for (size_t i = 0, n = samples.size(); i < n; ++i)		// // //
+			if (samples[i].name == newSample.name) {
+				music->mySamples.push_back(static_cast<uint16_t>(i));
 				return;						// Don't add two of the same sample.
 			}
-		}
 
-		for (int i = 0; i < samples.size(); i++)
-		{
-			if (samples[i].data == newSample.data)
-			{
+		for (size_t i = 0, n = samples.size(); i < n; ++i)
+			if (samples[i].data == newSample.data) {
 				sampleToIndex[name] = i;
-				music->mySamples.push_back(i);
+				music->mySamples.push_back(static_cast<uint16_t>(i));
 				return;
 			}
-		}
 	}
 	sampleToIndex[newSample.name] = samples.size();
-	music->mySamples.push_back(samples.size());
+	music->mySamples.push_back(static_cast<uint16_t>(samples.size()));		// // //
 	samples.push_back(newSample);					// This is a sample we haven't encountered before.  Add it.
 }
 
 void addSampleGroup(const File &groupName, Music *music)
 {
-
-	for (int i = 0; i < bankDefines.size(); i++)
-	{
-		if ((std::string)groupName == bankDefines[i]->name)
-		{
-			for (int j = 0; j < bankDefines[i]->samples.size(); j++)
-			{
+	for (const auto &bank : bankDefines) {		// // //
+		if ((std::string)groupName == bank->name) {
+			for (size_t j = 0, n = bank->samples.size(); j < n; ++j) {
 				std::string temp;
 				//temp += "samples/";
-				temp += *(bankDefines[i]->samples[j]);
-				addSample((File)temp, music, bankDefines[i]->importants[j]);
+				temp += *(bank->samples[j]);
+				addSample((File)temp, music, bank->importants[j]);
 			}
 			return;
 		}
 	}
-	std::cout << music->name << ":\n";
-	std::cout << "The specified sample group, \"" << groupName << "\", could not be found." << std::endl;
+	std::cerr << music->name << ":\n";
+	std::cerr << "The specified sample group, \"" << groupName << "\", could not be found." << std::endl;
 	quit(1);
 }
 
@@ -531,9 +518,6 @@ void addSampleBank(const File &fileName, Music *music)
 	else
 		printError("Could not find sample bank " + (std::string)fileName, true, music->name);
 
-
-
-
 	openFile(actualPath, bankFile);
 
 	if (bankFile.size() != 0x8000)
@@ -556,20 +540,12 @@ void addSampleBank(const File &fileName, Music *music)
 
 		startPosition -= 0x8000;
 
-		int pos = startPosition;
-
-		while (pos < bankFile.size())
-		{
-			for (int i = 0; i < 9; i++)
-			{
-				tempSample.data.push_back(bankFile[pos]);
-				pos++;
-			}
-
+		size_t pos = startPosition;		// // //
+		while (pos < bankFile.size()) {
+			for (int i = 0; i <= CHANNELS; ++i)
+				tempSample.data.push_back(bankFile[pos++]);
 			if ((tempSample.data[tempSample.data.size() - 9] & 1) == 1)
-			{
 				break;
-			}
 		}
 
 		char temp[20];

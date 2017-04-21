@@ -517,8 +517,8 @@ void SoundEffect::compileASM()
 		if (k == -1)
 			error2("Could not match asm and jsr names.");
 		
-		data[jmpPoses[k]] = (posInARAM + data.size() + codePositions[k]) & 0xFF;
-		data[jmpPoses[k]+1] = (posInARAM + data.size() + codePositions[k]) >> 8;
+		data[jmpPoses[k]] = static_cast<uint8_t>((posInARAM + data.size() + codePositions[k]) & 0xFF);		// // //
+		data[jmpPoses[k] + 1] = static_cast<uint8_t>((posInARAM + data.size() + codePositions[k]) >> 8);
 	}
 }
 

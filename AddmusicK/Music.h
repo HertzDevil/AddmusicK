@@ -74,7 +74,7 @@ public:
 	std::map<int, uint16_t> loopPointers;		// // //
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
 	std::string text;
-	int totalSize;
+	size_t totalSize;		// // //
 	int spaceForPointersAndInstrs;
 	std::vector<uint8_t> allPointersAndInstrs;		// // //
 	std::vector<uint8_t> instrumentData;
@@ -110,7 +110,7 @@ public:
 	bool usedSamples[256];		// Holds a record of which samples have been used for this song.
 
 
-	int minSize;
+	size_t minSize;		// // //
 
 	bool exists;
 
