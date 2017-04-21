@@ -1,12 +1,8 @@
-#ifndef _BANKDEFINE_H
-#define _BANKDEFINE_H
+#pragma once		// // //
 
-class BankDefine
+struct BankDefine
 {
-public:
 	std::string name;
 	std::vector<const std::string *> samples;
 	std::vector<bool> importants;
 };
-
-#endif

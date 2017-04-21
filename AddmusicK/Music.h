@@ -1,9 +1,9 @@
-#ifndef _MUSIC_H
-#define _MUSIC_H
+#pragma once		// // //
+
 #include <vector>
 #include <string>
 #include <map>
-#include "globals.h"
+#include <cstdint>		// // //
 
 const size_t CHANNELS = 8;		// // //
 
@@ -24,8 +24,8 @@ struct SpaceInfo {
 // // // eventually replace this with AMKd::Music::Track
 struct Track
 {
-	std::vector<byte> data;
-	std::vector<unsigned short> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
+	std::vector<uint8_t> data;		// // //
+	std::vector<uint16_t> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
 
 	double channelLength = 0.; // How many ticks are in each channel.
 	int q = 0x7F;
@@ -76,9 +76,9 @@ public:
 	std::string text;
 	int totalSize;
 	int spaceForPointersAndInstrs;
-	std::vector<byte> allPointersAndInstrs;
-	std::vector<byte> instrumentData;
-	std::vector<byte> finalData;
+	std::vector<uint8_t> allPointersAndInstrs;		// // //
+	std::vector<uint8_t> instrumentData;
+	std::vector<uint8_t> finalData;
 
 	SpaceInfo spaceInfo;
 
@@ -217,7 +217,7 @@ private:
 	double superLoopLength;					// How many ticks were in the most previously declared super loop.
 	std::vector<std::pair<double, int>> tempoChanges;	// Where any changes in tempo occur. A negative tempo marks the beginning of the main loop, if an intro exists.
 
-	std::vector<std::vector<byte>> remoteGainConversion;	// Containers that hold data for anticipation gain and rest/gain replacement so that we can convert it to a remote command.
+	std::vector<std::vector<uint8_t>> remoteGainConversion;	// // // Containers that hold data for anticipation gain and rest/gain replacement so that we can convert it to a remote command.
 	std::vector<unsigned int> remoteGainPositions[CHANNELS + 1];	// Container that holds the positions for the pointers that we have to go back and correct during old gain and remote command conversion.
 
 	bool baseLoopIsNormal;
@@ -233,5 +233,3 @@ private:
 
 	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
 };
-
-#endif

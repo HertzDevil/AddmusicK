@@ -1,3 +1,4 @@
+#include "globals.h"
 #include <sstream>
 #include <iostream>
 #include <fstream>
@@ -5,8 +6,7 @@
 #include <iomanip>
 #include <cstring>
 #include <cstdlib>
-#include "globals.h"
-#include <ctime>
+// // //
 #include "../AM405Remover/AM405Remover.h"
 #include <filesystem>		// // //
 namespace fs = std::experimental::filesystem;
@@ -18,7 +18,7 @@ namespace fs = std::experimental::filesystem;
 bool waitAtEnd = true;
 File ROMName;
 
-std::vector<byte> romHeader;
+std::vector<uint8_t> romHeader;		// // //
 
 void cleanROM();
 void tryToCleanSampleToolData();
@@ -957,7 +957,7 @@ void compileGlobalData()
 	writeFile("asm/SFX1DFCTable.bin", DFCPointers);
 
 
-	std::vector<byte> allSFXData;
+	std::vector<uint8_t> allSFXData;		// // //
 
 	for (int i = 0; i <= DF9Count; i++)
 	{
@@ -1184,7 +1184,7 @@ void fixMusicPointers()
 		}
 
 		
-		std::vector<byte> final;
+		std::vector<uint8_t> final;		// // //
 
 		int sizeWithPadding = (musics[i].minSize > 0) ? musics[i].minSize : musics[i].totalSize;
 		
@@ -1321,9 +1321,9 @@ void fixMusicPointers()
 
 	programSize = getFileSize("asm/SNES/bin/main.bin");
 
-	std::vector<byte> temp;
+	std::vector<uint8_t> temp;		// // //
 	openFile("asm/SNES/bin/main.bin", temp);
-	std::vector<byte> temp2;
+	std::vector<uint8_t> temp2;
 	temp2.resize(temp.size() + 4);
 	temp2[0] = programSize & 0xFF;
 	temp2[1] = programSize >> 8;
@@ -1382,7 +1382,7 @@ void generateSPCs()
 		return;			// In this case, trying to generate an SPC would crash.
 	//byte base[0x10000];
 
-	std::vector<byte> programData;
+	std::vector<uint8_t> programData;		// // //
 	openFile("asm/SNES/bin/main.bin", programData);
 	programData.erase(programData.begin(), programData.begin() + 4);	// Erase the upload data.
 	unsigned int i;
@@ -1397,7 +1397,7 @@ void generateSPCs()
 
 	localPos = programData.size() + programPos;
 
-	std::vector<byte> SPC, SPCBase, DSPBase;
+	std::vector<uint8_t> SPC, SPCBase, DSPBase;		// // //
 	openFile("asm/SNES/SPCBase.bin", SPCBase);
 	openFile("asm/SNES/SPCDSPBase.bin", DSPBase);
 	SPC.resize(0x10200);
@@ -1630,7 +1630,7 @@ void assembleSNESDriver2()
 	//	quit(1);
 	//}
 
-	//std::vector<byte> patchBin;
+	//std::vector<uint8_t> patchBin;		// // //
 	//openFile("asm/SNES/temppatch.sfc", patchBin);
 
 	openTextFile("asm/SNES/patch.asm", patch);
@@ -1704,24 +1704,15 @@ void assembleSNESDriver2()
 	{
 		if (samples[i].exists)
 		{
-			std::vector<byte> temp;
-			temp.resize(samples[i].data.size() + 10);
-			temp[0] = 'S';
-			temp[1] = 'T';
-			temp[2] = 'A';
-			temp[3] = 'R';
+			const size_t ssize = samples[i].data.size();		// // //
+			std::vector<uint8_t> temp {
+				'S', 'T', 'A', 'R',
+				static_cast<uint8_t>((ssize + 1) & 0xFF), static_cast<uint8_t>((ssize + 1) >> 8),
+				static_cast<uint8_t>(~(ssize + 1) & 0xFF), static_cast<uint8_t>(~(ssize + 1) >> 8),
+				static_cast<uint8_t>(ssize & 0xFF), static_cast<uint8_t>(ssize >> 8),
+			};
+			temp.insert(temp.cend(), samples[i].data.cbegin(), samples[i].data.cend());		// // //
 
-			temp[4] = (samples[i].data.size()+2-1) & 0xFF;
-			temp[5] = (samples[i].data.size()+2-1) >> 8;
-
-			temp[6] = (~(samples[i].data.size()+2-1) & 0xFF);
-			temp[7] = (~(samples[i].data.size()+2-1) >> 8);
-			
-			temp[8] = samples[i].data.size() & 0xFF;
-			temp[9] = samples[i].data.size() >> 8;
-
-			for (unsigned int j = 0; j < samples[i].data.size(); j++)
-				temp[j+10] = samples[i].data[j];
 			std::stringstream filename;
 			filename << "asm/SNES/bin/brr" << hex2 << i << ".bin";
 			writeFile(filename.str(), temp);
@@ -1804,14 +1795,12 @@ void assembleSNESDriver2()
 		//	printError("asar reported an error.  Refer to temp.log for details.", true);
 
 
-		std::vector<byte> final;
+		std::vector<uint8_t> final;		// // //
 		final = romHeader;
 
-		std::vector<byte> tempsfc;
+		std::vector<uint8_t> tempsfc;
 		openFile("asm/SNES/temp.sfc", tempsfc);
-
-		for (unsigned int i = 0; i < tempsfc.size(); i++)
-			final.push_back(tempsfc[i]);
+		final.insert(final.cend(), tempsfc.cbegin(), tempsfc.cend());		// // //
 		
 		// // //
 		fs::remove((std::string)ROMName + "~");

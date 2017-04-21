@@ -1,7 +1,8 @@
-#ifndef _SOUNDEFFECT_H
-#define _SOUNDEFFECT_H
+#pragma once		// // //
 
-#include "globals.h"
+#include <string>
+#include <vector>
+#include <cstdint>
 
 class SoundEffect
 {
@@ -14,21 +15,14 @@ public:
 	int bank;
 	int index;
 	std::string name;
-	std::vector<byte> data;
+	std::vector<uint8_t> data;		// // //
 	std::string text;
-	bool add0;
+	bool add0 = true;		// // //
 	std::string pointName;
-	int pointsTo;
-	bool exists;
+	int pointsTo = 0;		// // //
+	bool exists = false;		// // //
 
 	int posInARAM;
-
-	SoundEffect(void)
-	{
-		add0 = true;
-		pointsTo = 0;
-		exists = false;
-	}
 
 	void compile();
 	void parseASM();
@@ -44,11 +38,8 @@ public:
 	std::vector<std::string> defineStrings;
 
 	std::vector<std::string> asmStrings;
-	std::vector<byte> code;
+	std::vector<uint8_t> code;		// // //
 	std::vector<std::string> asmNames;
 	std::vector<std::string> jmpNames;
 	std::vector<int> jmpPoses;
-
 };
-
-#endif

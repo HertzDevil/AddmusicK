@@ -28,7 +28,7 @@
 
 #define DATA_VERSION 0				// Used to keep track of incompatible changes to any and all compiled data, either to the SNES or to the PC
 
-typedef unsigned char byte;
+// // //
 //class ROM;
 class Music;
 class SoundEffect;
@@ -47,12 +47,13 @@ class SampleGroup;
 #include <vector>
 #include <fstream>
 #include <map>
+#include <cstdint>		// // //
 #include "Directory.h"
 #include "asardll.h"
 
 
 //extern ROM rom;
-extern std::vector<byte> rom;
+extern std::vector<uint8_t> rom;		// // //
 
 extern Music musics[256];
 //extern Sample samples[256];
@@ -97,7 +98,7 @@ extern bool useAsarDLL;
 bool asarCompileToBIN(const File &patchName, const File &binOutput, bool dieOnError = true);
 bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError = true);
 
-void openFile(const File &fileName, std::vector<byte> &vector);
+void openFile(const File &fileName, std::vector<uint8_t> &vector);		// // //
 void openTextFile(const File &fileName, std::string &string);
 
 // // //
@@ -137,7 +138,7 @@ void removeFile(const File &fileName);
 
 void insertValue(int value, int length, const std::string &find, std::string &str);
 
-int findFreeSpace(unsigned int size, int start, std::vector<byte> &ROM);	// Returns a position in the ROM with the specified amount of free space, starting at the specified position.  NOT using SNES addresses!  This function writes a RATS address at the position returned.
+int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM);	// // // Returns a position in the ROM with the specified amount of free space, starting at the specified position.  NOT using SNES addresses!  This function writes a RATS address at the position returned.
 
 int SNESToPC(int addr);
 
@@ -146,7 +147,7 @@ int PCToSNES(int addr);
 int clearRATS(int PCaddr);
 
 void addSample(const File &fileName, Music *music, bool important);
-void addSample(const std::vector<byte> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint = 0);
+void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint = 0);		// // //
 void addSampleGroup(const File &fileName, Music *music);
 void addSampleBank(const File &fileName, Music *music);
 

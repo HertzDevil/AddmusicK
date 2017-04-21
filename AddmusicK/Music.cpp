@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <locale>		// // //
 
+#include "globals.h"		// // //
 #include "Utility/Trie.h"		// // //
 #include "Binary/Defines.h"		// // //
 #include <functional>
@@ -103,7 +104,7 @@ std::string current;
 // // //
 template <typename... Args>
 void Music::append(Args&&... value) {
-	SWALLOW(tracks[channel].data.push_back(static_cast<byte>(std::forward<Args>(value))));
+	SWALLOW(tracks[channel].data.push_back(static_cast<uint8_t>(std::forward<Args>(value))));
 }
 
 // // //
@@ -1207,7 +1208,7 @@ void Music::parseHexCommand() {
 				// If we're just using the FC command and not the FA command as well,
 				if (!tracks[channelToCheck].usingFA) {
 					// Then add the "restore instrument command"
-					remoteGainConversion.push_back(std::vector<byte> {
+					remoteGainConversion.push_back(std::vector<uint8_t> {
 						AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00
 					});		// // //
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);
@@ -1215,7 +1216,7 @@ void Music::parseHexCommand() {
 
 					// Then add in the first part of a "apply gain before a note ends" call.
 					hexLeft = 2;
-					remoteGainConversion.push_back(std::vector<byte> {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain});
+					remoteGainConversion.push_back(std::vector<uint8_t> {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain});
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);
 					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Release);
 
@@ -1228,7 +1229,7 @@ void Music::parseHexCommand() {
 					// Shh.  Don't tell anyone.
 
 					hexLeft = 2;
-					remoteGainConversion.push_back(std::vector<byte> {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain});		// // //
+					remoteGainConversion.push_back(std::vector<uint8_t> {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain});		// // //
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
 					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05);
 					//append(lastFAGainValue[channelToCheck]);
@@ -1320,7 +1321,7 @@ void Music::parseHexCommand() {
 					tracks[channel].data.pop_back();
 					tracks[channel].data.pop_back();
 
-					remoteGainConversion.push_back(std::vector<byte>());
+					remoteGainConversion.push_back(std::vector<uint8_t>());
 
 					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
 					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00);
@@ -1338,8 +1339,8 @@ void Music::parseHexCommand() {
 					tracks[channel].data.pop_back();
 
 					// Then add the "set gain" remote call.
-					remoteGainConversion.push_back(std::vector<byte> {
-						AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<byte>(i), 0x00
+					remoteGainConversion.push_back(std::vector<uint8_t> {
+						AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00
 					});		// // //
 
 					// And finally the remote call data.
@@ -1386,7 +1387,7 @@ void Music::parseHexCommand() {
 				if (!tracks[channelToCheck].usingFC)		// // //
 				{
 					// Then add in a "restore instrument" remote call.
-					remoteGainConversion.push_back(std::vector<byte> {
+					remoteGainConversion.push_back(std::vector<uint8_t> {
 						AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00
 					});
 
@@ -1394,8 +1395,8 @@ void Music::parseHexCommand() {
 					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00);
 
 					// Then add the "set gain" remote call.
-					remoteGainConversion.push_back(std::vector<byte> {
-						AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<byte>(i), 0x00
+					remoteGainConversion.push_back(std::vector<uint8_t> {
+						AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00
 					});
 
 					// And finally the remote call data.
@@ -1406,8 +1407,8 @@ void Music::parseHexCommand() {
 					// Otherwise, add in a "2 5 combination" command.
 
 					// Then add the "set gain" remote call.
-					remoteGainConversion.push_back(std::vector<byte> {
-						AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<byte>(i), 0x00
+					remoteGainConversion.push_back(std::vector<uint8_t> {
+						AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00
 					});
 
 					// And finally the remote call data.
@@ -1420,7 +1421,7 @@ void Music::parseHexCommand() {
 				tracks[channelToCheck].usingFA = true;
 			}
 			else {
-				remoteGainConversion.push_back(std::vector<byte>());
+				remoteGainConversion.push_back(std::vector<uint8_t>());
 				remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
 				append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00);
 				tracks[channelToCheck].usingFA = false;

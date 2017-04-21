@@ -14,7 +14,7 @@ namespace fs = std::experimental::filesystem;
 #include "Directory.h"
 #include "globals.h"
 //ROM rom;
-std::vector<byte> rom;
+std::vector<uint8_t> rom;		// // //
 
 Music musics[256];
 //Sample samples[256];
@@ -56,7 +56,7 @@ int songCount = 0;
 int songSampleListSize;
 bool useAsarDLL;
 
-void openFile(const File &fileName, std::vector<byte> &v)
+void openFile(const File &fileName, std::vector<uint8_t> &v)		// // //
 {
 
 	std::ifstream is(fileName.cStr(), std::ios::binary);
@@ -296,7 +296,7 @@ void insertValue(int value, int length, const std::string &find, std::string &st
 //	srcn->exists = true;
 //}
 
-int findFreeSpace(unsigned int size, int start, std::vector<byte> &ROM)
+int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM)		// // //
 {
 	if (size == 0)
 		printError("Internal error: Requested free ROM space cannot be 0 bytes.", true);
@@ -408,7 +408,7 @@ int clearRATS(int offset)
 
 void addSample(const File &fileName, Music *music, bool important)
 {
-	std::vector<byte> temp;
+	std::vector<uint8_t> temp;		// // //
 	std::string actualPath = "";
 
 	std::string relativeDir = music->name;
@@ -429,7 +429,8 @@ void addSample(const File &fileName, Music *music, bool important)
 	addSample(temp, actualPath, music, important, false);
 }
 
-void addSample(const std::vector<byte> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint)
+// // //
+void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint)
 {
 	Sample newSample;
 	if (important)
@@ -513,7 +514,7 @@ int bankSampleCount = 0;			// Used to give unique names to sample bank brrs.
 
 void addSampleBank(const File &fileName, Music *music)
 {
-	std::vector<byte> bankFile;
+	std::vector<uint8_t> bankFile;		// // //
 	std::string actualPath = "";
 
 	std::string relativeDir = music->name;
@@ -938,7 +939,7 @@ bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool die
 		int binlen = 0;
 		int buflen = 0x10000;		// 0x10000 instead of 0x8000 because a few things related to sound effects are stored at 0x8000 at times.
 
-		byte *binOutput = (byte *)malloc(buflen);
+		uint8_t *binOutput = (uint8_t *)malloc(buflen);		// // //
 
 		asar_patch(patchName.cStr(), (char *)binOutput, buflen, &binlen);
 		int count = 0, currentCount = 0;
@@ -972,7 +973,7 @@ bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool die
 			return false;
 		}
 
-		std::vector<byte> v;
+		std::vector<uint8_t> v;		// // //
 		v.assign(binOutput, binOutput + binlen);
 		writeFile(binOutputFile, v);
 		free(binOutput);
@@ -998,7 +999,7 @@ bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError)
 		int binlen = 0;
 		int buflen;
 
-		std::vector<byte> patchrom;
+		std::vector<uint8_t> patchrom;		// // //
 		openFile(romName, patchrom);
 		buflen = patchrom.size();
 
