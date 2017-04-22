@@ -146,7 +146,6 @@ private:
 	void parseInstrumentCommand();
 	void parseOpenParenCommand();
 	void parseLabelLoopCommand();
-	void parseSampleLoadCommand();
 	void parseLoopCommand();
 	void parseLoopEndCommand();
 	void parseStarLoopCommand();
@@ -207,6 +206,7 @@ private:
 	bool getHexByte(int &out);		// // //
 	int getPitch(int j);
 	int getNoteLength(int);
+	std::string getIdentifier();		// // //
 	std::string getQuotedString();		// // //
 
 	bool guessLength;

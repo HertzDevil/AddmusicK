@@ -109,7 +109,8 @@ void Music::append(Args&&... value) {
 
 // // //
 bool Music::trim(std::string_view str) {
-	if (std::string_view(text.c_str(), str.size()) == str) {
+	auto &text_ = text;
+	if (std::string_view(text_.c_str(), str.size()) == str) {
 		skipChars(str.size());
 		return true;
 	}
@@ -118,8 +119,9 @@ bool Music::trim(std::string_view str) {
 
 // // //
 bool Music::trimChar(char c) {
-	if (!text.empty()) {
-		char ch = text.front();
+	auto &text_ = text;
+	if (!text_.empty()) {
+		char ch = text_.front();
 		if (ch == c) {
 			skipChars(1);
 			return true;
@@ -130,8 +132,9 @@ bool Music::trimChar(char c) {
 
 // // //
 char Music::trimChar(std::string_view clist) {
-	if (!text.empty()) {
-		char ch = text.front();
+	auto &text_ = text;
+	if (!text_.empty()) {
+		char ch = text_.front();
 		if (clist.find(ch, 0) != std::string_view::npos) {
 			skipChars(1);
 			return ch;
@@ -142,16 +145,17 @@ char Music::trimChar(std::string_view clist) {
 
 // // //
 bool Music::trimDirective(std::string_view str) {
-	std::size_t l = str.size();
-	if (text.size() <= l)
+	size_t l = str.size();
+	auto &text_ = text;
+	if (text_.size() < l)
 		return false;
-	auto prefix = text.substr(0, l);
+	auto prefix = text_.substr(0, l);
 
 	// case-insensitive
-	std::use_facet<std::ctype<char>>(std::locale("")).tolower(&prefix[0], &prefix[0] + prefix.size());
+	std::use_facet<std::ctype<char>>(std::locale("")).tolower(&prefix[0], &prefix[0] + l);
 
-	if (prefix == str && ::isspace(text[l])) {
-		skipChars(l + 1);
+	if (prefix == str) { // no need to check that next character is a space
+		skipChars(l);
 		return true;
 	}
 
@@ -160,14 +164,16 @@ bool Music::trimDirective(std::string_view str) {
 
 // // //
 void Music::skipChars(size_t count) {
-	text.erase(0, count);
+	auto &text_ = text;
+	text_.erase(0, count);
 }
 
 // // //
 void Music::skipSpaces() {
-	while (!text.empty() && isspace(text.front())) {
-		if (text.front() == '\n')
-			line++;
+	auto &text_ = text;
+	while (!text_.empty() && isspace(text_.front())) {
+		if (text_.front() == '\n')
+			++line;
 		skipChars(1);
 	}
 }
@@ -289,14 +295,11 @@ void Music::init() {
 	if (p != -1) {
 		//name.clear();
 		p += 7;
-		while (text[p] != '\r' && text[p] != '\n' && p < text.length()) {
+		while (p < text.length() && text[p] != '\r' && text[p] != '\n')
 			title += text[p++];
-		}
 	}
 	else {
-		p = name.find_last_of('.');
-		if (p != -1)
-			title = name.substr(0, p);
+		title = name.substr(0, name.find_last_of('.'));		// // //
 		p = name.find_last_of('/');
 		if (p != -1)
 			title = name.substr(p + 1);
@@ -604,10 +607,8 @@ void Music::parseIntroDirective() {
 }
 
 void Music::parseT() {
-	if (strncmp(&text.front(), "uning[", 6) == 0) {
-		skipChars(6);		// // //
+	if (trimDirective("uning["))		// // //
 		parseTransposeDirective();
-	}
 	else
 		parseTempoCommand();
 }
@@ -715,15 +716,7 @@ void Music::parseInstrumentCommand() {
 }
 
 void Music::parseOpenParenCommand() {
-	if (text.front() == '"' || text.front() == '@')
-		parseSampleLoadCommand();
-	else
-		parseLabelLoopCommand();
-}
-
-void Music::parseSampleLoadCommand() {
-	if (text.front() == '@') {
-		skipChars(1);
+	if (trimChar('@')) {		// // //
 		i = getInt();
 		i = instrToSample[i];
 		if (!trimChar(',')) {		// // //
@@ -731,16 +724,9 @@ void Music::parseSampleLoadCommand() {
 			return;
 		}
 	}
-	else {
+	else if (text.front() == '\"') {
 		// text.front() == '\"';
-		skipChars(1);
-		std::string s = "";
-		while (text.front() != '"') {
-			if (text.empty()) error("Error parsing sample load command.");		// // //
-			s += text.front();
-			skipChars(1);
-		}
-		skipChars(1);
+		std::string s = getQuotedString();		// // //
 		if (!trimChar(',')) {		// // //
 			error("Error parsing sample load command.");
 			return;
@@ -752,6 +738,10 @@ void Music::parseSampleLoadCommand() {
 		if (it == mySamples.cend())
 			error("The specified sample was not included in this song.");
 		i = std::distance(mySamples.cbegin(), it);
+	}
+	else {
+		parseLabelLoopCommand();
+		return;
 	}
 
 	if (!getHexByte(j)) {		// // //
@@ -1590,32 +1580,29 @@ void Music::parseNote() {
 		nextNoteIsForDD = false;
 		return;
 	}
-	nextNoteIsForDD = false;
 
 	j = 0;
 
 	bool okayToRewind = false;
 
 	do {
-		int tempsize = j;	// If there's a pitch bend up ahead, we need to not optimize the last tie.
 		std::string temptext = text;		// // //
 
 		if (j != 0 && (text.front() == '^' || (i == AMKd::Binary::CmdType::Rest && text.front() == 'r')))
 			skipChars(1);
 
+		int tempsize = j;	// If there's a pitch bend up ahead, we need to not optimize the last tie.
+
 		j += getNoteLength(getInt());
 		skipSpaces();
 
-		if ((strncmp(text.c_str(), "$DD", 3) == 0 || strncmp(text.c_str(), "$dd", 3) == 0) && okayToRewind) {
+		if (strnicmp(text.c_str(), "$DD", 3) == 0 && okayToRewind) {
 			j = tempsize;		//
 			text = temptext;		// // // "Rewind" so we forcibly place a tie before the bend.
 			break;			//
 		}
 		okayToRewind = true;
-
-		if (text.empty())		// // //
-			break;
-	} while (text.front() == '^' || (i == AMKd::Binary::CmdType::Rest && text.front() == 'r'));
+	} while (!text.empty() && (text.front() == '^' || (i == AMKd::Binary::CmdType::Rest && text.front() == 'r')));
 
 	/*if (normalLoopInsideE6Loop)
 	tempLoopLength += j;
@@ -1778,13 +1765,10 @@ void Music::parseSpecialDirective() {
 		;
 	else if (trimDirective("amm"))		// // //
 		;
-	else if (strnicmp(text.c_str(), "amk=", 4) == 0) {
-		skipChars(4);		// // //
+	else if (trimDirective("amk="))		// // //
 		getInt();
-	}
-	else if (strnicmp(text.c_str(), "halvetempo", 10) == 0) {
-		skipChars(10);		// // //
-		if (channelDefined == true)
+	else if (trimDirective("halvetempo")) {		// // //
+		if (channelDefined)
 			error("#halvetempo must be used before any and all channels.");		// // //
 		tempoRatio *= 2;
 
@@ -1797,9 +1781,7 @@ void Music::parseSpecialDirective() {
 
 void Music::parseReplacementDirective() {
 	std::string s = getQuotedString();		// // //
-
 	i = s.find('=');
-
 	if (i == -1)
 		printError("Error parsing replacement directive; could not find '='", true, name, line);
 
@@ -1816,8 +1798,6 @@ void Music::parseReplacementDirective() {
 	if (!replStr.empty())
 		while (isspace(replStr.front()))
 			replStr.erase(0, 1);
-	if (replStr.empty())
-		fatalError("Error parsing replacement directive; string to replace was of zero length.");
 
 	auto it = replacements.find(findStr);
 	if (it != replacements.end())
@@ -1865,42 +1845,16 @@ void Music::parseReplacementDirective() {
 }
 
 void Music::parseInstrumentDefinitions() {
-	enum parseState
-	{
-		lookingForOpenBrace,
-		lookingForAnything,
-		lookingForDollarSign,
-		lookingForOpenQuote,
-		gettingName,
-		gettingValue,
-	};
-
-	parseState state = lookingForOpenBrace;
-
 	skipSpaces();
 	if (!trimChar('{'))		// // //
 		fatalError("Could not find opening curly brace in instrument definition.");
 
 	skipSpaces();
-	while (text.front() != '}') {
-		bool isName, isNoise;
-		switch (trimChar("\"@n")) {		// // //
-		case '"': isName = true; isNoise = false; break;
-		case '@': isName = false; isNoise = false; break;
-		case 'n': isName = false; isNoise = true; break;
-		default:
-			fatalError("Error parsing instrument definition.");
-		}
-
-		if (isName) {
-			std::string brrName;
-			while (text.front() != '"') {
-				if (text.empty()) fatalError("Error parsing sample portion of the instrument definition.");
-				brrName += text.front();
-				skipChars(1);		// // //
-			}
-			skipChars(1);
-			i = -1;
+	while (!trimChar('}')) {
+		if (text.front() == '\"') {
+			std::string brrName = getQuotedString();
+			if (brrName.empty())
+				fatalError("Error parsing sample portion of the instrument definition.");
 			brrName = basepath + brrName;
 			int gs = getSample(brrName, this);
 			auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(brrName, this));		// // //
@@ -1908,7 +1862,7 @@ void Music::parseInstrumentDefinitions() {
 				fatalError("The specified sample was not included in this song.");		// // //
 			i = std::distance(mySamples.cbegin(), it);
 		}
-		else if (isNoise) {
+		else if (trimChar('n')) {		// // //
 			i = getHex();
 			if (i == -1 || i > 0xFF)
 				fatalError("Error parsing the noise portion of the instrument command.");
@@ -1918,7 +1872,7 @@ void Music::parseInstrumentDefinitions() {
 
 			i |= 0x80;
 		}
-		else {
+		else if (trimChar('@')) {
 			i = getInt();
 			if (i == -1)
 				fatalError("Error parsing the instrument copy portion of the instrument command.");
@@ -1928,6 +1882,8 @@ void Music::parseInstrumentDefinitions() {
 
 			i = instrToSample[i];
 		}
+		else
+			fatalError("Error parsing instrument definition.");
 
 		instrumentData.push_back(i);
 		if (optimizeSampleUsage)
@@ -1943,9 +1899,19 @@ void Music::parseInstrumentDefinitions() {
 		skipSpaces();
 	}
 
-	skipChars(1);
-
 	/*
+	enum parseState
+	{
+		lookingForOpenBrace,
+		lookingForAnything,
+		lookingForDollarSign,
+		lookingForOpenQuote,
+		gettingName,
+		gettingValue,
+	};
+
+	parseState state = lookingForOpenBrace;
+
 	//unsigned char temp;
 	int count = 0;
 
@@ -2001,11 +1967,10 @@ void Music::parseSampleDefinitions() {
 
 		if (text.front() == '\"') {
 			std::string tempstr = basepath + getQuotedString();		// // //
-			std::string extension;
 			auto tmppos = tempstr.find_last_of(".");
 			if (tmppos == -1)
 				fatalError("The filename for the sample was missing its extension; is it a .brr or .bnk?");		// // //
-			extension = tempstr.substr(tmppos);
+			std::string extension = tempstr.substr(tmppos);
 			if (extension == ".bnk")
 				addSampleBank(tempstr, this);
 			else if (extension == ".brr")
@@ -2013,19 +1978,8 @@ void Music::parseSampleDefinitions() {
 			else
 				fatalError("The filename for the sample was invalid.  Only \".brr\" and \".bnk\" are allowed.");		// // //
 		}
-		else if (trimChar('#')) {
-			std::string tempstr;
-			while (true) {
-				if (text.empty())		// // //
-					fatalError("Unexpected end of file found while parsing sample group definition.");
-				if (isspace(text.front()))
-					break;
-				tempstr += text.front();
-				skipChars(1);
-			}
-
-			addSampleGroup(tempstr, this);
-		}
+		else if (trimChar('#'))
+			addSampleGroup(getIdentifier(), this);		// // //
 		else if (trimChar('}'))
 			return;
 		else
@@ -2052,7 +2006,10 @@ void Music::parseLouderCommand() {
 
 void Music::parsePath() {
 	skipSpaces();
-	basepath = "./" + getQuotedString() + "/";		// // //
+	auto str = getQuotedString();		// // //
+	if (str.empty())
+		fatalError("Unexpected symbol found in path command. Expected a quoted string.");
+	basepath = "./" + str + "/";
 }
 
 int Music::getInt() {
@@ -2062,44 +2019,23 @@ int Music::getInt() {
 	// l8r$ED$00$00
 	// Yeah. Oh well.
 	// Attempt to do a replacement.  (So things like "ab = 8"    [c1]ab    are valid).
-	if (!doReplacement(text))		// // //
+	auto &text_ = text;
+	if (!doReplacement(text_))		// // //
 		fatalError("Infinite lexical macro substitution.");
 
 	int i = 0;
 	int d = 0;
 
-	while (!text.empty() && text.front() >= '0' && text.front() <= '9') {		// // //
+	while (!text_.empty() && text_.front() >= '0' && text_.front() <= '9') {		// // //
 		d++;
-		i = (i * 10) + text.front() - '0';
+		i = (i * 10) + text_.front() - '0';
 		skipChars(1);
 	}
 
 	return d ? i : -1;
 }
 
-int Music::getIntWithNegative() {
-	if (!doReplacement(text))		// // //
-		fatalError("Infinite lexical macro substitution.");
-
-	int i = 0;
-	int d = 0;
-	bool n = trimChar('-');		// // //
-
-	while (!text.empty() && text.front() >= '0' && text.front() <= '9') {		// // //
-		d++;
-		i = (i * 10) + text.front() - '0';
-		skipChars(1);
-	}
-
-	if (d == 0)
-		throw "Invalid number";
-	return n ? -i : i;
-}
-
 int Music::getInt(const std::string &str, int &p) {
-	if (!doReplacement(text))		// // //
-		fatalError("Infinite lexical macro substitution.");
-
 	int i = 0;
 	int d = 0;
 
@@ -2112,30 +2048,55 @@ int Music::getInt(const std::string &str, int &p) {
 	if (d == 0) return -1; else return i;
 }
 
+int Music::getIntWithNegative() {
+	auto &text_ = text;
+	if (!doReplacement(text_))		// // //
+		fatalError("Infinite lexical macro substitution.");
+
+	int i = 0;
+	int d = 0;
+	bool n = trimChar('-');		// // //
+
+	while (!text_.empty() && text_.front() >= '0' && text_.front() <= '9') {		// // //
+		d++;
+		i = (i * 10) + text_.front() - '0';
+		skipChars(1);
+	}
+
+	if (d == 0)
+		throw "Invalid number";
+	return n ? -i : i;
+}
+
 int Music::getHex(bool anyLength) {
-	if (!doReplacement(text))		// // //
+	auto &text_ = text;
+	if (!doReplacement(text_))		// // //
 		fatalError("Infinite lexical macro substitution.");
 
 	int i = 0;
 	int d = 0;
 	int j;
 
-	while (!text.empty()) {		// // //
-		if (d >= 2 && songTargetProgram == TargetType::AM4) break;		// // //
-		if (d >= 2 && anyLength == false)
+	while (!text_.empty()) {		// // //
+		if (d >= 2 && (!anyLength || songTargetProgram == TargetType::AM4))
 			break;
 
-		if ('0' <= text.front() && text.front() <= '9') j = text.front() - 0x30;
-		else if ('A' <= text.front() && text.front() <= 'F') j = text.front() - 0x37;
-		else if ('a' <= text.front() && text.front() <= 'f') j = text.front() - 0x57;
-		else break;
+		char ch = text_.front();
+		if ('0' <= ch && ch <= '9')
+			j = ch - '0';
+		else if ('A' <= ch && ch <= 'F')
+			j = ch - '7';
+		else if ('a' <= ch && ch <= 'f')
+			j = ch - ('7' + 'a' - 'A');
+		else
+			break;
 		skipChars(1);
-		d++;
-		i = (i * 16) + j;
-	}
-	if (d == 0) return -1;
 
-	return i;
+		++d;
+		i = i * 16 + j;
+	}
+
+	return d != 0 ? i : -1;
 }
 
 // // //
@@ -2197,20 +2158,33 @@ int Music::getNoteLength(int i) {
 }
 
 // // //
+std::string Music::getIdentifier() {
+	std::string str;
+	size_t pos = 0, n = str.size();
+	auto &text_ = text;
+	while (pos < n && !::isspace(text_[pos]))
+		str += text_[pos++];
+	skipChars(pos);
+	return str;
+}
+
+// // //
 std::string Music::getQuotedString() {
-	if (!trimChar('\"'))
-		fatalError("Unexpected symbol found in path command.  Expected a quoted string.");
-
 	std::string tempstr;
-
+	if (!trimChar('\"'))
+		return tempstr;
+	
+	auto &text_ = text;
 	while (true) {
-		if (text.empty())
+		if (text_.empty()) {
 			printError("Unexpected end of file found.", false);
+			return tempstr;
+		}
 
 		if (trimChar('\"'))
 			break;
 
-		char ch = text.front();
+		char ch = text_.front();
 		skipChars(1);
 		if (ch == '\\') {
 			if (trimChar('\"'))
@@ -2584,19 +2558,12 @@ void Music::parseSPCInfo() {
 	skipSpaces();
 	if (!trimChar('{'))
 		error("Could not find opening brace in SPC info command.");
-
-	skipChars(1);
 	skipSpaces();
 
-	while (text.front() != '}') {
+	while (!trimChar('}')) {
 		if (!trimChar('#'))		// // //
 			error("Unexpected symbol found in SPC info command.  Expected \'#\'.");
-		std::string typeName;
-
-		while (!isspace(text.front())) {		// // //
-			typeName += text.front();
-			skipChars(1);
-		}
+		std::string typeName = getIdentifier();		// // //
 
 		if (typeName != "author" && typeName != "comment" && typeName != "title" && typeName != "game" && typeName != "length")
 			error("Unexpected type name found in SPC info command.  Only \"author\", \"comment\", \"title\", \"game\", and \"length\" are allowed.");
@@ -2604,6 +2571,8 @@ void Music::parseSPCInfo() {
 		skipSpaces();
 
 		std::string parameter = getQuotedString();		// // //
+		if (parameter.empty())
+			error("Error while parsing parameter for SPC info command.");
 
 		if (typeName == "author")
 			author = parameter;
@@ -2657,8 +2626,6 @@ void Music::parseSPCInfo() {
 		title = title.substr(0, 32);
 		printWarning((std::string)("\"Title\" field was too long.  Truncating to \"") + title + "\".");
 	}
-
-	skipChars(1);		// // //
 }
 
 void Music::handleNormalLoopEnter() {
