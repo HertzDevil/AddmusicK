@@ -872,10 +872,8 @@ void Music::parseLabelLoopCommand() {
 			error("Label not yet defined.");
 		j = getInt();
 		if (j == -1) j = 1;
-		if (j < 1 || j > 255) {
+		if (j < 1 || j > 255)
 			error("Invalid loop count.");		// // //
-			j = 1;
-		}
 
 		handleNormalLoopRemoteCall(j);
 
@@ -990,10 +988,8 @@ void Music::parseStarLoopCommand() {
 
 	i = getInt();
 	if (i == -1) i = 1;
-	if (i < 1 || i > 255) {
+	if (i < 1 || i > 255)
 		error("Invalid loop count.");
-		i = 1;
-	}
 
 	handleNormalLoopRemoteCall(i);
 
@@ -1571,10 +1567,8 @@ void Music::parseNote() {
 				i -= transposeMap[tracks[channel].instrument];
 		}
 
-		if (i < 0) {
+		if (i < 0)
 			error("Note's pitch was too low.");		// // //
-			i = AMKd::Binary::CmdType::Rest;
-		}
 		else if (i >= AMKd::Binary::CmdType::Tie)
 			error("Note's pitch was too high.");
 		else if (tracks[channel].instrument >= 21 && tracks[channel].instrument < 30)		// // //
@@ -2753,6 +2747,7 @@ void Music::addNoteLength(double ticks) {
 
 int Music::divideByTempoRatio(int value, bool fractionIsError) {
 	return value;
+	/*
 	int temp = value / tempoRatio;
 	if (temp * tempoRatio != value)
 		if (fractionIsError)
@@ -2761,6 +2756,7 @@ int Music::divideByTempoRatio(int value, bool fractionIsError) {
 			printWarning("The tempo ratio resulted in a fractional value.", name, line);
 
 	return temp;
+	*/
 }
 
 int Music::multiplyByTempoRatio(int value) {

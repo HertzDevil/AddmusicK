@@ -53,23 +53,21 @@ int songCount = 0;
 int songSampleListSize;
 bool useAsarDLL;
 
+
+
 void openFile(const File &fileName, std::vector<uint8_t> &v)		// // //
 {
-
 	std::ifstream is(fileName.cStr(), std::ios::binary);
-
 	if (!is)
 		printError(std::string("Error: File \"") + fileName.cStr() + std::string("\" not found."), true);
 
-	
 	is.seekg(0, std::ios::end);
 	unsigned int length = (unsigned int)is.tellg();
 	is.seekg(0, std::ios::beg);
 	v.clear();
 	v.reserve(length);
 
-	while (length > 0)
-	{
+	while (length > 0) {
 		char temp;
 		is.read(&temp, 1);
 		v.push_back(temp);
@@ -79,37 +77,28 @@ void openFile(const File &fileName, std::vector<uint8_t> &v)		// // //
 	is.close();
 }
 
-
-
-void openTextFile(const File &fileName, std::string &s) 
-{
+void openTextFile(const File &fileName, std::string &s) {
 	std::ifstream is(fileName.cStr());
 
 	if (!is)
 		printError(std::string("Error: File \"") + fileName.cStr() + std::string("\" not found."), true);
 
-	s.assign( (std::istreambuf_iterator<char>(is)), (std::istreambuf_iterator<char>()) );
+	s.assign((std::istreambuf_iterator<char>(is)), (std::istreambuf_iterator<char>()));
 }
 
-time_t getTimeStamp(const File &file)
-{
+time_t getTimeStamp(const File &file) {
 	struct stat s;
-	if (stat(file, &s) == -1) 
-	{
-		//std::cout << "Could not determine timestamp of \"" << file << "\"." << std::endl;
+	if (stat(file, &s) == -1) {
+		//std::cerr << "Could not determine timestamp of \"" << file << "\"." << std::endl;
 		return 0;
 	}
 	return s.st_mtime;
 }
 
-
-void printError(const std::string &error, bool isFatal, const std::string &fileName, int line)
-{
+void printError(const std::string &error, bool isFatal, const std::string &fileName, int line) {
 	std::ostringstream oss;
 	if (line >= 0)
-	{
 		oss << std::dec << "File: " << fileName << " Line: " << line << ":\n";
-	}
 	errorCount++;
 	fputs((oss.str() + error).c_str(), stderr);
 	fputc('\n', stderr);
@@ -121,37 +110,30 @@ void printError(const std::string &error, bool isFatal, const std::string &fileN
 	if (isFatal) quit(1);
 }
 
-void printWarning(const std::string &error, const std::string &fileName, int line)
-{
+void printWarning(const std::string &error, const std::string &fileName, int line) {
 	std::ostringstream oss;
 	if (line >= 0)
-	{
 		oss << "File: " << fileName << " Line: " << line << ":\n";
-	}
 	puts((oss.str() + error).c_str());
 	putchar('\n');
 }
 
-void quit(int code)
-{
-	if (forceNoContinuePrompt == false)
-	{
+void quit(int code) {
+	if (forceNoContinuePrompt == false) {
 		puts("Press ENTER to continue...\n");
 		getc(stdin);
 	}
 	exit(code);
 }
 
-int execute(const File &command, bool prepend)
-{
-     std::string tempstr = command.cStr();
-     if (prepend)
-     {
+int execute(const File &command, bool prepend) {
+	std::string tempstr = command.cStr();
+	if (prepend) {
 #ifndef _WIN32
-	  tempstr.insert(0, "./");
+		tempstr.insert(0, "./");
 #endif
-     }
-     return system(tempstr.c_str());
+	}
+	return system(tempstr.c_str());
 }
 
 int scanInt(const std::string &str, const std::string &value)		// Scans an integer value that comes after the specified string within another string.  Must be in $XXXX format (or $XXXXXX, etc.).
@@ -164,14 +146,12 @@ int scanInt(const std::string &str, const std::string &value)		// Scans an integ
 	return ret;
 }
 
-bool fileExists(const File &fileName)
-{
+bool fileExists(const File &fileName) {
 	std::ifstream is(fileName.cStr(), std::ios::binary);
 
 	bool yes = !(!is);
 
-	if (yes)
-	{
+	if (yes) {
 		is.seekg(0, std::ios::end);
 		unsigned int length = (unsigned int)is.tellg();
 		is.seekg(0, std::ios::beg);
@@ -184,8 +164,7 @@ bool fileExists(const File &fileName)
 	return yes;
 }
 
-unsigned int getFileSize(const File &fileName)
-{
+unsigned int getFileSize(const File &fileName) {
 	std::ifstream is(fileName.cStr(), std::ios::binary);
 
 	if (!is) return 0;
@@ -196,19 +175,14 @@ unsigned int getFileSize(const File &fileName)
 	return length;
 }
 
-void removeFile(const File &fileName)
-{
-	if (remove(fileName.cStr()) == 1)
-	{
+void removeFile(const File &fileName) {
+	if (remove(fileName.cStr()) == 1) {
 		std::cout << "Could not delete critical file \"" << fileName.cStr() << "\"." << std::endl;
 		quit(1);
 	}
-
-
 }
 
-void writeTextFile(const File &fileName, const std::string &string)
-{
+void writeTextFile(const File &fileName, const std::string &string) {
 	std::ofstream ofs;
 	ofs.open(fileName.cStr(), std::ios::binary);
 
@@ -216,10 +190,8 @@ void writeTextFile(const File &fileName, const std::string &string)
 
 #ifdef _WIN32
 	unsigned int i = 0;
-	while (i < n.length())
-	{
-		if (n[i] == '\n')
-		{
+	while (i < n.length()) {
+		if (n[i] == '\n') {
 			n = n.insert(i, "\r");
 			i++;
 		}
@@ -231,16 +203,15 @@ void writeTextFile(const File &fileName, const std::string &string)
 	ofs.close();
 }
 
-void insertValue(int value, int length, const std::string &find, std::string &str)
-{
+void insertValue(int value, int length, const std::string &find, std::string &str) {
 	int pos = str.find(find);
-	if (pos == -1)	{ std::cout << "Error: \"" << find << "\" could not be found." << std::endl; quit(1); }
+	if (pos == -1) { std::cout << "Error: \"" << find << "\" could not be found." << std::endl; quit(1); }
 	pos += find.length();
 
 	std::stringstream ss;
 	ss << hex_formatter(length) << value << std::dec;		// // //
 	std::string tempStr = ss.str();
-	str.replace(pos+1, length, tempStr);
+	str.replace(pos + 1, length, tempStr);
 }
 
 //int getSampleIndex(const std::string &name)
@@ -305,10 +276,8 @@ int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM)		// /
 	size += 8;
 	int i;
 
-	for (i = start; (unsigned)i < ROM.size(); i++)
-	{
-		if (runningSpace == size)
-		{
+	for (i = start; (unsigned)i < ROM.size(); i++) {
+		if (runningSpace == size) {
 			pos = i;
 			break;
 		}
@@ -316,12 +285,10 @@ int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM)		// /
 		if (i % 0x8000 == 0)
 			runningSpace = 0;
 
-		if ((unsigned)i < ROM.size() - 4 && memcmp(&ROM[i], "STAR", 4) == 0)
-		{
-			unsigned short RATSSize = ROM[i+4] | ROM[i+5] << 8;
-			unsigned short sizeInv = (ROM[i+6] | ROM[i+7] << 8) ^ 0xFFFF;
-			if (RATSSize != sizeInv)
-			{
+		if ((unsigned)i < ROM.size() - 4 && memcmp(&ROM[i], "STAR", 4) == 0) {
+			unsigned short RATSSize = ROM[i + 4] | ROM[i + 5] << 8;
+			unsigned short sizeInv = (ROM[i + 6] | ROM[i + 7] << 8) ^ 0xFFFF;
+			if (RATSSize != sizeInv) {
 				runningSpace += 1;
 				continue;
 			}
@@ -329,12 +296,10 @@ int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM)		// /
 			runningSpace = 0;
 
 		}
-		else if (ROM[i] == 0 || aggressive)
-		{
+		else if (ROM[i] == 0 || aggressive) {
 			runningSpace += 1;
 		}
-		else
-		{
+		else {
 			runningSpace = 0;
 		}
 	}
@@ -342,8 +307,7 @@ int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM)		// /
 	if (runningSpace == size)
 		pos = i;
 
-	if (pos == 0) 
-	{
+	if (pos == 0) {
 		if (start == 0x080000)
 			return -1;
 		else
@@ -352,59 +316,56 @@ int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM)		// /
 
 	pos -= size;
 
-	ROM[pos+0] = 'S';
-	ROM[pos+1] = 'T';
-	ROM[pos+2] = 'A';
-	ROM[pos+3] = 'R';
+	ROM[pos + 0] = 'S';
+	ROM[pos + 1] = 'T';
+	ROM[pos + 2] = 'A';
+	ROM[pos + 3] = 'R';
 	pos += 4;
 	size -= 9;			// Not -8.  -8 would accidentally protect one too many bytes.
-	ROM[pos+0] = size & 0xFF;
-	ROM[pos+1] = size >> 8;
+	ROM[pos + 0] = size & 0xFF;
+	ROM[pos + 1] = size >> 8;
 	size ^= 0xFFFF;
-	ROM[pos+2] = size & 0xFF;
-	ROM[pos+3] = size >> 8;
+	ROM[pos + 2] = size & 0xFF;
+	ROM[pos + 3] = size >> 8;
 	pos -= 4;
 	return pos;
 }
 
 int SNESToPC(int addr)					// Thanks to alcaro.
-{ 
+{
 	if (addr < 0 || addr > 0xFFFFFF ||		// not 24bit 
 		(addr & 0xFE0000) == 0x7E0000 ||	// wram 
 		(addr & 0x408000) == 0x000000)		// hardware regs 
-		return -1; 
-	if (usingSA1 && addr >= 0x808000) 
+		return -1;
+	if (usingSA1 && addr >= 0x808000)
 		addr -= 0x400000;
-	addr = ((addr & 0x7F0000) >> 1 | (addr & 0x7FFF)); 
-	return addr; 
+	addr = ((addr & 0x7F0000) >> 1 | (addr & 0x7FFF));
+	return addr;
 }
 
-int PCToSNES(int addr)
-{	
-	if (addr<0 || addr>=0x400000) 
-		return -1; 
-	
-	addr = ((addr <<1 ) & 0x7F0000) | (addr&0x7FFF) | 0x8000; 
-	
-	if ((addr&0xF00000) == 0x700000) 
-		addr |= 0x800000; 
+int PCToSNES(int addr) {
+	if (addr < 0 || addr >= 0x400000)
+		return -1;
+
+	addr = ((addr << 1) & 0x7F0000) | (addr & 0x7FFF) | 0x8000;
+
+	if ((addr & 0xF00000) == 0x700000)
+		addr |= 0x800000;
 
 	if (usingSA1 && addr >= 0x400000)
 		addr += 0x400000;
-	return addr; 
+	return addr;
 }
 
-int clearRATS(int offset)
-{
-	int size = ((rom[offset + 5] << 8) | rom[offset+4]) + 8;
+int clearRATS(int offset) {
+	int size = ((rom[offset + 5] << 8) | rom[offset + 4]) + 8;
 	int r = size;
 	while (size >= 0)
 		rom[offset + size--] = 0;
-	return r+1;
+	return r + 1;
 }
 
-void addSample(const File &fileName, Music *music, bool important)
-{
+void addSample(const File &fileName, Music *music, bool important) {
 	std::vector<uint8_t> temp;		// // //
 	std::string actualPath = "";
 
@@ -414,7 +375,7 @@ void addSample(const File &fileName, Music *music, bool important)
 	relativeDir = "music/" + relativeDir;
 	relativeDir = relativeDir.substr(0, relativeDir.find_last_of('/'));
 	relativeDir += "/" + (std::string)fileName;
-	
+
 	if (fileExists(relativeDir))
 		actualPath = relativeDir;
 	else if (fileExists(absoluteDir))
@@ -427,20 +388,16 @@ void addSample(const File &fileName, Music *music, bool important)
 }
 
 // // //
-void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint)
-{
+void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint) {
 	Sample newSample;
 	if (important)
 		newSample.important = true;
 	else
 		newSample.important = false;
 
-	if (sample.size() != 0)
-	{
-		if (!noLoopHeader)
-		{
-			if ((sample.size() - 2) % 9 != 0)
-			{
+	if (sample.size() != 0) {
+		if (!noLoopHeader) {
+			if ((sample.size() - 2) % 9 != 0) {
 				std::stringstream errstream;
 
 				errstream << "The sample \"" + name + "\" was of an invalid length (the filesize - 2 should be a multiple of 9).  Did you forget the loop header?" << std::endl;
@@ -450,8 +407,7 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 			newSample.loopPoint = (sample[1] << 8) | (sample[0]);
 			newSample.data.assign(sample.begin() + 2, sample.end());
 		}
-		else
-		{
+		else {
 			newSample.data.assign(sample.begin(), sample.end());
 			newSample.loopPoint = loopPoint;
 		}
@@ -459,8 +415,7 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 	newSample.exists = true;
 	newSample.name = name;
 
-	if (dupCheck)
-	{
+	if (dupCheck) {
 		for (size_t i = 0, n = samples.size(); i < n; ++i)		// // //
 			if (samples[i].name == newSample.name) {
 				music->mySamples.push_back(static_cast<uint16_t>(i));
@@ -479,8 +434,7 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 	samples.push_back(newSample);					// This is a sample we haven't encountered before.  Add it.
 }
 
-void addSampleGroup(const File &groupName, Music *music)
-{
+void addSampleGroup(const File &groupName, Music *music) {
 	for (const auto &bank : bankDefines) {		// // //
 		if ((std::string)groupName == bank->name) {
 			for (size_t j = 0, n = bank->samples.size(); j < n; ++j) {
@@ -499,8 +453,7 @@ void addSampleGroup(const File &groupName, Music *music)
 
 int bankSampleCount = 0;			// Used to give unique names to sample bank brrs.
 
-void addSampleBank(const File &fileName, Music *music)
-{
+void addSampleBank(const File &fileName, Music *music) {
 	std::vector<uint8_t> bankFile;		// // //
 	std::string actualPath = "";
 
@@ -526,14 +479,12 @@ void addSampleBank(const File &fileName, Music *music)
 	//Sample bankSamples[0x40];
 	Sample tempSample;
 	int currentSample = 0;
-	for (currentSample = 0; currentSample < 0x40; currentSample++)
-	{
+	for (currentSample = 0; currentSample < 0x40; currentSample++) {
 		unsigned short startPosition = bankFile[currentSample * 4 + 0] | (bankFile[currentSample * 4 + 1] << 8);
 		tempSample.loopPoint = (bankFile[currentSample * 4 + 2] | bankFile[currentSample * 4 + 3] << 8) - startPosition;
 		tempSample.data.clear();
 
-		if (startPosition == 0 && tempSample.loopPoint == 0)
-		{
+		if (startPosition == 0 && tempSample.loopPoint == 0) {
 			addSample("EMPTY.brr", music, true);
 			continue;
 		}
@@ -551,12 +502,11 @@ void addSampleBank(const File &fileName, Music *music)
 		char temp[20];
 		sprintf(temp, "__SRCNBANKBRR%04X", bankSampleCount++);
 		tempSample.name = temp;
-		addSample(tempSample.data, tempSample.name, music, true, true, tempSample.loopPoint); 
+		addSample(tempSample.data, tempSample.name, music, true, true, tempSample.loopPoint);
 	}
 }
 
-int getSample(const File &name, Music *music)
-{
+int getSample(const File &name, Music *music) {
 	std::string actualPath = "";
 
 	std::string relativeDir = music->name;
@@ -573,15 +523,12 @@ int getSample(const File &name, Music *music)
 	else
 		printError("Could not find sample " + (std::string)name, true, music->name);
 
-
-
 	File ftemp = actualPath;
 	std::map<File, int>::const_iterator it = sampleToIndex.begin();
 
 	fs::path p1 = actualPath;
 
-	while (it != sampleToIndex.end())
-	{
+	while (it != sampleToIndex.end()) {
 		fs::path p2 = (std::string)it->first;
 		if (fs::equivalent(p1, p2))
 			return it->second;
@@ -591,7 +538,6 @@ int getSample(const File &name, Music *music)
 		it++;
 	}
 
-
 	return -1;
 }
 
@@ -599,14 +545,11 @@ int getSample(const File &name, Music *music)
 
 #define error(str) printError(str, true, filename, line)
 
-std::string getArgument(const std::string &str, char endChar, unsigned int &pos, const std::string &filename, int line, bool breakOnNewLines)
-{
+std::string getArgument(const std::string &str, char endChar, unsigned int &pos, const std::string &filename, int line, bool breakOnNewLines) {
 	std::string temp;
 
-	while (true)
-	{
-		if (endChar == ' ')
-		{
+	while (true) {
+		if (endChar == ' ') {
 			if (str[pos] == ' ' || str[pos] == '\t')
 				break;
 		}
@@ -614,8 +557,8 @@ std::string getArgument(const std::string &str, char endChar, unsigned int &pos,
 			if (str[pos] == endChar)
 				break;
 
-		if (pos == str.length()) 
-			error("Unexpected end of file found."); 
+		if (pos == str.length())
+			error("Unexpected end of file found.");
 		if (breakOnNewLines) if (str[pos] == '\r' || str[pos] == '\n') break;			// Break on new lines.
 		temp += str[pos];
 		pos++;
@@ -624,8 +567,7 @@ std::string getArgument(const std::string &str, char endChar, unsigned int &pos,
 	return temp;
 }
 
-int strToInt(const std::string &str)
-{
+int strToInt(const std::string &str) {
 	std::stringstream a;
 	a << str;
 	int j;
@@ -643,8 +585,7 @@ while (i < str.size() && isspace(str[i]))	\
 	i++;					\
 }
 
-void preprocess(std::string &str, const std::string &filename, int &version)
-{
+void preprocess(std::string &str, const std::string &filename, int &version) {
 	// Handles #ifdefs.  Maybe more later?
 
 	std::map<std::string, int> defines;
@@ -661,43 +602,37 @@ void preprocess(std::string &str, const std::string &filename, int &version)
 
 	std::stack<bool> okayStatus;
 
-
-	while (true)
-	{
+	while (true) {
 		if (i == str.length()) break;
-		
-		if (i < str.length()) 
-			if (str[i] == '\n') 
+
+		if (i < str.length())
+			if (str[i] == '\n')
 				line++;
 
-		if (str[i] == '\"')
-		{
+		if (str[i] == '\"') {
 			i++;
-			if (okayToAdd)
-			{
+			if (okayToAdd) {
 				newstr += '\"';
 				newstr += getArgument(str, '\"', i, filename, line, false) + '\"';
 			}
 			i++;
-			
+
 		}
-		else if (str[i] == '#')
-		{
+		else if (str[i] == '#') {
 			std::string temp;
 			i++;
-			
+
 			if (strncmp(str.c_str() + i, "amk=1", 5) == 0)					// Special handling so that we can have #amk=1.
 			{
 				if (version >= 0)
 					version = 1;
-				i+=5;
+				i += 5;
 				continue;
 			}
 
 			temp = getArgument(str, ' ', i, filename, line, true);
 
-			if (temp == "define")
-			{
+			if (temp == "define") {
 				if (!okayToAdd) { level++; continue; }
 
 				skipSpaces;
@@ -709,32 +644,27 @@ void preprocess(std::string &str, const std::string &filename, int &version)
 				std::string temp3 = getArgument(str, ' ', i, filename, line, true);
 				if (temp3.length() == 0)
 					defines[temp2] = 1;
-				else
-				{
+				else {
 					int j;
-					try
-					{
+					try {
 						j = strToInt(temp3);
+						defines[temp2] = j;		// // //
 					}
-					catch (...)
-					{
+					catch (...) {
 						error("Could not parse integer for #define.");
 					}
-					defines[temp2] = j;
 				}
 			}
-			else if (temp == "undef")
-			{		
-				if (!okayToAdd) { level++; continue; }	
+			else if (temp == "undef") {
+				if (!okayToAdd) { level++; continue; }
 
-				skipSpaces;	
+				skipSpaces;
 				std::string temp2 = getArgument(str, ' ', i, filename, line, true);
 				if (temp2.length() == 0)
 					error("#undef was missing its argument.");
 				defines.erase(temp2);
 			}
-			else if (temp == "ifdef")
-			{
+			else if (temp == "ifdef") {
 				if (!okayToAdd) { level++; continue; }
 
 				skipSpaces;
@@ -751,8 +681,7 @@ void preprocess(std::string &str, const std::string &filename, int &version)
 
 				level++;
 			}
-			else if (temp == "ifndef")
-			{
+			else if (temp == "ifndef") {
 				if (!okayToAdd) { level++; continue; }
 
 				skipSpaces;
@@ -769,8 +698,7 @@ void preprocess(std::string &str, const std::string &filename, int &version)
 
 				level++;
 			}
-			else if (temp == "if")
-			{
+			else if (temp == "if") {
 				if (!okayToAdd) { level++; continue; }
 
 				skipSpaces;
@@ -780,52 +708,45 @@ void preprocess(std::string &str, const std::string &filename, int &version)
 
 				if (defines.find(temp2) == defines.end())
 					error("First argument for #if was never defined.");
-				
 
 				skipSpaces;
 				std::string temp3 = getArgument(str, ' ', i, filename, line, true);
 				if (temp3.length() == 0)
 					error("#if was missing its comparison operator.");
-				
 
 				skipSpaces;
 				std::string temp4 = getArgument(str, ' ', i, filename, line, true);
 				if (temp4.length() == 0)
 					error("#if was missing its second argument.");
-				
+
 				okayStatus.push(okayToAdd);
-				
+
 				int j;
-				try
-				{
+				try {
 					j = strToInt(temp4);
+					if (temp3 == "==")		// // //
+						okayToAdd = (defines[temp2] == j);
+					else if (temp3 == ">")
+						okayToAdd = (defines[temp2] > j);
+					else if (temp3 == "<")
+						okayToAdd = (defines[temp2] < j);
+					else if (temp3 == "!=")
+						okayToAdd = (defines[temp2] != j);
+					else if (temp3 == ">=")
+						okayToAdd = (defines[temp2] >= j);
+					else if (temp3 == "<=")
+						okayToAdd = (defines[temp2] <= j);
+					else
+						error("Unknown operator for #if.");
 				}
-				catch (...)
-				{
+				catch (...) {
 					error("Could not parse integer for #if.");
 				}
 
-				if (temp3 == "==")
-					okayToAdd = (defines[temp2] == j);
-				else if (temp3 == ">")
-					okayToAdd = (defines[temp2] > j);
-				else if (temp3 == "<")
-					okayToAdd = (defines[temp2] < j);
-				else if (temp3 == "!=")
-					okayToAdd = (defines[temp2] != j);
-				else if (temp3 == ">=")
-					okayToAdd = (defines[temp2] >= j);
-				else if (temp3 == "<=")
-					okayToAdd = (defines[temp2] <= j);
-				else
-					error("Unknown operator for #if.");
-				
 				level++;
 			}
-			else if (temp == "endif")
-			{
-				if (level > 0)
-				{
+			else if (temp == "endif") {
+				if (level > 0) {
 					level--;
 					okayToAdd = okayStatus.top();
 					okayStatus.pop();
@@ -833,25 +754,19 @@ void preprocess(std::string &str, const std::string &filename, int &version)
 				else
 					error("There was an #endif without a matching #ifdef, #ifndef, or #if.");
 			}
-			else if (temp == "amk")
-			{
-				if (version >= 0)
-				{
+			else if (temp == "amk") {
+				if (version >= 0) {
 					skipSpaces;
 					std::string temp = getArgument(str, ' ', i, filename, line, true);
-					if (temp.length() == 0)
-					{
+					if (temp.length() == 0) {
 						printError("#amk must have an integer argument specifying the version.", false, filename, line);
 					}
-					else
-					{
+					else {
 						int j;
-						try
-						{
+						try {
 							j = strToInt(temp);
 						}
-						catch (...)
-						{
+						catch (...) {
 							error("Could not parse integer for #amk.");
 						}
 						version = j;
@@ -862,18 +777,15 @@ void preprocess(std::string &str, const std::string &filename, int &version)
 				version = -2;
 			else if (temp == "am4")
 				version = -1;
-			else
-			{
-				if (okayToAdd)
-				{
+			else {
+				if (okayToAdd) {
 					newstr += "#";
 					newstr += temp;
 				}
 			}
 
 		}
-		else
-		{
+		else {
 			if (okayToAdd || str[i] == '\n') newstr += str[i];
 			i++;
 		}
@@ -883,16 +795,12 @@ void preprocess(std::string &str, const std::string &filename, int &version)
 	if (level != 0)
 		error("There was an #ifdef, #ifndef, or #if without a matching #endif.");
 
-
-
 	i = 0;
 	if (version != -2)			// For now, skip comment erasing for #amm songs.  #amk songs will follow suit in a later version.
 	{
 
-		while (i < newstr.length())
-		{
-			if (newstr[i] == ';')
-			{
+		while (i < newstr.length()) {
+			if (newstr[i] == ';') {
 				while (i < newstr.length() && newstr[i] != '\n')
 					newstr = newstr.erase(i, 1);
 				continue;
@@ -904,14 +812,11 @@ void preprocess(std::string &str, const std::string &filename, int &version)
 	str = newstr;
 }
 
-
-bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool dieOnError)
-{
+bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool dieOnError) {
 	removeFile("temp.log");
 	removeFile("temp.txt");
 
-	if (useAsarDLL)
-	{
+	if (useAsarDLL) {
 		int binlen = 0;
 		int buflen = 0x10000;		// 0x10000 instead of 0x8000 because a few things related to sound effects are stored at 0x8000 at times.
 
@@ -923,8 +828,7 @@ bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool die
 
 		asar_getprints(&count);
 
-		while (currentCount != count)
-		{
+		while (currentCount != count) {
 			printout += asar_getprints(&count)[currentCount];
 			printout += "\n";
 			currentCount++;
@@ -936,14 +840,12 @@ bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool die
 		printout.clear();
 
 		asar_geterrors(&count);
-		
-		while (currentCount != count)
-		{
+
+		while (currentCount != count) {
 			printout += asar_geterrors(&count)[currentCount].fullerrdata + (std::string)"\n";
 			currentCount++;
 		}
-		if (count > 0)
-		{
+		if (count > 0) {
 			writeTextFile("temp.log", printout);
 			free(binOutput);
 			return false;
@@ -955,8 +857,7 @@ bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool die
 		free(binOutput);
 		return true;
 	}
-	else
-	{
+	else {
 		remove(binOutputFile);
 		std::string s = "asar " + (std::string)patchName + " " + (std::string)binOutputFile + " 2> temp.log > temp.txt";
 		execute(s);
@@ -965,13 +866,11 @@ bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool die
 	}
 }
 
-bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError)
-{
+bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError) {
 	removeFile("temp.log");
 	removeFile("temp.txt");
 
-	if (useAsarDLL)
-	{
+	if (useAsarDLL) {
 		int binlen = 0;
 		int buflen;
 
@@ -985,8 +884,7 @@ bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError)
 
 		asar_getprints(&count);
 
-		while (currentCount != count)
-		{
+		while (currentCount != count) {
 			printout += asar_getprints(&count)[currentCount];
 			printout += "\n";
 			currentCount++;
@@ -998,14 +896,12 @@ bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError)
 		printout.clear();
 
 		asar_geterrors(&count);
-		
-		while (currentCount != count)
-		{
+
+		while (currentCount != count) {
 			printout += asar_geterrors(&count)[currentCount].fullerrdata + (std::string)"\n";
 			currentCount++;
 		}
-		if (count > 0)
-		{
+		if (count > 0) {
 			writeTextFile("temp.log", printout);
 			return false;
 		}
@@ -1013,8 +909,7 @@ bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError)
 		writeFile(romName, patchrom);
 		return true;
 	}
-	else
-	{
+	else {
 		std::string s = "asar " + (std::string)patchName + " " + (std::string)romName + " 2> temp.log > temp.txt";
 		execute(s);
 		if (dieOnError && fileExists("temp.log") && getFileSize("temp.log") != 0) return false;
