@@ -165,7 +165,7 @@ void addSampleBank(const File &fileName, Music *music);
 
 int getSample(const File &name, Music *music);
 
-void preprocess(std::string &str, const std::string &filename, int &version);
+void preprocess(std::string &str, const std::string &filename, int &version, std::string &title);		// // //
 
 int strToInt(const std::string &str);
 

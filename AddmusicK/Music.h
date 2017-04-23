@@ -109,7 +109,6 @@ public:
 
 	bool usedSamples[256];		// Holds a record of which samples have been used for this song.
 
-
 	size_t minSize;		// // //
 
 	bool exists;
@@ -200,6 +199,8 @@ private:
 	void insertedZippedSamples(const std::string &path);
 
 	bool hasNextToken();		// // //
+	int peek();		// // //
+
 	int getInt();
 	int getInt(const std::string &str, int &p);
 	int getIntWithNegative();

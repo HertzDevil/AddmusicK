@@ -585,7 +585,8 @@ while (i < str.size() && isspace(str[i]))	\
 	i++;					\
 }
 
-void preprocess(std::string &str, const std::string &filename, int &version) {
+// // //
+void preprocess(std::string &str, const std::string &filename, int &version, std::string &title) {
 	// Handles #ifdefs.  Maybe more later?
 
 	std::map<std::string, int> defines;
@@ -795,17 +796,17 @@ void preprocess(std::string &str, const std::string &filename, int &version) {
 	if (level != 0)
 		error("There was an #ifdef, #ifndef, or #if without a matching #endif.");
 
-	i = 0;
-	if (version != -2)			// For now, skip comment erasing for #amm songs.  #amk songs will follow suit in a later version.
-	{
-
-		while (i < newstr.length()) {
-			if (newstr[i] == ';') {
-				while (i < newstr.length() && newstr[i] != '\n')
-					newstr = newstr.erase(i, 1);
-				continue;
-			}
-			i++;
+	if (version != -2) {		// For now, skip comment erasing for #amm songs.  #amk songs will follow suit in a later version.
+		while (true) {
+			int p = newstr.find(';');
+			if (p == std::string::npos)
+				break;
+			int finish = newstr.find('\n', p);
+			if (finish == std::string::npos)
+				finish = newstr.size();
+			if (newstr.substr(p, 7) == ";title=")
+				title = newstr.substr(p + 7, finish - p - 7);
+			newstr.replace(p, finish - p, "");
 		}
 	}
 

@@ -125,8 +125,9 @@ int SoundEffect::getNoteLength(int i)
 void SoundEffect::compile()
 {
 	text += "                   ";
+	std::string title;		// // // unused
 	int version = 0;			// Unused for sound effects for now.
-	preprocess(text, name, version);
+	preprocess(text, name, version, title);
 	pos = 0;
 	line = 0;
 	triplet = false;

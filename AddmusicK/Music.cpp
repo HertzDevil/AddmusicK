@@ -116,26 +116,19 @@ bool Music::trim(std::string_view str) {
 
 // // //
 bool Music::trimChar(char c) {
-	auto &text_ = text;
-	if (!text_.empty()) {
-		char ch = text_.front();
-		if (ch == c) {
-			skipChars(1);
-			return true;
-		}
+	if (peek() == c) { // not safe for all inputs
+		skipChars(1);
+		return true;
 	}
 	return false;
 }
 
 // // //
 char Music::trimChar(std::string_view clist) {
-	auto &text_ = text;
-	if (!text_.empty()) {
-		char ch = text_.front();
-		if (clist.find(ch, 0) != std::string_view::npos) {
-			skipChars(1);
-			return ch;
-		}
+	char ch = peek();
+	if (ch != std::string::npos && clist.find(ch, 0) != std::string_view::npos) {
+		skipChars(1);
+		return ch;
 	}
 	return '\0';
 }
@@ -282,35 +275,23 @@ void Music::init() {
 	for (int z = 0; z < 19; z++)
 		transposeMap[z] = tmpTrans[z];
 
-	for (int z = 0; z < 16; z++)	// Add some spaces to the end.
-		text += ' ';
-
 	trim("\xEF\xBB\xBF");		// // // utf-8 bom
+	if (std::any_of(text.cbegin(), text.cend(), [] (char ch) { return static_cast<unsigned char>(ch) > 0x7Fu; }))
+		printWarning("Non-ASCII characters detected.");
 
-	unsigned int p = text.find(";title=");
-	if (p != -1) {
-		//name.clear();
-		p += 7;
-		while (p < text.length() && text[p] != '\r' && text[p] != '\n')
-			title += text[p++];
-	}
-	else {
-		title = name.substr(0, name.find_last_of('.'));		// // //
-		p = name.find_last_of('/');
-		if (p != -1)
-			title = name.substr(p + 1);
-		p = name.find_last_of('\\');
-		if (p != -1)
-			title = name.substr(p);
-	}
+	title = name.substr(0, name.find_last_of('.'));		// // //
+	size_t p = name.find_last_of('/');
+	if (p != std::string::npos)
+		title = name.substr(p + 1);
+	p = name.find_last_of('\\');
+	if (p != std::string::npos)
+		title = name.substr(p);
 
 	//std::string backup = text;
 
 	int v = 0;
 
-	preprocess(text, name, v);
-
-	text += "                       ";
+	preprocess(text, name, v, title);		// // //
 
 	//Preprocessor preprocessor;
 
@@ -365,7 +346,10 @@ void Music::compile() {
 	init();
 
 	while (hasNextToken()) {		// // //
-		if (hexLeft != 0 && text.front() != '$') {
+		char ch = ::tolower(peek());		// // //
+		skipChars(1);
+
+		if (hexLeft != 0 && ch != '$') {
 			if (songTargetProgram == TargetType::AM4 && currentHex == AMKd::Binary::CmdType::Subloop) {		// // //
 				// tremolo off
 				tracks[channel].data.pop_back();
@@ -375,9 +359,6 @@ void Music::compile() {
 			else
 				error("Unknown hex command.");
 		}
-
-		char ch = ::tolower(text.front());		// // //
-		skipChars(1);
 		switch (ch) {
 		case '?': parseQMarkDirective();		break;
 //		case '!': parseExMarkDirective();		break;
@@ -421,12 +402,9 @@ void Music::compile() {
 
 void Music::parseComment() {
 	if (songTargetProgram == TargetType::AMM) {		// // //
-		while (!text.empty()) {		// // //
-			if (text.front() == '\n')
-				break;
+		while (peek() != std::string::npos && peek() != '\n')		// // //
 			skipChars(1);
-		}
-		line++;
+		++line;
 	}
 	else
 		error("Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2.");		// // //
@@ -463,7 +441,7 @@ void Music::parseExMarkDirective() {
 }
 
 void Music::parseChannelDirective() {
-	if (isalpha(text.front())) {
+	if (isalpha(peek())) {		// // //
 		parseSpecialDirective();
 		return;
 	}
@@ -689,17 +667,13 @@ void Music::parseOpenParenCommand() {
 	if (trimChar('@')) {		// // //
 		i = getInt();
 		i = instrToSample[i];
-		if (!trimChar(',')) {		// // //
+		if (!trimChar(','))		// // //
 			error("Error parsing sample load command.");
-			return;
-		}
 	}
 	else if (trimChar('\"')) {		// // //
 		std::string s = getEscapedString();		// // //
-		if (!trimChar(',')) {		// // //
+		if (!trimChar(','))		// // //
 			error("Error parsing sample load command.");
-			return;
-		}
 
 		s = basepath + s;
 
@@ -713,10 +687,8 @@ void Music::parseOpenParenCommand() {
 		return;
 	}
 
-	if (!getHexByte(j)) {		// // //
+	if (!getHexByte(j))		// // //
 		error("Error parsing sample load command.");
-		return;
-	}
 	if (!trimChar(')'))
 		error("Error parsing sample load command.");
 
@@ -742,7 +714,7 @@ void Music::parseLabelLoopCommand() {
 			if (!trimChar(','))		// // //
 				error("Error parsing code setup.");
 			skipSpaces();
-			//if (text.front() == '-') negative = true, skipChars(1);
+			//if (peek() == '-') negative = true, skipChars(1);
 			try {
 				j = getIntWithNegative();
 			}
@@ -792,14 +764,13 @@ void Music::parseLabelLoopCommand() {
 			if (!trimChar(')'))		// // //
 				error("Error parsing remote code definition.");
 
-			if (text.front() == '[') {
+			if (peek() == '[') {
 				loopLabel = i;
 				remoteDefinitionType = j;
 				inRemoteDefinition = true;
 				return;
 			}
 			error("Error parsing remote code definition; the definition was missing.");
-			return;
 		}
 	}
 	if (channel == CHANNELS)
@@ -817,7 +788,7 @@ void Music::parseLabelLoopCommand() {
 	tracks[CHANNELS].updateQ = true;
 	prevNoteLength = -1;
 
-	if (text.front() == '[') {				// If this is a loop definition...
+	if (peek() == '[') {				// If this is a loop definition...
 		loopLabel = i;				// Just set the loop label to this. The rest of the code is handled in the respective function.
 		tracks[channel].isDefiningLoop = true;		// // //
 	}
@@ -1089,7 +1060,6 @@ void Music::parseHFDHex() {
 		} break;
 		case 0x83:
 			error("HFD hex command $ED$83 not implemented.");
-			return;
 		}
 
 		hexLeft = 0;
@@ -1107,10 +1077,8 @@ static bool nextNoteIsForDD;
 
 void Music::parseHexCommand() {
 	i = getHex();
-	if (i < 0 || i > 0xFF) {
+	if (i < 0 || i > 0xFF)
 		error("Error parsing hex command.");
-		return;
-	}
 
 	if (!validateHex) {
 		append(i);
@@ -1213,7 +1181,7 @@ void Music::parseHexCommand() {
 			if (!getHexByte(param))
 				error("Incomplete hex command.");
 
-			if (text.front() != '$') {
+			if (peek() != '$') {
 				if (songTargetProgram == TargetType::AM4 && currentHex == AMKd::Binary::CmdType::Subloop) {		// // //
 					// tremolo off
 					tracks[channel].data.pop_back();
@@ -1249,7 +1217,7 @@ void Music::parseHexCommand() {
 					bool finished = false;
 					while (!finished) {
 						skipSpaces();
-						switch (text.front()) {
+						switch (peek()) {
 						case 'o':
 							getInt(); break;
 						case 'c': case 'd': case 'e': case 'f': case 'g': case 'a': case 'b':
@@ -1520,20 +1488,15 @@ void Music::parseHexCommand() {
 			break;
 		}
 
-		if (i == -1) {
+		if (i == -1)
 			error("Error parsing hex command.");
-			return;
-		}
-		if (i < 0 || i > 255) {
+		if (i < 0 || i > 255)
 			error("Illegal value for hex command.");
-			return;
-		}
 		append(i);
 	}
 }
 
 void Music::parseNote(int ch) {		// // //
-	j = text.front();
 	if (inRemoteDefinition)
 		error("Remote definitions cannot contain note data!");
 
@@ -1587,7 +1550,7 @@ void Music::parseNote(int ch) {		// // //
 	do {
 		std::string temptext = text;		// // //
 
-		if (j != 0 && (text.front() == '^' || (i == AMKd::Binary::CmdType::Rest && text.front() == 'r')))
+		if (j != 0 && (peek() == '^' || (i == AMKd::Binary::CmdType::Rest && peek() == 'r')))
 			skipChars(1);
 
 		int tempsize = j;	// If there's a pitch bend up ahead, we need to not optimize the last tie.
@@ -1595,13 +1558,14 @@ void Music::parseNote(int ch) {		// // //
 		j += getNoteLength(getInt());
 		skipSpaces();
 
-		if (strnicmp(text.c_str(), "$DD", 3) == 0 && okayToRewind) {
+		int check = 0;
+		if (getHexByte(check) && check == AMKd::Binary::CmdType::Portamento && okayToRewind) {		// // //
 			j = tempsize;		//
 			text = temptext;		// // // "Rewind" so we forcibly place a tie before the bend.
 			break;			//
 		}
 		okayToRewind = true;
-	} while (!text.empty() && (text.front() == '^' || (i == AMKd::Binary::CmdType::Rest && text.front() == 'r')));
+	} while (peek() == '^' || (i == AMKd::Binary::CmdType::Rest && peek() == 'r'));
 
 	/*if (normalLoopInsideE6Loop)
 	tempLoopLength += j;
@@ -1660,7 +1624,7 @@ void Music::parseNote(int ch) {		// // //
 void Music::parseHDirective() {
 	//bool negative = false;
 
-	//if (text.front() == '-') 
+	//if (peek() == '-') 
 	//{
 	//	negative = true;
 	//	skipChars(1);
@@ -1915,21 +1879,21 @@ void Music::parseInstrumentDefinitions() {
 	while (pos < text.length()) {
 		switch (state) {
 		case lookingForOpenBrace:
-			if (isspace(text.front())) break;
-			if (text.front() != '{')
+			if (isspace(peek())) break;
+			if (peek() != '{')
 				error("Could not find opening curly brace in instrument definition.");
 			state = lookingForDollarSign;
 			break;
 		case lookingForDollarSign:
-			if (text.front() == '\n')
+			if (peek() == '\n')
 				count = 0;
-			if (isspace(text.front())) break;
-			if (text.front() == '$') {
+			if (isspace(peek())) break;
+			if (peek() == '$') {
 				if (count == 6) error("Invalid number of arguments for instrument.  Total number of bytes must be a multiple of 6.");
 				state = gettingValue;
 				break;
 			}
-			if (text.front() == '}') {
+			if (peek() == '}') {
 				if (count != 0)
 					error("Invalid number of arguments for instrument.  Total number of bytes must be a multiple of 6.");
 				skipChars(1);
@@ -1959,9 +1923,6 @@ void Music::parseSampleDefinitions() {
 
 	while (true) {		// // //
 		skipSpaces();
-		if (text.empty())
-			fatalError("Unexpected end of file found while parsing sample group definition.");
-
 		if (trimChar('\"')) {		// // //
 			std::string tempstr = basepath + getEscapedString();		// // //
 			auto tmppos = tempstr.find_last_of(".");
@@ -1980,7 +1941,7 @@ void Music::parseSampleDefinitions() {
 		else if (trimChar('}'))
 			return;
 		else
-			fatalError("Unexpected character found in sample group definition.");
+			fatalError("Unexpected end of sample group definition.");
 	}
 }
 
@@ -2022,8 +1983,16 @@ bool Music::hasNextToken() {
 	return !text_.empty();
 }
 
+// // //
+int Music::peek() {
+	auto &text_ = text;
+	if (text_.empty())
+		return std::string::npos;
+	return text_.front();
+}
+
 int Music::getInt() {
-	//if (text.front() == '$') { skipChars(1); return getHex(); }	// Allow for things such as t$20 instead of t32.
+	//if (peek() == '$') { skipChars(1); return getHex(); }	// Allow for things such as t$20 instead of t32.
 	// Actually, can't do it.
 	// Consider this:
 	// l8r$ED$00$00
@@ -2216,7 +2185,7 @@ std::string Music::getEscapedString() {
 
 void Music::pointersFirstPass() {
 	if (errorCount)
-		printError("There were errors when compiling the music file.  Compilation aborted.  Your ROM has not been modified.", true);
+		fatalError("There were errors when compiling the music file.  Compilation aborted.  Your ROM has not been modified.");
 
 	if (std::all_of(tracks, tracks + CHANNELS, [] (const Track &t) { return t.data.empty(); }))		// // //
 		error("This song contained no musical data!");
@@ -2458,7 +2427,7 @@ void Music::parseDefine() {
 	error("A #define was found after the preprocessing stage.");
 	//skipSpaces();
 	//std::string defineName;
-	//while (!isspace(text.front()) && pos < text.length())
+	//while (!isspace(peek()) && pos < text.length())
 	//{
 	//	defineName += text[pos++];
 	//}
@@ -2474,7 +2443,7 @@ void Music::parseUndef() {
 	error("An #undef was found after the preprocessing stage.");
 	//	skipSpaces();
 	//	std::string defineName;
-	//	while (!isspace(text.front()) && pos < text.length())
+	//	while (!isspace(peek()) && pos < text.length())
 	//	{
 	//		defineName += text[pos++];
 	//	}
@@ -2495,7 +2464,7 @@ void Music::parseIfdef() {
 	//	inDefineBlock = true;
 	//	skipSpaces();
 	//	std::string defineName;
-	//	while (!isspace(text.front()) && pos < text.length())
+	//	while (!isspace(peek()) && pos < text.length())
 	//	{
 	//		defineName += text[pos++];
 	//	}
@@ -2523,7 +2492,7 @@ void Music::parseIfndef() {
 	//	inDefineBlock = true;
 	//	skipSpaces();
 	//	std::string defineName;
-	//	while (!isspace(text.front()) && pos < text.length())
+	//	while (!isspace(peek()) && pos < text.length())
 	//	{
 	//		defineName += text[pos++];
 	//	}
