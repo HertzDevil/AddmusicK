@@ -210,7 +210,6 @@ private:
 	std::string getQuotedString();		// // //
 
 	bool guessLength;
-	int resizedChannel;
 	
 	std::map<int, double> loopLengths;		// // // How many ticks are in each loop.
 	double normalLoopLength;				// How many ticks were in the most previously declared normal loop.

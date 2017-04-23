@@ -545,7 +545,7 @@ int getSample(const File &name, Music *music) {
 
 #define error(str) printError(str, true, filename, line)
 
-std::string getArgument(const std::string &str, char endChar, unsigned int &pos, const std::string &filename, int line, bool breakOnNewLines) {
+std::string getArgument(const std::string &str, char endChar, unsigned int &pos, bool breakOnNewLines) {		// // //
 	std::string temp;
 
 	while (true) {
@@ -558,7 +558,7 @@ std::string getArgument(const std::string &str, char endChar, unsigned int &pos,
 				break;
 
 		if (pos == str.length())
-			error("Unexpected end of file found.");
+			printError("Unexpected end of file found.", true);		// // //
 		if (breakOnNewLines) if (str[pos] == '\r' || str[pos] == '\n') break;			// Break on new lines.
 		temp += str[pos];
 		pos++;
@@ -613,7 +613,7 @@ void preprocess(std::string &str, const std::string &filename, int &version) {
 			i++;
 			if (okayToAdd) {
 				newstr += '\"';
-				newstr += getArgument(str, '\"', i, filename, line, false) + '\"';
+				newstr += getArgument(str, '\"', i, false) + '\"';		// // //
 			}
 			i++;
 
@@ -630,18 +630,18 @@ void preprocess(std::string &str, const std::string &filename, int &version) {
 				continue;
 			}
 
-			temp = getArgument(str, ' ', i, filename, line, true);
+			temp = getArgument(str, ' ', i, true);		// // //
 
 			if (temp == "define") {
 				if (!okayToAdd) { level++; continue; }
 
 				skipSpaces;
-				std::string temp2 = getArgument(str, ' ', i, filename, line, true);
+				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.length() == 0)
 					error("#define was missing its argument.");
 
 				skipSpaces;
-				std::string temp3 = getArgument(str, ' ', i, filename, line, true);
+				std::string temp3 = getArgument(str, ' ', i, true);		// // //
 				if (temp3.length() == 0)
 					defines[temp2] = 1;
 				else {
@@ -659,7 +659,7 @@ void preprocess(std::string &str, const std::string &filename, int &version) {
 				if (!okayToAdd) { level++; continue; }
 
 				skipSpaces;
-				std::string temp2 = getArgument(str, ' ', i, filename, line, true);
+				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.length() == 0)
 					error("#undef was missing its argument.");
 				defines.erase(temp2);
@@ -668,7 +668,7 @@ void preprocess(std::string &str, const std::string &filename, int &version) {
 				if (!okayToAdd) { level++; continue; }
 
 				skipSpaces;
-				std::string temp2 = getArgument(str, ' ', i, filename, line, true);
+				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.length() == 0)
 					error("#ifdef was missing its argument.");
 
@@ -685,7 +685,7 @@ void preprocess(std::string &str, const std::string &filename, int &version) {
 				if (!okayToAdd) { level++; continue; }
 
 				skipSpaces;
-				std::string temp2 = getArgument(str, ' ', i, filename, line, true);
+				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 
 				okayStatus.push(okayToAdd);
 
@@ -702,7 +702,7 @@ void preprocess(std::string &str, const std::string &filename, int &version) {
 				if (!okayToAdd) { level++; continue; }
 
 				skipSpaces;
-				std::string temp2 = getArgument(str, ' ', i, filename, line, true);
+				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.length() == 0)
 					error("#if was missing its first argument.");
 
@@ -710,12 +710,12 @@ void preprocess(std::string &str, const std::string &filename, int &version) {
 					error("First argument for #if was never defined.");
 
 				skipSpaces;
-				std::string temp3 = getArgument(str, ' ', i, filename, line, true);
+				std::string temp3 = getArgument(str, ' ', i, true);		// // //
 				if (temp3.length() == 0)
 					error("#if was missing its comparison operator.");
 
 				skipSpaces;
-				std::string temp4 = getArgument(str, ' ', i, filename, line, true);
+				std::string temp4 = getArgument(str, ' ', i, true);		// // //
 				if (temp4.length() == 0)
 					error("#if was missing its second argument.");
 
@@ -757,7 +757,7 @@ void preprocess(std::string &str, const std::string &filename, int &version) {
 			else if (temp == "amk") {
 				if (version >= 0) {
 					skipSpaces;
-					std::string temp = getArgument(str, ' ', i, filename, line, true);
+					std::string temp = getArgument(str, ' ', i, true);		// // //
 					if (temp.length() == 0) {
 						printError("#amk must have an integer argument specifying the version.", false, filename, line);
 					}
