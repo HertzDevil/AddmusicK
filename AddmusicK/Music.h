@@ -156,7 +156,7 @@ private:
 	void parseLowerOctaveDirective();
 	void parsePitchSlideCommand();
 	void parseHexCommand();
-	void parseNote();
+	void parseNote(int ch);		// // //
 	void parseHDirective();
 	void parseReplacementDirective();
 	void parseNCommand();
@@ -199,6 +199,7 @@ private:
 	void parseHFDInstrumentHack(int addr, int bytes);
 	void insertedZippedSamples(const std::string &path);
 
+	bool hasNextToken();		// // //
 	int getInt();
 	int getInt(const std::string &str, int &p);
 	int getIntWithNegative();
@@ -207,7 +208,7 @@ private:
 	int getPitch(int j);
 	int getNoteLength(int);
 	std::string getIdentifier();		// // //
-	std::string getQuotedString();		// // //
+	std::string getEscapedString();		// // //
 
 	bool guessLength;
 	

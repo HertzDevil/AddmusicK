@@ -88,9 +88,6 @@ static std::string basepath;
 
 static bool usingSMWVTable;
 
-#ifdef _DEBUG
-std::string current;
-#endif
 //static bool songVersionIdentified;
 //static int hTranspose = 0;00
 
@@ -366,19 +363,8 @@ void Music::init() {
 
 void Music::compile() {
 	init();
-	while (true)		// // //
-	{
-#ifdef _DEBUG
-		current = text;
-#endif
-		skipSpaces();		// // //
-		if (!doReplacement(text))		// // //
-			fatalError("Infinite lexical macro substitution.");
 
-		skipSpaces();		// // //
-		if (text.empty())
-			break;
-
+	while (hasNextToken()) {		// // //
 		if (hexLeft != 0 && text.front() != '$') {
 			if (songTargetProgram == TargetType::AM4 && currentHex == AMKd::Binary::CmdType::Subloop) {		// // //
 				// tremolo off
@@ -390,41 +376,43 @@ void Music::compile() {
 				error("Unknown hex command.");
 		}
 
-		switch (tolower(text.front())) {
-		case '?': skipChars(1); parseQMarkDirective();			break;
-//		case '!': skipChars(1); parseExMarkDirective();			break;
-		case '#': skipChars(1); parseChannelDirective();		break;
-		case 'l': skipChars(1); parseLDirective();				break;
-		case 'w': skipChars(1); parseGlobalVolumeCommand();		break;
-		case 'v': skipChars(1); parseVolumeCommand();			break;
-		case 'q': skipChars(1); parseQuantizationCommand();		break;
-		case 'y': skipChars(1); parsePanCommand();				break;
-		case '/': skipChars(1); parseIntroDirective();			break;
-		case 't': skipChars(1); parseT();						break;
-		case 'o': skipChars(1); parseOctaveDirective();			break;
-		case '@': skipChars(1); parseInstrumentCommand();		break;
-		case '(': skipChars(1); parseOpenParenCommand();		break;
-		case '[': skipChars(1); parseLoopCommand();				break;
-		case ']': skipChars(1); parseLoopEndCommand();			break;
-		case '*': skipChars(1); parseStarLoopCommand();			break;
-		case 'p': skipChars(1); parseVibratoCommand();			break;
-		case '{': skipChars(1); parseTripletOpenDirective();	break;
-		case '}': skipChars(1); parseTripletCloseDirective();	break;
-		case '>': skipChars(1); parseRaiseOctaveDirective();	break;
-		case '<': skipChars(1); parseLowerOctaveDirective();	break;
-		case '&': skipChars(1); parsePitchSlideCommand();		break;
-		case '$': skipChars(1); parseHexCommand();				break;
-		case 'h': skipChars(1); parseHDirective();				break;
-		case 'n': skipChars(1); parseNCommand();				break;
-		case '\"': parseReplacementDirective();					break;
-		case '|': skipChars(1); hexLeft = 0;					break;
+		char ch = ::tolower(text.front());		// // //
+		skipChars(1);
+		switch (ch) {
+		case '?': parseQMarkDirective();		break;
+//		case '!': parseExMarkDirective();		break;
+		case '#': parseChannelDirective();		break;
+		case 'l': parseLDirective();			break;
+		case 'w': parseGlobalVolumeCommand();	break;
+		case 'v': parseVolumeCommand();			break;
+		case 'q': parseQuantizationCommand();	break;
+		case 'y': parsePanCommand();			break;
+		case '/': parseIntroDirective();		break;
+		case 't': parseT();						break;
+		case 'o': parseOctaveDirective();		break;
+		case '@': parseInstrumentCommand();		break;
+		case '(': parseOpenParenCommand();		break;
+		case '[': parseLoopCommand();			break;
+		case ']': parseLoopEndCommand();		break;
+		case '*': parseStarLoopCommand();		break;
+		case 'p': parseVibratoCommand();		break;
+		case '{': parseTripletOpenDirective();	break;
+		case '}': parseTripletCloseDirective();	break;
+		case '>': parseRaiseOctaveDirective();	break;
+		case '<': parseLowerOctaveDirective();	break;
+		case '&': parsePitchSlideCommand();		break;
+		case '$': parseHexCommand();			break;
+		case 'h': parseHDirective();			break;
+		case 'n': parseNCommand();				break;
+		case '"': parseReplacementDirective();	break;
+		case '|':								break;		// // // no-op
 		case 'c': case 'd': case 'e': case 'f': case 'g': case 'a': case 'b': case 'r': case '^':
-			parseNote();										break;
-		case ';': skipChars(1); parseComment();					break;		// Needed for comments in quotes
+			parseNote(ch);						break;
+		case ';': parseComment();				break;		// Needed for comments in quotes
 		default:
 			std::cerr << "File " << name << ", line " << line
-				<< ": Unexpected character \"" << text.front() << "\" found." << std::endl;
-			skipChars(1); break;
+				<< ": Unexpected character \"" << ch << "\" found." << std::endl;
+			break;
 		}
 	}
 
@@ -452,7 +440,9 @@ void Music::printChannelDataNonVerbose(int totalSize) {
 
 	if (knowsLength) {
 		int s = (unsigned int)std::floor((mainLength + introLength) / (2.0 * tempo) + 0.5);
-		printf("%d:%02d, 0x%04X bytes\n", (int)(std::floor((introSeconds + mainSeconds) / 60) + 0.5), (int)(std::floor(introSeconds + mainSeconds) + 0.5) % 60, totalSize);
+		printf("%d:%02d, 0x%04X bytes\n",
+			(int)(std::floor((introSeconds + mainSeconds) / 60) + 0.5),
+			(int)(std::floor(introSeconds + mainSeconds) + 0.5) % 60, totalSize);
 	}
 	else
 		printf("?:??, 0x%04X bytes\n", totalSize);
@@ -704,9 +694,8 @@ void Music::parseOpenParenCommand() {
 			return;
 		}
 	}
-	else if (text.front() == '\"') {
-		// text.front() == '\"';
-		std::string s = getQuotedString();		// // //
+	else if (trimChar('\"')) {		// // //
+		std::string s = getEscapedString();		// // //
 		if (!trimChar(',')) {		// // //
 			error("Error parsing sample load command.");
 			return;
@@ -1220,11 +1209,8 @@ void Music::parseHexCommand() {
 
 		/*
 		while (hexLeft > 0) {
-			skipSpaces();
-			if (!doReplacement(text))
-				fatalError("Infinite lexical macro substitution.");
-			skipSpaces();
-			if (text.empty())
+			int param;
+			if (!getHexByte(param))
 				error("Incomplete hex command.");
 
 			if (text.front() != '$') {
@@ -1546,10 +1532,8 @@ void Music::parseHexCommand() {
 	}
 }
 
-void Music::parseNote() {
+void Music::parseNote(int ch) {		// // //
 	j = text.front();
-	skipChars(1);
-
 	if (inRemoteDefinition)
 		error("Remote definitions cannot contain note data!");
 
@@ -1557,13 +1541,13 @@ void Music::parseNote() {
 	if (songTargetProgram == TargetType::AMK && channelDefined == false && inRemoteDefinition == false)
 		error("Note data must be inside a channel!");
 
-	if (j == 'r')
+	if (ch == 'r')
 		i = AMKd::Binary::CmdType::Rest;		// // //
-	else if (j == '^')
+	else if (ch == '^')
 		i = AMKd::Binary::CmdType::Tie;
 	else {
 		//am4silence++;
-		i = getPitch(j);
+		i = getPitch(ch);
 
 		if (usingHTranspose)
 			i += hTranspose;
@@ -1793,7 +1777,7 @@ void Music::parseSpecialDirective() {
 }
 
 void Music::parseReplacementDirective() {
-	std::string s = getQuotedString();		// // //
+	std::string s = getEscapedString();		// // //
 	i = s.find('=');
 	if (i == -1)
 		printError("Error parsing replacement directive; could not find '='", true, name, line);
@@ -1864,8 +1848,8 @@ void Music::parseInstrumentDefinitions() {
 
 	skipSpaces();
 	while (!trimChar('}')) {
-		if (text.front() == '\"') {
-			std::string brrName = getQuotedString();
+		if (trimChar('\"')) {		// // //
+			std::string brrName = getEscapedString();
 			if (brrName.empty())
 				fatalError("Error parsing sample portion of the instrument definition.");
 			brrName = basepath + brrName;
@@ -1978,8 +1962,8 @@ void Music::parseSampleDefinitions() {
 		if (text.empty())
 			fatalError("Unexpected end of file found while parsing sample group definition.");
 
-		if (text.front() == '\"') {
-			std::string tempstr = basepath + getQuotedString();		// // //
+		if (trimChar('\"')) {		// // //
+			std::string tempstr = basepath + getEscapedString();		// // //
 			auto tmppos = tempstr.find_last_of(".");
 			if (tmppos == -1)
 				fatalError("The filename for the sample was missing its extension; is it a .brr or .bnk?");		// // //
@@ -2019,10 +2003,23 @@ void Music::parseLouderCommand() {
 
 void Music::parsePath() {
 	skipSpaces();
-	auto str = getQuotedString();		// // //
+	if (!trimChar('\"'))
+		fatalError("Unexpected symbol found in path command. Expected a quoted string.");
+	auto str = getEscapedString();		// // //
 	if (str.empty())
 		fatalError("Unexpected symbol found in path command. Expected a quoted string.");
 	basepath = "./" + str + "/";
+}
+
+// // //
+bool Music::hasNextToken() {
+	auto &text_ = text;
+	skipSpaces();
+	if (!doReplacement(text_))
+		fatalError("Infinite replacement macro substitution.");
+
+	skipSpaces();
+	return !text_.empty();
 }
 
 int Music::getInt() {
@@ -2033,8 +2030,8 @@ int Music::getInt() {
 	// Yeah. Oh well.
 	// Attempt to do a replacement.  (So things like "ab = 8"    [c1]ab    are valid).
 	auto &text_ = text;
-	if (!doReplacement(text_))		// // //
-		fatalError("Infinite lexical macro substitution.");
+	if (!hasNextToken())		// // //
+		return -1;
 
 	int i = 0;
 	int d = 0;
@@ -2063,8 +2060,8 @@ int Music::getInt(const std::string &str, int &p) {
 
 int Music::getIntWithNegative() {
 	auto &text_ = text;
-	if (!doReplacement(text_))		// // //
-		fatalError("Infinite lexical macro substitution.");
+	if (!hasNextToken())		// // //
+		return -1;
 
 	int i = 0;
 	int d = 0;
@@ -2083,8 +2080,8 @@ int Music::getIntWithNegative() {
 
 int Music::getHex(bool anyLength) {
 	auto &text_ = text;
-	if (!doReplacement(text_))		// // //
-		fatalError("Infinite lexical macro substitution.");
+	if (!hasNextToken())		// // //
+		return -1;
 
 	int i = 0;
 	int d = 0;
@@ -2114,7 +2111,10 @@ int Music::getHex(bool anyLength) {
 
 // // //
 bool Music::getHexByte(int &out) {
-	skipSpaces();
+	auto &text_ = text;
+	if (!hasNextToken())		// // //
+		return false;
+
 	if (!trimChar('$'))
 		return false;
 	int x = getHex();
@@ -2182,12 +2182,10 @@ std::string Music::getIdentifier() {
 }
 
 // // //
-std::string Music::getQuotedString() {
-	std::string tempstr;
-	if (!trimChar('\"'))
-		return tempstr;
-	
+std::string Music::getEscapedString() {
+	std::string tempstr;	
 	auto &text_ = text;
+
 	while (true) {
 		if (text_.empty()) {
 			printError("Unexpected end of file found.", false);
@@ -2570,10 +2568,9 @@ void Music::parseSPCInfo() {
 			error("Unexpected type name found in SPC info command.  Only \"author\", \"comment\", \"title\", \"game\", and \"length\" are allowed.");
 
 		skipSpaces();
-
-		std::string parameter = getQuotedString();		// // //
-		if (parameter.empty())
+		if (!trimChar('\"'))
 			error("Error while parsing parameter for SPC info command.");
+		std::string parameter = getEscapedString();		// // //
 
 		if (typeName == "author")
 			author = parameter;
