@@ -292,29 +292,30 @@ void Music::init() {
 
 	//std::string backup = text;
 
-	int v = 0;
-
-	preprocess(text, name, v, title);		// // //
+	const auto stat = preprocess(text, name);		// // //
+	text = stat.result;		// // //
+	if (!stat.title.empty())
+		title = stat.title;
 
 	//Preprocessor preprocessor;
 
 	//preprocessor.run(text, name);
 
-	if (v == -1) {
+	if (stat.version == -1) {
 		songTargetProgram = TargetType::AM4;		// // //
 		//songVersionIdentified = true;
 		targetAMKVersion = 0;
 	}
 
-	else if (v == -2) {
+	else if (stat.version == -2) {
 		songTargetProgram = TargetType::AMM;		// // //
 		//songVersionIdentified = true;
 		targetAMKVersion = 0;
 	}
-	else if (v == 0)
+	else if (stat.version == 0)
 		error("Song did not specify target program with #amk, #am4, or #amm.");
 	else {						// Just assume it's AMK for now.
-		targetAMKVersion = v;
+		targetAMKVersion = stat.version;
 
 		if (targetAMKVersion > PARSER_VERSION)
 			error("This song was made for a newer version of AddmusicK.  You must update to use\nthis song.");
@@ -327,22 +328,18 @@ void Music::init() {
 		writeTextFile((std::string)"music/" + name, backup);*/
 	}
 
-	if (targetAMKVersion >= 2)
-		usingSMWVTable = false;
-	else
-		usingSMWVTable = true;
-
-	if (validateHex && index > highestGlobalSong)		// // // We can't just insert this at the end due to looping complications and such.
-		for (int ch = 0; ch < CHANNELS; ++ch)
-			if (text.find(std::string {'#', static_cast<char>('0' + ch)}) != std::string::npos) {
-				if (targetAMKVersion > 1) {
-					std::vector<uint8_t> header {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, 0x01};
-					tracks[ch].data.insert(tracks[ch].data.cbegin(), header.cbegin(), header.cend());
-				}
-				std::vector<uint8_t> header {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::EchoBuffer, static_cast<uint8_t>(echoBufferSize)};
-				tracks[ch].data.insert(tracks[ch].data.cbegin(), header.cbegin(), header.cend());
-				break;
-			}
+	usingSMWVTable = (targetAMKVersion < 2);		// // //
+	
+	// // // We can't just insert this at the end due to looping complications and such.
+	if (validateHex && index > highestGlobalSong && stat.firstChannel != CHANNELS) {
+		auto &data = tracks[stat.firstChannel].data;
+		if (targetAMKVersion > 1) {
+			std::vector<uint8_t> header {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, 0x01};
+			data.insert(data.cbegin(), header.cbegin(), header.cend());
+		}
+		std::vector<uint8_t> header {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::EchoBuffer, static_cast<uint8_t>(echoBufferSize)};
+		data.insert(data.cbegin(), header.cbegin(), header.cend());
+	}
 }
 
 void Music::compile() {

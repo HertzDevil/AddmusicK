@@ -586,21 +586,15 @@ while (i < str.size() && isspace(str[i]))	\
 }
 
 // // //
-void preprocess(std::string &str, const std::string &filename, int &version, std::string &title) {
+PreprocessStatus preprocess(const std::string &str, const std::string &filename) {
 	// Handles #ifdefs.  Maybe more later?
-
-	std::map<std::string, int> defines;
+	PreprocessStatus stat;
 
 	unsigned int i = 0;
-
 	int level = 0, line = 1;
 
-	std::string newstr;
-
+	std::map<std::string, int> defines;
 	bool okayToAdd = true;
-
-	i = 0;
-
 	std::stack<bool> okayStatus;
 
 	while (true) {
@@ -613,8 +607,8 @@ void preprocess(std::string &str, const std::string &filename, int &version, std
 		if (str[i] == '\"') {
 			i++;
 			if (okayToAdd) {
-				newstr += '\"';
-				newstr += getArgument(str, '\"', i, false) + '\"';		// // //
+				stat.result += '\"';
+				stat.result += getArgument(str, '\"', i, false) + '\"';		// // //
 			}
 			i++;
 
@@ -623,10 +617,9 @@ void preprocess(std::string &str, const std::string &filename, int &version, std
 			std::string temp;
 			i++;
 
-			if (strncmp(str.c_str() + i, "amk=1", 5) == 0)					// Special handling so that we can have #amk=1.
-			{
-				if (version >= 0)
-					version = 1;
+			if (strncmp(str.c_str() + i, "amk=1", 5) == 0) {		// Special handling so that we can have #amk=1.
+				if (stat.version >= 0)		// // //
+					stat.version = 1;
 				i += 5;
 				continue;
 			}
@@ -638,17 +631,16 @@ void preprocess(std::string &str, const std::string &filename, int &version, std
 
 				skipSpaces;
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
-				if (temp2.length() == 0)
+				if (temp2.empty())
 					error("#define was missing its argument.");
 
 				skipSpaces;
 				std::string temp3 = getArgument(str, ' ', i, true);		// // //
-				if (temp3.length() == 0)
+				if (temp3.empty())
 					defines[temp2] = 1;
 				else {
-					int j;
 					try {
-						j = strToInt(temp3);
+						int j = strToInt(temp3);
 						defines[temp2] = j;		// // //
 					}
 					catch (...) {
@@ -661,7 +653,7 @@ void preprocess(std::string &str, const std::string &filename, int &version, std
 
 				skipSpaces;
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
-				if (temp2.length() == 0)
+				if (temp2.empty())
 					error("#undef was missing its argument.");
 				defines.erase(temp2);
 			}
@@ -670,15 +662,11 @@ void preprocess(std::string &str, const std::string &filename, int &version, std
 
 				skipSpaces;
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
-				if (temp2.length() == 0)
+				if (temp2.empty())
 					error("#ifdef was missing its argument.");
 
 				okayStatus.push(okayToAdd);
-
-				if (defines.find(temp2) == defines.end())
-					okayToAdd = false;
-				else
-					okayToAdd = true;
+				okayToAdd = (defines.find(temp2) != defines.end());
 
 				level++;
 			}
@@ -687,15 +675,11 @@ void preprocess(std::string &str, const std::string &filename, int &version, std
 
 				skipSpaces;
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
+				if (temp2.empty())
+					error("#ifndef was missing its argument.");
 
 				okayStatus.push(okayToAdd);
-
-				if (temp2.length() == 0)
-					error("#ifndef was missing its argument.");
-				if (defines.find(temp2) != defines.end())
-					okayToAdd = false;
-				else
-					okayToAdd = true;
+				okayToAdd = (defines.find(temp2) == defines.end());
 
 				level++;
 			}
@@ -722,9 +706,8 @@ void preprocess(std::string &str, const std::string &filename, int &version, std
 
 				okayStatus.push(okayToAdd);
 
-				int j;
 				try {
-					j = strToInt(temp4);
+					int j = strToInt(temp4);
 					if (temp3 == "==")		// // //
 						okayToAdd = (defines[temp2] == j);
 					else if (temp3 == ">")
@@ -756,12 +739,11 @@ void preprocess(std::string &str, const std::string &filename, int &version, std
 					error("There was an #endif without a matching #ifdef, #ifndef, or #if.");
 			}
 			else if (temp == "amk") {
-				if (version >= 0) {
+				if (stat.version >= 0) {
 					skipSpaces;
 					std::string temp = getArgument(str, ' ', i, true);		// // //
-					if (temp.length() == 0) {
+					if (temp.empty())
 						printError("#amk must have an integer argument specifying the version.", false, filename, line);
-					}
 					else {
 						int j;
 						try {
@@ -770,47 +752,49 @@ void preprocess(std::string &str, const std::string &filename, int &version, std
 						catch (...) {
 							error("Could not parse integer for #amk.");
 						}
-						version = j;
+						stat.version = j;
 					}
 				}
 			}
 			else if (temp == "amm")
-				version = -2;
+				stat.version = -2;
 			else if (temp == "am4")
-				version = -1;
-			else {
-				if (okayToAdd) {
-					newstr += "#";
-					newstr += temp;
+				stat.version = -1;
+			else if (okayToAdd) {
+				if (temp.size() == 1) {		// // //
+					char ch = temp.front();
+					if (ch >= '0' && ch <= '7')
+						stat.firstChannel = std::min(stat.firstChannel, ch - '0');
 				}
+				stat.result += "#";
+				stat.result += temp;
 			}
-
 		}
 		else {
-			if (okayToAdd || str[i] == '\n') newstr += str[i];
+			if (okayToAdd || str[i] == '\n')
+				stat.result += str[i];
 			i++;
 		}
-
 	}
 
 	if (level != 0)
 		error("There was an #ifdef, #ifndef, or #if without a matching #endif.");
 
-	if (version != -2) {		// For now, skip comment erasing for #amm songs.  #amk songs will follow suit in a later version.
+	if (stat.version != -2) {		// For now, skip comment erasing for #amm songs.  #amk songs will follow suit in a later version.
 		while (true) {
-			int p = newstr.find(';');
+			int p = stat.result.find(';');
 			if (p == std::string::npos)
 				break;
-			int finish = newstr.find('\n', p);
+			int finish = stat.result.find('\n', p);
 			if (finish == std::string::npos)
-				finish = newstr.size();
-			if (newstr.substr(p, 7) == ";title=")
-				title = newstr.substr(p + 7, finish - p - 7);
-			newstr.replace(p, finish - p, "");
+				finish = stat.result.size();
+			if (stat.result.substr(p, 7) == ";title=")
+				stat.title = stat.result.substr(p + 7, finish - p - 7);
+			stat.result.replace(p, finish - p, "");
 		}
 	}
 
-	str = newstr;
+	return stat;		// // //
 }
 
 bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool dieOnError) {
