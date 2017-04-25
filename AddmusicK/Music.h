@@ -117,7 +117,7 @@ public:
 
 	void compile();
 
-	int remoteDefinitionType;
+	// // //
 	bool inRemoteDefinition;
 	//int remoteDefinitionArg;
 
@@ -207,7 +207,7 @@ private:
 	int getHex(bool anyLength = false);
 	bool getHexByte(int &out);		// // //
 	int getPitch(int j);
-	int getNoteLength(int);
+	int getNoteLength();		// // //
 	std::string getIdentifier();		// // //
 	std::string getEscapedString();		// // //
 
