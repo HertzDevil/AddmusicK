@@ -42,7 +42,7 @@ struct Track
 	bool usingFA = false;
 	bool usingFC = false;
 	bool ignoreTuning = false; // Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
-	bool isDefiningLoop = false;		// // //
+	bool isDefiningLabelLoop = false;		// // //
 };
 
 // // //

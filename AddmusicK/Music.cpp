@@ -27,6 +27,7 @@
 
 static int line, channel, prevChannel, octave, prevNoteLength, defaultNoteLength;
 static bool inDefineBlock;
+static bool inNormalLoop;		// // //
 
 static unsigned int prevLoop;
 static bool doesntLoop;
@@ -213,6 +214,7 @@ void Music::init() {
 	// // //
 	//remoteDefinitionArg = 0;
 	inRemoteDefinition = false;
+	inNormalLoop = false;		// // //
 
 	superLoopLength = normalLoopLength = 0;
 
@@ -479,7 +481,7 @@ void Music::parseQuantizationCommand() {
 	if (i < 0 || i > 0x7F)		// // //
 		error("Error parsing quantization (\"q\") command.");		// // //
 
-	if (channel == CHANNELS) {
+	if (inNormalLoop) {		// // //
 		tracks[prevChannel].q = i;		// // //
 		tracks[prevChannel].updateQ = true;
 	}
@@ -522,7 +524,7 @@ void Music::parsePanCommand() {
 }
 
 void Music::parseIntroDirective() {
-	if (channel == CHANNELS)
+	if (inNormalLoop)		// // //
 		error("Intro directive found within a loop.");		// // //
 
 	if (hasIntro == false)
@@ -561,7 +563,7 @@ void Music::parseTempoCommand() {
 	tempo = i;
 	tempoDefined = true;
 
-	if (channel == CHANNELS || inE6Loop)								// Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
+	if (inNormalLoop || inE6Loop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
 		guessLength = false;
 	else
 		tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
@@ -764,7 +766,7 @@ void Music::parseLabelLoopCommand() {
 			error("Error parsing remote code definition; the definition was missing.");
 		}
 	}
-	if (channel == CHANNELS)
+	if (inNormalLoop)		// // //
 		error("Nested loops are not allowed.");		// // //
 
 	int i = getInt();		// // //
@@ -782,7 +784,7 @@ void Music::parseLabelLoopCommand() {
 
 	if (peek() == '[') {				// If this is a loop definition...
 		loopLabel = i;				// Just set the loop label to this. The rest of the code is handled in the respective function.
-		tracks[channel].isDefiningLoop = true;		// // //
+		tracks[channel].isDefiningLabelLoop = true;		// // //
 	}
 	else {						// Otherwise, if this is a loop call...
 		loopLabel = i;
@@ -808,7 +810,7 @@ void Music::parseLabelLoopCommand() {
 }
 
 void Music::parseLoopCommand() {
-	if (channel < CHANNELS)		// // //
+	if (!inNormalLoop)		// // //
 		tracks[channel].updateQ = true;
 	tracks[CHANNELS].updateQ = true;
 	prevNoteLength = -1;
@@ -819,7 +821,7 @@ void Music::parseLoopCommand() {
 					   "the \"[[\" and \"[\" to clarify your intention.");
 		if (inE6Loop)
 			error("You cannot nest a subloop within another subloop.");
-		if (loopLabel > 0 && tracks[channel].isDefiningLoop)		// // //
+		if (loopLabel > 0 && tracks[channel].isDefiningLabelLoop)		// // //
 			error("A label loop cannot define a subloop.  Use a standard or remote loop instead.");
 
 		handleSuperLoopEnter();
@@ -827,13 +829,14 @@ void Music::parseLoopCommand() {
 		append(AMKd::Binary::CmdType::Subloop, 0x00);		// // //
 		return;
 	}
-	else if (channel == CHANNELS)
+	else if (inNormalLoop)		// // //
 		error("You cannot nest standard [ ] loops.");
 
 	prevLoop = tracks[CHANNELS].data.size();		// // //
 
 	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
 	channel = CHANNELS;					// So we have to back up the current channel.
+	inNormalLoop = true;		// // //
 	prevNoteLength = -1;
 	tracks[CHANNELS].instrument = tracks[prevChannel].instrument;		// // //
 	if (songTargetProgram == TargetType::AM4)
@@ -849,7 +852,7 @@ void Music::parseLoopCommand() {
 }
 
 void Music::parseLoopEndCommand() {
-	if (channel < CHANNELS)
+	if (!inNormalLoop)		// // //
 		tracks[channel].updateQ = true;		// // //
 
 	tracks[CHANNELS].updateQ = true;
@@ -875,7 +878,7 @@ void Music::parseLoopEndCommand() {
 		append(AMKd::Binary::CmdType::Subloop, i - 1);		// // //
 		return;
 	}
-	else if (channel != CHANNELS)
+	else if (!inNormalLoop)		// // //
 		error("Loop end found outside of a loop.");
 
 	int i = getInt();		// // //
@@ -888,6 +891,7 @@ void Music::parseLoopEndCommand() {
 
 	append(0);
 	channel = prevChannel;
+	inNormalLoop = false;		// // //
 
 	handleNormalLoopExit(i);
 
@@ -897,11 +901,11 @@ void Music::parseLoopEndCommand() {
 	}
 	inRemoteDefinition = false;
 	loopLabel = 0;
-	tracks[channel].isDefiningLoop = false;		// // //
+	tracks[channel].isDefiningLabelLoop = false;		// // //
 }
 
 void Music::parseStarLoopCommand() {
-	if (channel == CHANNELS)
+	if (inNormalLoop)		// // //
 		error("Nested loops are not allowed.");		// // //
 
 	tracks[channel].updateQ = true;
@@ -1118,7 +1122,7 @@ void Music::parseHexCommand() {
 			else if (targetAMKVersion == 1) {
 				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 					// Add in a "restore instrument" remote call.
-				int channelToCheck = channel == CHANNELS ? prevChannel : channelToCheck = channel;		// // //
+				int channelToCheck = inNormalLoop ? prevChannel : channel;		// // //
 				tracks[channelToCheck].usingFC = true;		// // //
 
 				// If we're just using the FC command and not the FA command as well,
@@ -1351,7 +1355,7 @@ void Music::parseHexCommand() {
 				tracks[channel].data.pop_back();					// // // Remove the last two bytes
 				tracks[channel].data.pop_back();					// (i.e. the $FA $05)
 
-				int channelToCheck = channel == CHANNELS ? prevChannel : channel;
+				int channelToCheck = inNormalLoop ? prevChannel : channel;
 
 				if (i != 0) {
 					// Check if this channel is using FA and FC combined...
@@ -1410,7 +1414,7 @@ void Music::parseHexCommand() {
 			if (hexLeft == 1 && targetAMKVersion == 1) {
 				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 
-				int channelToCheck = channel == CHANNELS ? prevChannel : channel;		// // //
+				int channelToCheck = inNormalLoop ? prevChannel : channel;		// // //
 
 				if (i == 0) {							// If i is zero, we have to undo a bunch of stuff.
 					if (!tracks[channelToCheck].usingFA) {		// // // But only if this is a "pure" FC command.
@@ -1473,7 +1477,7 @@ void Music::parseHexCommand() {
 				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 				// // //
 				if (!remoteGainConversion.back().empty()) {			// If the size was zero, then it has no data anyway.  Used for the 0 event type.
-					int channelToCheck = channel == CHANNELS ? prevChannel : channel;			// Only saves two bytes, though.
+					int channelToCheck = inNormalLoop ? prevChannel : channel;			// Only saves two bytes, though.
 
 					tracks[channelToCheck].lastFCGainValue = i;		// // //
 					remoteGainConversion.back().push_back(i);
@@ -1524,7 +1528,7 @@ void Music::parseNote(int ch) {		// // //
 		{
 			i = 0xD0 + (tracks[channel].instrument - 21);
 
-			if ((channel == 6 || channel == 7 || (channel == CHANNELS && (prevChannel == 6 || prevChannel == 7))) == false)	// If this is not a SFX channel,
+			if ((channel == 6 || channel == 7 || (inNormalLoop && (prevChannel == 6 || prevChannel == 7))) == false)	// If this is not a SFX channel,
 				tracks[channel].instrument = 0xFF;										// Then don't force the drum pitch on every note.
 		}
 	}
@@ -1565,7 +1569,7 @@ void Music::parseNote(int ch) {		// // //
 	e6LoopLength += j;
 	else if (::inE6Loop)
 	e6LoopLength += j;
-	else if (channel == CHANNELS)
+	else if (inNormalLoop)
 	tempLoopLength += j;
 	else
 	lengths[channel] += j;*/
@@ -2605,7 +2609,7 @@ void Music::handleNormalLoopEnter() {
 void Music::handleSuperLoopEnter() {
 	superLoopLength = 0;
 	inE6Loop = true;
-	if (channel == CHANNELS) {		// // // We're entering a super loop that's nested in a normal loop
+	if (inNormalLoop) {		// // // We're entering a super loop that's nested in a normal loop
 		baseLoopIsNormal = true;
 		baseLoopIsSuper = false;
 		extraLoopIsNormal = false;
