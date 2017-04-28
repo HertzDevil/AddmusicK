@@ -1068,6 +1068,18 @@ void Music::parseHFDHex() {
 	append(AMKd::Binary::CmdType::Envelope, i);		// // //
 }
 
+// // //
+void Music::insertRemoteConversion(std::vector<uint8_t> &&cmd, std::vector<uint8_t> &&conv) {
+	auto index = static_cast<uint16_t>(tracks[channel].data.size() + 1);
+	tracks[channel].remoteGainInfo.emplace_back(index, std::move(cmd));		// // //
+	tracks[channel].data.insert(tracks[channel].data.cend(), conv.cbegin(), conv.cend());
+}
+
+// // //
+void Music::removeRemoteConversion() {
+	tracks[channel].remoteGainInfo.pop_back();		// // //
+}
+
 //static bool validateTremolo;
 
 static bool nextNoteIsForDD;
@@ -1128,17 +1140,13 @@ void Music::parseHexCommand() {
 				// If we're just using the FC command and not the FA command as well,
 				if (!tracks[channelToCheck].usingFA) {
 					// Then add the "restore instrument command"
-					remoteGainConversion.push_back(std::vector<uint8_t> {
-						AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00
-					});		// // //
-					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);
-					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00);
+					insertRemoteConversion({AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00},
+										   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00});
 
 					// Then add in the first part of a "apply gain before a note ends" call.
 					hexLeft = 2;
-					remoteGainConversion.push_back(std::vector<uint8_t> {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain});
-					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);
-					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Release);
+					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain},
+										   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Release});
 
 					// We won't know the gain and delays until later.
 				}
@@ -1149,9 +1157,8 @@ void Music::parseHexCommand() {
 					// Shh.  Don't tell anyone.
 
 					hexLeft = 2;
-					remoteGainConversion.push_back(std::vector<uint8_t> {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain});		// // //
-					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05);
+					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain},
+										   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05});
 					//append(lastFAGainValue[channelToCheck]);
 				}
 				return;
@@ -1361,33 +1368,19 @@ void Music::parseHexCommand() {
 					// Check if this channel is using FA and FC combined...
 					if (!tracks[channelToCheck].usingFC) {		// // //
 						// Then add in a "restore instrument" remote call.
-						remoteGainConversion.push_back(std::vector<uint8_t> {
-							AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00
-						});
-
-						remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);
-						append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00);
+						insertRemoteConversion({AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00},
+											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00});
 
 						// Then add the "set gain" remote call.
-						remoteGainConversion.push_back(std::vector<uint8_t> {
-							AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00
-						});
-
-						// And finally the remote call data.
-						remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		 // // //
-						append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00);
+						insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
+											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00});
 					}
 					else {
 						// Otherwise, add in a "2 5 combination" command.
 
 						// Then add the "set gain" remote call.
-						remoteGainConversion.push_back(std::vector<uint8_t> {
-							AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00
-						});
-
-						// And finally the remote call data.
-						remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-						append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05, tracks[channelToCheck].lastFCDelayValue);
+						insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
+											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05, tracks[channelToCheck].lastFCDelayValue});
 						//append(0x00);
 					}
 
@@ -1395,9 +1388,8 @@ void Music::parseHexCommand() {
 					tracks[channelToCheck].usingFA = true;
 				}
 				else {
-					remoteGainConversion.push_back(std::vector<uint8_t>());
-					remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-					append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00);
+					insertRemoteConversion({},
+										   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00});
 					tracks[channelToCheck].usingFA = false;
 				}
 				return;
@@ -1418,10 +1410,8 @@ void Music::parseHexCommand() {
 
 				if (i == 0) {							// If i is zero, we have to undo a bunch of stuff.
 					if (!tracks[channelToCheck].usingFA) {		// // // But only if this is a "pure" FC command.
-						remoteGainConversion.pop_back();
-						remoteGainConversion.pop_back();
-						remoteGainPositions[channel].pop_back();
-						remoteGainPositions[channel].pop_back();
+						removeRemoteConversion();
+						removeRemoteConversion();
 
 						tracks[channel].data.pop_back();		// // //
 						tracks[channel].data.pop_back();
@@ -1433,17 +1423,14 @@ void Music::parseHexCommand() {
 						tracks[channel].data.pop_back();
 						tracks[channel].data.pop_back();
 
-						remoteGainConversion.push_back(std::vector<uint8_t>());
-
-						remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-						append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00);
+						insertRemoteConversion({},
+											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00});
 					}
 					else {
 						// If we're using FA and FC, then we need to "restore" the FA data.
 
 						// Same as the other "get rid of stuff", but without the "restore instrument" call.
-						remoteGainConversion.pop_back();
-						remoteGainPositions[channel].pop_back();
+						removeRemoteConversion();
 
 						tracks[channel].data.pop_back();		// // //
 						tracks[channel].data.pop_back();
@@ -1451,13 +1438,8 @@ void Music::parseHexCommand() {
 						tracks[channel].data.pop_back();
 
 						// Then add the "set gain" remote call.
-						remoteGainConversion.push_back(std::vector<uint8_t> {
-							AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00
-						});		// // //
-
-						// And finally the remote call data.
-						remoteGainPositions[channel].push_back(tracks[channel].data.size() + 1);		// // //
-						append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00);
+						insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
+											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00});
 					}
 
 					// Either way, FC gets turned off.
@@ -1468,20 +1450,24 @@ void Music::parseHexCommand() {
 				}
 				else {
 					i = divideByTempoRatio(i, false);
-					tracks[channelToCheck].lastFCDelayValue = i;		// // //
+					tracks[channelToCheck].lastFCDelayValue = static_cast<uint8_t>(i);		// // //
 					append(i);
 				}
 				return;
 			}
-			else if (hexLeft == 0 && targetAMKVersion == 1) {
+			else if (hexLeft == 0 && targetAMKVersion == 1) {		// // //
 				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 				// // //
-				if (!remoteGainConversion.back().empty()) {			// If the size was zero, then it has no data anyway.  Used for the 0 event type.
-					int channelToCheck = inNormalLoop ? prevChannel : channel;			// Only saves two bytes, though.
+				std::map<std::vector<uint8_t>, uint16_t> a;
+				if (!tracks[channel].remoteGainInfo.empty()) {
+					auto &conv = tracks[channel].remoteGainInfo.back().second;		// // //
+					if (!conv.empty()) {			// If the size was zero, then it has no data anyway.  Used for the 0 event type.
+	//					int channelToCheck = inNormalLoop ? prevChannel : channel;			// Only saves two bytes, though.
 
-					tracks[channelToCheck].lastFCGainValue = i;		// // //
-					remoteGainConversion.back().push_back(i);
-					remoteGainConversion.back().push_back(0x00);
+	//					tracks[channelToCheck].lastFCGainValue = static_cast<uint8_t>(i);		// // //
+						conv.push_back(i);
+						conv.push_back(0x00);
+					}
 				}
 				return;
 			}
@@ -2186,17 +2172,14 @@ void Music::pointersFirstPass() {
 		error("This song contained no musical data!");
 
 	if (targetAMKVersion == 1)			// Handle more conversion of the old $FC command to remote call.
-		for (int ch = 0; ch <= CHANNELS; ++ch) {
-			for (unsigned int z = 0, n = remoteGainPositions[ch].size(); z < n; ++z) {
-				size_t dataIndex = remoteGainPositions[ch][z];
-				tracks[ch].loopLocations.push_back(static_cast<uint16_t>(dataIndex));		// // //
+		for (auto &track : tracks) for (const auto &x : track.remoteGainInfo) {		// // //
+			uint16_t dataIndex = x.first;
+			track.loopLocations.push_back(dataIndex);
 
-				tracks[ch].data[dataIndex] = static_cast<uint8_t>(tracks[CHANNELS].data.size() & 0xFF);
-				tracks[ch].data[dataIndex + 1] = static_cast<uint8_t>(tracks[CHANNELS].data.size() >> 8);
+			track.data[dataIndex] = static_cast<uint8_t>(tracks[CHANNELS].data.size() & 0xFF);
+			track.data[dataIndex + 1] = static_cast<uint8_t>(tracks[CHANNELS].data.size() >> 8);
 
-				// // //
-				tracks[CHANNELS].data.insert(tracks[CHANNELS].data.end(), remoteGainConversion[z].cbegin(), remoteGainConversion[z].cend());
-			}
+			tracks[CHANNELS].data.insert(tracks[CHANNELS].data.end(), x.second.cbegin(), x.second.cend());
 		}
 
 	for (int z = 0; z < CHANNELS; z++) if (!tracks[z].data.empty())		// // //

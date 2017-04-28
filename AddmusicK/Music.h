@@ -26,14 +26,15 @@ struct Track
 {
 	std::vector<uint8_t> data;		// // //
 	std::vector<uint16_t> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
+	std::vector<std::pair<uint16_t, std::vector<uint8_t>>> remoteGainInfo;		// // // holds position and remote call data for gain command conversions
 
 	double channelLength = 0.; // How many ticks are in each channel.
 	int q = 0x7F;
 	int instrument = 0;
-	int lastFAGainValue = 0;
-	//int lastFADelayValue = 0;
-	int lastFCGainValue = 0;
-	int lastFCDelayValue = 0;
+	//uint8_t lastFAGainValue = 0;
+	//uint8_t lastFADelayValue = 0;
+	//uint8_t lastFCGainValue = 0;
+	uint8_t lastFCDelayValue = 0;
 
 	unsigned short phrasePointers[2] = {0, 0}; // first 8 only
 	bool noMusic[2] = {false, false}; // first 8 only
@@ -195,6 +196,8 @@ private:
 	void parseHFDHex();
 	void parseHFDInstrumentHack(int addr, int bytes);
 	void insertedZippedSamples(const std::string &path);
+	void insertRemoteConversion(std::vector<uint8_t> &&cmd, std::vector<uint8_t> &&conv);		// // //
+	void removeRemoteConversion();		// // //
 
 	bool hasNextToken();		// // //
 	int peek();		// // //
@@ -215,9 +218,6 @@ private:
 	double normalLoopLength;				// How many ticks were in the most previously declared normal loop.
 	double superLoopLength;					// How many ticks were in the most previously declared super loop.
 	std::vector<std::pair<double, int>> tempoChanges;	// Where any changes in tempo occur. A negative tempo marks the beginning of the main loop, if an intro exists.
-
-	std::vector<std::vector<uint8_t>> remoteGainConversion;	// // // Containers that hold data for anticipation gain and rest/gain replacement so that we can convert it to a remote command.
-	std::vector<unsigned int> remoteGainPositions[CHANNELS + 1];	// Container that holds the positions for the pointers that we have to go back and correct during old gain and remote command conversion.
 
 	bool baseLoopIsNormal;
 	bool baseLoopIsSuper;
