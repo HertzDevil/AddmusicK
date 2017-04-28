@@ -211,13 +211,12 @@ int main(int argc, char* argv[]) {
 		for (int i = highestGlobalSong + 1; i < 256; i++)
 			musics[i].exists = false;
 
-		for (size_t i = 0, n = textFilesToCompile.size(); i < n; ++i) {		// // //
+		for (int i = 0, n = textFilesToCompile.size(); i < n; ++i) {		// // //
 			if (highestGlobalSong + i >= 256)
 				printError("Error: The total number of requested music files to compile exceeded 255.", true);
 			musics[highestGlobalSong + 1 + i].exists = true;
 			// // //
 			musics[highestGlobalSong + 1 + i].name = textFilesToCompile[i];
-			openTextFile((std::string("music/") + musics[i + highestGlobalSong].getFileName()), musics[i + highestGlobalSong].text);
 		}
 	}
 
@@ -417,6 +416,7 @@ void loadMusicList() {
 	bool gettingName = false;
 	int index = -1;
 	int shallowSongCount = 0;
+	highestGlobalSong = -1;		// // //
 
 	std::string tempName;
 
