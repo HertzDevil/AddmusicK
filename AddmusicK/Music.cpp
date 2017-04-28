@@ -109,32 +109,12 @@ void Music::append(Args&&... value) {
 }
 
 // // //
-bool Music::trim(std::string_view str) {
-	auto &text_ = text;
-	if (std::string_view(text_.c_str(), str.size()) == str) {
-		skipChars(str.size());
-		return true;
-	}
-	return false;
-}
-
-// // //
 bool Music::trimChar(char c) {
 	if (peek() == c) { // not safe for all inputs
 		skipChars(1);
 		return true;
 	}
 	return false;
-}
-
-// // //
-char Music::trimChar(std::string_view clist) {
-	char ch = peek();
-	if (ch != std::string::npos && clist.find(ch, 0) != std::string_view::npos) {
-		skipChars(1);
-		return ch;
-	}
-	return '\0';
 }
 
 // // //
@@ -181,13 +161,11 @@ void Music::skipSpaces() {
 bool Music::doReplacement(std::string &str, std::size_t whence) {
 	AMKd::Utility::Trie<bool> prefix;
 
-	const auto equalFunc = [&] (const auto &x) {
-		const std::string &rhs = x.first;
-		return std::string_view(str.c_str() + whence, rhs.length()) == rhs;
-	};
-
 	while (true) {
-		auto it = std::find_if(replacements.cbegin(), replacements.cend(), equalFunc);
+		auto it = std::find_if(replacements.cbegin(), replacements.cend(), [&] (const auto &x) {
+			const std::string &rhs = x.first;
+			return std::string_view(str.c_str() + whence, rhs.length()) == rhs;
+		});
 		if (it == replacements.cend())
 			break;
 		str.replace(str.begin() + whence, str.begin() + whence + it->first.length(),
@@ -277,10 +255,6 @@ void Music::init() {
 
 	for (int z = 0; z < 19; z++)
 		transposeMap[z] = tmpTrans[z];
-
-	trim("\xEF\xBB\xBF");		// // // utf-8 bom
-	if (std::any_of(text.cbegin(), text.cend(), [] (char ch) { return static_cast<unsigned char>(ch) > 0x7Fu; }))
-		printWarning("Non-ASCII characters detected.");
 
 	title = name.substr(0, name.find_last_of('.'));		// // //
 	size_t p = name.find_last_of('/');

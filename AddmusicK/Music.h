@@ -183,9 +183,7 @@ private:
 
 	template <typename... Args>		// // //
 	void append(Args&&... value);
-	bool trim(std::string_view str);		// // //
 	bool trimChar(char c);		// // //
-	char trimChar(std::string_view clist);		// // //
 	bool trimDirective(std::string_view str);		// // //
 	void skipChars(size_t count);		// // //
 	void skipSpaces();		// // //

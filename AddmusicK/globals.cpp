@@ -6,7 +6,7 @@
 #include <map>
 #include <stack>
 
-#include <filesystem>		// // //
+#include <experimental/filesystem>		// // //
 namespace fs = std::experimental::filesystem;
 
 #include "Directory.h"
@@ -577,13 +577,9 @@ int strToInt(const std::string &str) {
 	return j;
 }
 
-#define skipSpaces				\
-while (i < str.size() && isspace(str[i]))	\
-{						\
-	if (str[i] == '\n' || str[i] == '\r')	\
-		break;				\
-	i++;					\
-}
+#define skipSpaces(...) \
+	while (i < str.size() && isspace(str[i]) && str[i] != '\n' && str[i] != '\r') \
+		++i
 
 // // //
 PreprocessStatus preprocess(const std::string &str, const std::string &filename) {
@@ -596,6 +592,11 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 	std::map<std::string, int> defines;
 	bool okayToAdd = true;
 	std::stack<bool> okayStatus;
+
+	if (str.substr(0, 3) == "\xEF\xBB\xBF")		// // // utf-8 bom
+		i = 3;
+	if (std::any_of(str.cbegin() + i, str.cend(), [] (char ch) { return static_cast<unsigned char>(ch) > 0x7Fu; }))
+		printWarning("Non-ASCII characters detected.");
 
 	while (true) {
 		if (i == str.length()) break;
@@ -629,12 +630,12 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 			if (temp == "define") {
 				if (!okayToAdd) { level++; continue; }
 
-				skipSpaces;
+				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.empty())
 					error("#define was missing its argument.");
 
-				skipSpaces;
+				skipSpaces();		// // //
 				std::string temp3 = getArgument(str, ' ', i, true);		// // //
 				if (temp3.empty())
 					defines[temp2] = 1;
@@ -651,7 +652,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 			else if (temp == "undef") {
 				if (!okayToAdd) { level++; continue; }
 
-				skipSpaces;
+				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.empty())
 					error("#undef was missing its argument.");
@@ -660,7 +661,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 			else if (temp == "ifdef") {
 				if (!okayToAdd) { level++; continue; }
 
-				skipSpaces;
+				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.empty())
 					error("#ifdef was missing its argument.");
@@ -673,7 +674,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 			else if (temp == "ifndef") {
 				if (!okayToAdd) { level++; continue; }
 
-				skipSpaces;
+				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.empty())
 					error("#ifndef was missing its argument.");
@@ -686,7 +687,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 			else if (temp == "if") {
 				if (!okayToAdd) { level++; continue; }
 
-				skipSpaces;
+				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.length() == 0)
 					error("#if was missing its first argument.");
@@ -694,12 +695,12 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 				if (defines.find(temp2) == defines.end())
 					error("First argument for #if was never defined.");
 
-				skipSpaces;
+				skipSpaces();		// // //
 				std::string temp3 = getArgument(str, ' ', i, true);		// // //
 				if (temp3.length() == 0)
 					error("#if was missing its comparison operator.");
 
-				skipSpaces;
+				skipSpaces();		// // //
 				std::string temp4 = getArgument(str, ' ', i, true);		// // //
 				if (temp4.length() == 0)
 					error("#if was missing its second argument.");
@@ -740,7 +741,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 			}
 			else if (temp == "amk") {
 				if (stat.version >= 0) {
-					skipSpaces;
+					skipSpaces();		// // //
 					std::string temp = getArgument(str, ' ', i, true);		// // //
 					if (temp.empty())
 						printError("#amk must have an integer argument specifying the version.", false, filename, line);
