@@ -2,7 +2,7 @@
 
 You saw this coming!
 
-This repository is based on AddmusicK version 1.0.4. (I don't think the parser ever changed in 1.0.5.) Changes to existing code are marked with `// // //`; new things should all be present in the `AMKd` namespace. "AMKd" is not the name of this fork; there is no name yet.
+This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will not be considered at this moment.) Changes to existing code are marked with `// // //`; new things should all be present in the `AMKd` namespace. "AMKd" is not the name of this fork; there is no name yet.
 
 Assume that only AddmusicK will be modified and the 4 other projects in the solution won't.
 

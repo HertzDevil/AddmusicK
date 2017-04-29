@@ -277,8 +277,8 @@ org $00A635
 Skip2:	
 
 org $00C53E
-	LDA !RestoreSong
-	NOP	
+	LDA !MusicBackup
+	NOP	: NOP
 
 ;org $00C53E
 	
@@ -294,8 +294,8 @@ org $02E277		;;; fix for the directional coins (more like code restore)
 	LDA $14AD|!SA1Addr2
 	
 org $02E27F		;;; ditto
-	LDA !RestoreSong
-	NOP
+	LDA !MusicBackup
+	NOP : NOP
 	
 org $03A842
 	db $2E,$2F,$30,$31,$32,$33,$34,!Bowser2,!Bowser3

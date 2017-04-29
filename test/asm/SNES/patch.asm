@@ -43,7 +43,7 @@ endif
 !SPCOutput2		= !SongPositionHigh
 !SPCOutput3		= !FreeRAM+$06
 !SPCOutput4		= !FreeRAM+$07
-!RestoreSong		= !FreeRAM+$08
+;!MusicBackup		= !FreeRAM+$08
 !SampleCount		= !FreeRAM+$09
 !SRCNTableBuffer	= !FreeRAM+$0A
 
@@ -91,7 +91,7 @@ endif
 !MusicMir = 	$1DFB|!SA1Addr2
 !SFX1DFCMir = 	$1DFC|!SA1Addr2
 
-!MusicBackup = $1DDA|!SA1Addr2
+!MusicBackup = $0DDA|!SA1Addr2
 
 
 !DefARAMRet = $044E	; This is the address that the SPC will jump to after uploading a block of data normally.
@@ -172,7 +172,7 @@ PlayDirect:
 ;	PHA
 ;	STA !MusicReg
 ;	LDA !CurrentSong
-;	STA !RestoreSong
+;	STA !MusicBackup
 ;	PLA
 ;	STA !CurrentSong
 ;	BRA End
@@ -182,7 +182,7 @@ PlayDirect:
 ;	LDA !CurrentSong
 ;	CMP !GlobalMusicCount+1
 ;	BCC +
-;	STA !RestoreSong
+;	STA !MusicBackup
 ;+
 ;	PLA
 ;	STA !CurrentSong
@@ -265,12 +265,12 @@ Okay:
 	BCC ++				; | / ;;; can't be bad to allow everything below
 	LDA !MusicMir			; |
 	STA !CurrentSong		; |
-	STA !RestoreSong		; |
+	STA !MusicBackup		; |
 	JMP SPCNormal			; |
 ++					; /
 	LDA !MusicMir
 	STA !CurrentSong
-	STA !RestoreSong
+	STA !MusicBackup
 	STA $0DDA|!SA1Addr2
 	
 ;	LDA $0100|!SA1Addr2
@@ -286,13 +286,13 @@ Okay:
 
 
 ;	LDA !MusicMir
-;	CMP !RestoreSong
+;	CMP !MusicBackup
 ;	BNE +
 ;	STA !CurrentSong
 ;	JMP SkipSPCNormal
 ;+
 ;	LDA #$00
-;	STA !RestoreSong
+;	STA !MusicBackup
 ;+	LDA !MusicMir		;
 ;	STA !CurrentSong
 ;
@@ -617,7 +617,7 @@ HandleSpecialSongs:
 	RTS
 	
 .restoreFromStarMusic
-	LDA !RestoreSong
+	LDA !MusicBackup
 	STA !MusicMir
 +
 	RTS
