@@ -144,9 +144,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <None Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="asardll.h" />
     <ClInclude Include="BankDefine.h" />
     <ClInclude Include="D:\C++\lodepng\lodepng.h" />
@@ -159,6 +156,7 @@
     <ClInclude Include="Sample.h" />
     <ClInclude Include="SampleGroup.h" />
     <ClInclude Include="SoundEffect.h" />
+    <ClInclude Include="Utility\Exception.h" />
     <ClInclude Include="Utility\Trie.h" />
   </ItemGroup>
   <ItemGroup>

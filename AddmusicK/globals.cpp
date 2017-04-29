@@ -96,18 +96,15 @@ time_t getTimeStamp(const File &file) {
 }
 
 void printError(const std::string &error, bool isFatal, const std::string &fileName, int line) {
-	std::ostringstream oss;
-	if (line >= 0)
-		oss << std::dec << "File: " << fileName << " Line: " << line << ":\n";
-	errorCount++;
-	fputs((oss.str() + error).c_str(), stderr);
-	fputc('\n', stderr);
-	//puts((oss.str() + error).c_str());
-	//putchar('\n');
+	if (line >= 0)		// // //
+		std::cerr << std::dec << "File: " << fileName << " Line: " << line << ":\n";
+	++errorCount;
+	std::cerr << error << '\n';
 #ifdef _DEBUG		// // //
 	_CrtDbgBreak();
 #endif
-	if (isFatal) quit(1);
+	if (isFatal)
+		std::exit(1);
 }
 
 void printWarning(const std::string &error, const std::string &fileName, int line) {
