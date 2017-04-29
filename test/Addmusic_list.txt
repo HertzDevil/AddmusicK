@@ -1,3 +1,4 @@
 Globals:
+01 test.mml
 
 Locals:
