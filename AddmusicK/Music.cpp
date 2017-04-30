@@ -37,7 +37,13 @@ T requires(T x, T min, T max, U&& err) {
 		return; 							\
 	} while (false)
 
-static int line, channel, prevChannel, octave, prevNoteLength, defaultNoteLength;
+// // //
+static int line;
+[[noreturn]] void Music::fatalError(const std::string &str) {
+	printError(str, true, name, line);
+}
+
+static int channel, prevChannel, octave, prevNoteLength, defaultNoteLength;
 static bool inDefineBlock;
 static bool inNormalLoop;		// // //
 
@@ -157,38 +163,52 @@ void Music::skipChars(size_t count) {
 
 // // //
 void Music::skipSpaces() {
-	auto &text_ = text;
-	while (!text_.empty() && isspace(text_.front())) {
-		if (text_.front() == '\n')
-			++line;
-		skipChars(1);
+	auto *text_ = &text;
+	while (true) {		// // //
+		while (!text_->empty() && isspace(text_->front())) {
+			if (text_->front() == '\n')
+				++line;
+			skipChars(1);
+		}
+		if (!text_->empty())
+			break;
+		if (!popReplacement())
+			break;
+		text_ = &text;
 	}
 }
 
 // // //
-[[noreturn]] void Music::fatalError(const std::string &str) {
-	printError(str, true, name, line);
+bool Music::pushReplacement(const std::string &key, const std::string &value) {
+	for (const auto &x : macroRecord_)
+		if (x.first == key)
+			return false;
+	macroRecord_.emplace_back(key, text.substr(key.size()));
+	text = value;
+	return true;
 }
 
 // // //
-bool Music::doReplacement(std::string &str, std::size_t whence) {
-	// TODO: use a stack in AMKd::MML::SourceFile
-	// same replacement on the stack means infinite loop
-	// requires replaced string to form complete tokens
-	AMKd::Utility::Trie<bool> prefix;
+bool Music::popReplacement() {
+	if (macroRecord_.empty())
+		return false;
+	text = std::move(macroRecord_.back().second);
+	macroRecord_.pop_back();
+	return true;
+}
 
+// // //
+bool Music::doReplacement() {
+	auto &text_ = text;
 	while (true) {
 		auto it = std::find_if(replacements.cbegin(), replacements.cend(), [&] (const auto &x) {
 			const std::string &rhs = x.first;
-			return std::string_view(str.c_str() + whence, rhs.length()) == rhs;
+			return std::string_view(text_.c_str(), rhs.length()) == rhs;
 		});
 		if (it == replacements.cend())
 			break;
-		str.replace(str.begin() + whence, str.begin() + whence + it->first.length(),
-					it->second.begin(), it->second.end());
-		if (prefix.SearchIndex(str.c_str() + whence) != std::string_view::npos)
+		if (!pushReplacement(it->first, it->second))
 			return false;
-		prefix.Insert(it->first, true);
 	}
 
 	return true;
@@ -287,6 +307,7 @@ void Music::init() {
 	text = stat.result;		// // //
 	if (!stat.title.empty())
 		title = stat.title;
+	macroRecord_.clear();		// // //
 
 	//Preprocessor preprocessor;
 
@@ -436,6 +457,7 @@ void Music::parseQMarkDirective() {
 
 void Music::parseExMarkDirective() {
 	text.clear();		// // //
+	macroRecord_.clear();		// // //
 }
 
 void Music::parseChannelDirective() {
@@ -1726,59 +1748,19 @@ void Music::parseReplacementDirective() {
 	std::string replStr = s.substr(i + 1);
 
 	// // //
-	if (!findStr.empty())
-		while (isspace(findStr.back()))
-			findStr.pop_back();
+	while (!findStr.empty() && isspace(findStr.back()))
+		findStr.pop_back();
 	if (findStr.empty())
 		fatalError("Error parsing replacement directive; string to find was of zero length.");
 
-	if (!replStr.empty())
-		while (isspace(replStr.front()))
-			replStr.erase(0, 1);
+	while (!replStr.empty() && isspace(replStr.front()))
+		replStr.erase(0, 1);
 
-	auto it = replacements.find(findStr);
-	if (it != replacements.end())
-		replacements.erase(it);
+//	auto it = replacements.find(findStr);
+//	if (it != replacements.end())
+//		replacements.erase(it);
 
-	// keep substituting existing lexical macros in the result string; if the
-	// original string appears as a substring of any intermediate result, then
-	// the macro must fire an infinite recursion due to the macros alone
-	// any macro that ultimately consumes external text cannot loop, so this
-	// check is sufficient
-	std::string replNew = replStr;
-	for (std::size_t p = 0; p < replNew.size(); ++p) {
-		auto it = std::find_if(replacements.cbegin(), replacements.cend(), [&] (const auto &x) {
-			const std::string &rhs = x.first;
-			std::size_t len = rhs.length();
-			return p + len <= replNew.size() && std::string_view(replNew.c_str() + p, len) == rhs;
-		});
-		if (it == replacements.cend())
-			continue;
-		replNew.replace(replNew.begin() + p, replNew.begin() + p + it->first.length(),
-						it->second.begin(), it->second.end());
-		if (replNew.find(findStr, p) != std::string::npos)
-			fatalError("Using this replacement macro will lead to infinite recursion.");
-	}
-
-	// repeat for the existing replacement macros, against the new one
-	/*
-	const std::size_t flen = findStr.length();
-	for (auto &it : replacements) {
-		const std::string &fi = it.first;
-		std::string &re = it.second;
-		std::size_t p = 0;
-		while (true) {
-			p = re.find(findStr, p);
-			if (p == std::string::npos)
-				break;
-			re.replace(re.begin() + p, re.begin() + p + findStr.length(),
-					   replNew.begin(), replNew.end());
-			// ???
-		}
-	}
-	*/
-
-	replacements[findStr] = replNew;
+	replacements[findStr] = replStr;
 }
 
 void Music::parseInstrumentDefinitions() {
@@ -1949,7 +1931,7 @@ void Music::parsePath() {
 bool Music::hasNextToken() {
 	auto &text_ = text;
 	skipSpaces();
-	if (!doReplacement(text_))
+	if (!doReplacement())
 		fatalError("Infinite replacement macro substitution.");
 
 	skipSpaces();

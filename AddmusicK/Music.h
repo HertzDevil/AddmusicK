@@ -75,6 +75,7 @@ public:
 	std::map<int, uint16_t> loopPointers;		// // //
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
 	std::string text;
+	std::vector<std::pair<std::string, std::string>> macroRecord_;		// // //
 	size_t totalSize;		// // //
 	int spaceForPointersAndInstrs;
 	std::vector<uint8_t> allPointersAndInstrs;		// // //
@@ -126,7 +127,6 @@ public:
 	Music();
 
 	void init();
-	bool doReplacement(std::string &str, std::size_t whence = 0);		// // //
 private:
 	void pointersFirstPass();
 	void parseComment();
@@ -188,17 +188,10 @@ private:
 	bool trimDirective(std::string_view str);		// // //
 	void skipChars(size_t count);		// // //
 	void skipSpaces();		// // //
-	[[noreturn]] void fatalError(const std::string &str);		// // //
-	
-	//std::vector<std::string> defineStrings;
 
-	void printChannelDataNonVerbose(int);
-	void parseHFDHex();
-	void parseHFDInstrumentHack(int addr, int bytes);
-	void insertedZippedSamples(const std::string &path);
-	void insertRemoteConversion(std::vector<uint8_t> &&cmd, std::vector<uint8_t> &&conv);		// // //
-	void removeRemoteConversion();		// // //
-
+	bool pushReplacement(const std::string &key, const std::string &value);		// // //
+	bool popReplacement();		// // //
+	bool doReplacement();		// // //
 	bool hasNextToken();		// // //
 	int peek();		// // //
 
@@ -211,6 +204,17 @@ private:
 	int getNoteLength();		// // //
 	std::string getIdentifier();		// // //
 	std::string getEscapedString();		// // //
+
+	[[noreturn]] void fatalError(const std::string &str);		// // //
+
+	//std::vector<std::string> defineStrings;
+
+	void printChannelDataNonVerbose(int);
+	void parseHFDHex();
+	void parseHFDInstrumentHack(int addr, int bytes);
+	void insertedZippedSamples(const std::string &path);
+	void insertRemoteConversion(std::vector<uint8_t> &&cmd, std::vector<uint8_t> &&conv);		// // //
+	void removeRemoteConversion();		// // //
 
 	bool guessLength;
 	
