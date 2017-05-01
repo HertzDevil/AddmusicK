@@ -6,10 +6,6 @@
 #include <map>
 #include <stack>
 
-#include <experimental/filesystem>		// // //
-namespace fs = std::experimental::filesystem;
-
-#include "Directory.h"
 //ROM rom;
 std::vector<uint8_t> rom;		// // //
 
@@ -21,7 +17,7 @@ SoundEffect soundEffectsDFC[256];
 SoundEffect *soundEffects[2] = {soundEffectsDF9, soundEffectsDFC};
 //std::vector<SampleGroup> sampleGroups;
 std::vector<BankDefine *> bankDefines;
-std::map<File, int> sampleToIndex;
+std::map<fs::path, int> sampleToIndex;		// // //
 
 bool convert = true;
 bool checkEcho = true;
@@ -41,12 +37,12 @@ bool sfxDump = false;
 bool visualizeSongs = false;
 bool redirectStandardStreams = false;
 
-int programPos;
-int programUploadPos;
-int mainLoopPos;
-int reuploadPos;
-int SRCNTableCodePos;
-int programSize;
+unsigned programPos;		// // //
+unsigned programUploadPos;
+unsigned mainLoopPos;
+unsigned reuploadPos;
+unsigned SRCNTableCodePos;
+unsigned programSize;
 int highestGlobalSong;
 int totalSampleCount;
 int songCount = 0;
@@ -55,11 +51,11 @@ bool useAsarDLL;
 
 
 
-void openFile(const File &fileName, std::vector<uint8_t> &v)		// // //
+void openFile(const fs::path &fileName, std::vector<uint8_t> &v)		// // //
 {
-	std::ifstream is(fileName.cStr(), std::ios::binary);
+	std::ifstream is(fileName, std::ios::binary);
 	if (!is)
-		printError(std::string("Error: File \"") + fileName.cStr() + std::string("\" not found."), true);
+		printError(std::string("Error: File \"") + fileName.string() + std::string("\" not found."), true);
 
 	is.seekg(0, std::ios::end);
 	unsigned int length = (unsigned int)is.tellg();
@@ -77,22 +73,22 @@ void openFile(const File &fileName, std::vector<uint8_t> &v)		// // //
 	is.close();
 }
 
-void openTextFile(const File &fileName, std::string &s) {
-	std::ifstream is(fileName.cStr());
+void openTextFile(const fs::path &fileName, std::string &s) {
+	std::ifstream is(fileName);
 
 	if (!is)
-		printError(std::string("Error: File \"") + fileName.cStr() + std::string("\" not found."), true);
+		printError(std::string("Error: File \"") + fileName.string() + std::string("\" not found."), true);
 
-	s.assign((std::istreambuf_iterator<char>(is)), (std::istreambuf_iterator<char>()));
+	s.assign(std::istreambuf_iterator<char> {is}, std::istreambuf_iterator<char> { });
 }
 
-time_t getTimeStamp(const File &file) {
-	struct stat s;
-	if (stat(file, &s) == -1) {
+time_t getTimeStamp(const fs::path &file) {
+	// // // TODO: <chrono>
+	if (!fs::exists(file)) {
 		//std::cerr << "Could not determine timestamp of \"" << file << "\"." << std::endl;
 		return 0;
 	}
-	return s.st_mtime;
+	return fs::last_write_time(file).time_since_epoch().count();
 }
 
 void printError(const std::string &error, bool isFatal, const std::string &fileName, int line) {
@@ -100,11 +96,8 @@ void printError(const std::string &error, bool isFatal, const std::string &fileN
 		std::cerr << std::dec << "File: " << fileName << " Line: " << line << ":\n";
 	++errorCount;
 	std::cerr << error << '\n';
-#ifdef _DEBUG		// // //
-	_CrtDbgBreak();
-#endif
 	if (isFatal)
-		std::exit(1);
+		quit(1);
 }
 
 void printWarning(const std::string &error, const std::string &fileName, int line) {
@@ -116,15 +109,20 @@ void printWarning(const std::string &error, const std::string &fileName, int lin
 }
 
 void quit(int code) {
+#ifdef _DEBUG		// // //
+	if (code != 0)
+		_CrtDbgBreak();
+#else
 	if (forceNoContinuePrompt == false) {
 		puts("Press ENTER to continue...\n");
 		getc(stdin);
 	}
-	exit(code);
+#endif
+	std::exit(code);
 }
 
-int execute(const File &command, bool prepend) {
-	std::string tempstr = command.cStr();
+int execute(const std::string &command, bool prepend) {
+	std::string tempstr = command;		// // //
 	if (prepend) {
 #ifndef _WIN32
 		tempstr.insert(0, "./");
@@ -143,45 +141,18 @@ int scanInt(const std::string &str, const std::string &value)		// Scans an integ
 	return ret;
 }
 
-bool fileExists(const File &fileName) {
-	std::ifstream is(fileName.cStr(), std::ios::binary);
+// // //
 
-	bool yes = !(!is);
-
-	if (yes) {
-		is.seekg(0, std::ios::end);
-		unsigned int length = (unsigned int)is.tellg();
-		is.seekg(0, std::ios::beg);
-
-	}
-
-
-	is.close();
-
-	return yes;
-}
-
-unsigned int getFileSize(const File &fileName) {
-	std::ifstream is(fileName.cStr(), std::ios::binary);
-
-	if (!is) return 0;
-
-	is.seekg(0, std::ios::end);
-	unsigned int length = (unsigned int)is.tellg();
-	is.close();
-	return length;
-}
-
-void removeFile(const File &fileName) {
-	if (remove(fileName.cStr()) == 1) {
-		std::cout << "Could not delete critical file \"" << fileName.cStr() << "\"." << std::endl;
+void removeFile(const fs::path &fileName) {
+	if (fs::exists(fileName) && !fs::remove(fileName)) {		// // //
+		std::cerr << "Could not delete critical file \"" << fileName << "\"." << std::endl;
 		quit(1);
 	}
 }
 
-void writeTextFile(const File &fileName, const std::string &string) {
+void writeTextFile(const fs::path &fileName, const std::string &string) {
 	std::ofstream ofs;
-	ofs.open(fileName.cStr(), std::ios::binary);
+	ofs.open(fileName, std::ios::binary);
 
 	std::string n = string;
 
@@ -362,26 +333,11 @@ int clearRATS(int offset) {
 	return r + 1;
 }
 
-void addSample(const File &fileName, Music *music, bool important) {
+void addSample(const fs::path &fileName, Music *music, bool important) {
 	std::vector<uint8_t> temp;		// // //
-	std::string actualPath = "";
-
-	std::string relativeDir = music->name;
-	std::string absoluteDir = "samples/" + (std::string)fileName;
-	std::replace(relativeDir.begin(), relativeDir.end(), '\\', '/');
-	relativeDir = "music/" + relativeDir;
-	relativeDir = relativeDir.substr(0, relativeDir.find_last_of('/'));
-	relativeDir += "/" + (std::string)fileName;
-
-	if (fileExists(relativeDir))
-		actualPath = relativeDir;
-	else if (fileExists(absoluteDir))
-		actualPath = absoluteDir;
-	else
-		printError("Could not find sample " + (std::string)fileName, true, music->name);
-
+	fs::path actualPath = getSamplePath(fileName, music->name);
 	openFile(actualPath, temp);
-	addSample(temp, actualPath, music, important, false);
+	addSample(temp, actualPath.string(), music, important, false);
 }
 
 // // //
@@ -431,14 +387,14 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 	samples.push_back(newSample);					// This is a sample we haven't encountered before.  Add it.
 }
 
-void addSampleGroup(const File &groupName, Music *music) {
+void addSampleGroup(const fs::path &groupName, Music *music) {
 	for (const auto &bank : bankDefines) {		// // //
-		if ((std::string)groupName == bank->name) {
+		if (groupName == bank->name) {		// // //
 			for (size_t j = 0, n = bank->samples.size(); j < n; ++j) {
 				std::string temp;
 				//temp += "samples/";
 				temp += *(bank->samples[j]);
-				addSample((File)temp, music, bank->importants[j]);
+				addSample(temp, music, bank->importants[j]);
 			}
 			return;
 		}
@@ -450,24 +406,10 @@ void addSampleGroup(const File &groupName, Music *music) {
 
 int bankSampleCount = 0;			// Used to give unique names to sample bank brrs.
 
-void addSampleBank(const File &fileName, Music *music) {
+void addSampleBank(const fs::path &fileName, Music *music) {
 	std::vector<uint8_t> bankFile;		// // //
-	std::string actualPath = "";
 
-	std::string relativeDir = music->name;
-	std::string absoluteDir = "samples/" + (std::string)fileName;
-	std::replace(relativeDir.begin(), relativeDir.end(), '\\', '/');
-	relativeDir = "music/" + relativeDir;
-	relativeDir = relativeDir.substr(0, relativeDir.find_last_of('/'));
-	relativeDir += "/" + (std::string)fileName;
-
-	if (fileExists(relativeDir))
-		actualPath = relativeDir;
-	else if (fileExists(absoluteDir))
-		actualPath = absoluteDir;
-	else
-		printError("Could not find sample bank " + (std::string)fileName, true, music->name);
-
+	fs::path actualPath = getSamplePath(fileName, music->name);		// // //
 	openFile(actualPath, bankFile);
 
 	if (bankFile.size() != 0x8000)
@@ -503,39 +445,32 @@ void addSampleBank(const File &fileName, Music *music) {
 	}
 }
 
-int getSample(const File &name, Music *music) {
-	std::string actualPath = "";
+int getSample(const fs::path &name, Music *music) {
+	fs::path actualPath = getSamplePath(name, music->name);		// // //
 
-	std::string relativeDir = music->name;
-	std::string absoluteDir = "samples/" + (std::string)name;
-	std::replace(relativeDir.begin(), relativeDir.end(), '\\', '/');
-	relativeDir = "music/" + relativeDir;
-	relativeDir = relativeDir.substr(0, relativeDir.find_last_of('/'));
-	relativeDir += "/" + (std::string)name;
-
-	if (fileExists(relativeDir))
-		actualPath = relativeDir + (std::string)name;
-	else if (fileExists(absoluteDir))
-		actualPath = absoluteDir;
-	else
-		printError("Could not find sample " + (std::string)name, true, music->name);
-
-	File ftemp = actualPath;
-	std::map<File, int>::const_iterator it = sampleToIndex.begin();
-
-	fs::path p1 = actualPath;
-
-	while (it != sampleToIndex.end()) {
-		fs::path p2 = (std::string)it->first;
-		if (fs::equivalent(p1, p2))
-			return it->second;
-
-		//if ((std::string)it->first == (std::string)ftemp)
-		//	return it->second;
-		it++;
+	for (const auto &x : sampleToIndex) {
+		fs::path p2 = x.first;
+		if (fs::equivalent(actualPath, p2))
+			return x.second;
 	}
 
 	return -1;
+}
+
+fs::path getSamplePath(const fs::path &name, const std::string &musicName) {
+	fs::path actualPath;
+	fs::path absoluteDir = "samples" / name;
+	fs::path relativeDir = (fs::path("music") / musicName).parent_path();
+	relativeDir.append(name);
+
+	if (fs::exists(relativeDir))
+		actualPath = relativeDir;
+	else if (fs::exists(absoluteDir))
+		actualPath = absoluteDir;
+	else
+		printError("Could not find sample " + name.string(), true, musicName);
+
+	return actualPath;
 }
 
 // // //
@@ -795,7 +730,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 	return stat;		// // //
 }
 
-bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool dieOnError) {
+bool asarCompileToBIN(const fs::path &patchName, const fs::path &binOutputFile, bool dieOnError) {
 	removeFile("temp.log");
 	removeFile("temp.txt");
 
@@ -805,7 +740,7 @@ bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool die
 
 		uint8_t *binOutput = (uint8_t *)malloc(buflen);		// // //
 
-		asar_patch(patchName.cStr(), (char *)binOutput, buflen, &binlen);
+		asar_patch(patchName.string().c_str(), (char *)binOutput, buflen, &binlen);		// // //
 		int count = 0, currentCount = 0;
 		std::string printout;
 
@@ -842,14 +777,15 @@ bool asarCompileToBIN(const File &patchName, const File &binOutputFile, bool die
 	}
 	else {
 		remove(binOutputFile);
-		std::string s = "asar " + (std::string)patchName + " " + (std::string)binOutputFile + " 2> temp.log > temp.txt";
+		std::string s = "asar " + patchName.string() + " " + binOutputFile.string() + " 2> temp.log > temp.txt";		// // //
 		execute(s);
-		if (dieOnError && fileExists("temp.log") && getFileSize("temp.log") != 0) return false;
+		if (dieOnError && fs::exists("temp.log") && fs::file_size("temp.log") != 0)
+			return false;
 		return true;
 	}
 }
 
-bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError) {
+bool asarPatchToROM(const fs::path &patchName, const fs::path &romName, bool dieOnError) {
 	removeFile("temp.log");
 	removeFile("temp.txt");
 
@@ -861,7 +797,7 @@ bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError)
 		openFile(romName, patchrom);
 		buflen = patchrom.size();
 
-		asar_patch(patchName.cStr(), (char *)patchrom.data(), buflen, &buflen);
+		asar_patch(patchName.string().c_str(), (char *)patchrom.data(), buflen, &buflen);		// // //
 		int count = 0, currentCount = 0;
 		std::string printout;
 
@@ -893,9 +829,10 @@ bool asarPatchToROM(const File &patchName, const File &romName, bool dieOnError)
 		return true;
 	}
 	else {
-		std::string s = "asar " + (std::string)patchName + " " + (std::string)romName + " 2> temp.log > temp.txt";
+		std::string s = "asar " + patchName.string() + " " + romName.string() + " 2> temp.log > temp.txt";
 		execute(s);
-		if (dieOnError && fileExists("temp.log") && getFileSize("temp.log") != 0) return false;
+		if (dieOnError && fs::exists("temp.log") && fs::file_size("temp.log") > 0)		// // //
+			return false;
 		return true;
 	}
 }

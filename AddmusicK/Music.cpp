@@ -419,6 +419,14 @@ void Music::compile() {
 	pointersFirstPass();
 }
 
+// // //
+size_t Music::getDataSize() const {
+	size_t x = 0;
+	for (int i = 0; i < CHANNELS; ++i)
+		x += tracks[i].data.size();
+	return x;
+}
+
 void Music::parseComment() {
 	if (songTargetProgram == TargetType::AMM) {		// // //
 		while (peek() != std::string::npos && peek() != '\n')		// // //
@@ -2248,8 +2256,7 @@ void Music::pointersFirstPass() {
 		}
 	}
 
-	totalSize = spaceForPointersAndInstrs;
-	std::for_each(std::cbegin(tracks), std::cend(tracks), [&] (const Track &t) { totalSize += t.data.size(); });		// // //
+	totalSize = spaceForPointersAndInstrs + tracks[CHANNELS].data.size() + getDataSize();		// // //
 
 	//if (tempo == -1) tempo = 0x36;
 	unsigned int totalLength;
@@ -2337,10 +2344,7 @@ void Music::pointersFirstPass() {
 	statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << spaceForPointersAndInstrs << "\n";
 	statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
 	statStrStream << "ECHO SIZE:				0x" << hex4 << (echoBufferSize << 11) << "\n";
-
-	int totalSize = spaceForPointersAndInstrs;		// // //
-	std::for_each(std::cbegin(tracks), std::cend(tracks), [&] (const Track &x) { totalSize += x.data.size(); });
-	statStrStream << "SONG TOTAL DATA SIZE:			0x" << hex4 << totalSize << "\n";
+	statStrStream << "SONG TOTAL DATA SIZE:			0x" << hex4 << totalSize << "\n";		// // //
 
 	if (index > highestGlobalSong)
 		statStrStream << "FREE ARAM (APPROXIMATE):		0x" << hex4 << 0x10000 - (echoBufferSize << 11) - spaceUsedBySamples - totalSize - programUploadPos << "\n\n";
@@ -2377,6 +2381,19 @@ void Music::pointersFirstPass() {
 	fname = "stats/" + fname + ".txt";
 
 	writeTextFile(fname, statStr);
+}
+
+// // //
+void Music::adjustLoopPointers() {
+	int normalChannelsSize = getDataSize();		// // //
+	for (Track &t : tracks) {		// // //
+		for (unsigned short x : t.loopLocations) {
+			int temp = (t.data[x] & 0xFF) | (t.data[x + 1] << 8);
+			temp += posInARAM + normalChannelsSize + spaceForPointersAndInstrs;
+			t.data[x] = temp & 0xFF;
+			t.data[x + 1] = temp >> 8;
+		}
+	}
 }
 
 void Music::parseDefine() {
@@ -2660,4 +2677,11 @@ int Music::multiplyByTempoRatio(int value) {
 // // //
 const std::string &Music::getFileName() const {
 	return name;
+}
+
+
+
+// // //
+void Track::InsertData(std::vector<uint8_t> &buf) const {
+	buf.insert(buf.cend(), data.cbegin(), data.cend());
 }

@@ -22,8 +22,13 @@ struct SpaceInfo {
 };
 
 // // // eventually replace this with AMKd::Music::Track
-struct Track
+class Track
 {
+public:
+	friend class Music;
+	void InsertData(std::vector<uint8_t> &buf) const;
+
+private:
 	std::vector<uint8_t> data;		// // //
 	std::vector<uint16_t> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
 	std::vector<std::pair<uint16_t, std::vector<uint8_t>>> remoteGainInfo;		// // // holds position and remote call data for gain command conversions
@@ -118,6 +123,9 @@ public:
 	int posInARAM;
 
 	void compile();
+
+	size_t getDataSize() const;		// // //
+	void adjustLoopPointers();		// // //
 
 	// // //
 	bool inRemoteDefinition;

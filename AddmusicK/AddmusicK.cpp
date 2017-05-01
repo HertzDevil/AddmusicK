@@ -16,7 +16,7 @@ namespace fs = std::experimental::filesystem;
 
 
 bool waitAtEnd = true;
-File ROMName;
+fs::path ROMName;		// // //
 
 std::vector<uint8_t> romHeader;		// // //
 
@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
 
 	std::vector<std::string> arguments;
 
-	if (fileExists("Addmusic_options.txt")) {
+	if (fs::exists("Addmusic_options.txt")) {		// // //
 		std::string optionsString;
 		openTextFile("Addmusic_options.txt", optionsString);
 		unsigned int osPos = 0;
@@ -117,11 +117,11 @@ int main(int argc, char* argv[]) {
 			std::freopen("AddmusicK_stderr", "w+", stderr);
 		}
 		else if (arg == "-norom") {
-			if (ROMName.size() != 0)
+			if (!ROMName.empty())		// // //
 				printError("Error: -norom cannot be used after a filepath has already been used. Input your text files /after/ the -norom option.", true);
 			justSPCsPlease = true;
 		}
-		else if (ROMName.size() == 0 && arg[0] != '-')
+		else if (ROMName.empty() && arg[0] != '-')
 			if (!justSPCsPlease)
 				ROMName = arg;
 			else
@@ -148,30 +148,28 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (justSPCsPlease == false) {
-		if (ROMName.size() == 0) {
+		if (ROMName.empty()) {		// // //
 			printf("Enter your ROM name: ");
-			std::getline(std::cin, ROMName.filePath);
+			std::string temp;
+			std::getline(std::cin, temp);
+			ROMName = temp;
 			puts("\n\n");
 		}
 
-		if (asar_init() == false)
-			useAsarDLL = false;
-		else
-			useAsarDLL = true;
+		useAsarDLL = asar_init();		// // //
 
-		std::string tempROMName = ROMName.cStr();
-		if (fileExists(tempROMName + ".smc") && fileExists(tempROMName + ".sfc"))
+		fs::path smc = fs::path {ROMName} += ".smc";		// // //
+		fs::path sfc = fs::path {ROMName} += ".sfc";
+		if (fs::exists(smc) && fs::exists(sfc))
 			printError("Error: Ambiguity detected; there were two ROMs with the specified name (one\n"
 					   "with a .smc extension and one with a .sfc extension). Either delete one or\n"
 					   "include the extension in your filename.", true);
-		else if (fileExists(tempROMName + ".smc"))
-			tempROMName += ".smc";
-		else if (fileExists(tempROMName + ".sfc"))
-			tempROMName += ".sfc";
-		else if (fileExists(tempROMName));
-		else
+		else if (fs::exists(smc))
+			ROMName = smc;
+		else if (fs::exists(sfc))
+			ROMName = sfc;
+		else if (!fs::exists(ROMName))
 			printError("ROM not found.", true);
-		ROMName = tempROMName;
 		openFile(ROMName, rom);
 
 		tryToCleanAM4Data();
@@ -376,9 +374,9 @@ void assembleSNESDriver() {
 }
 
 void assembleSPCDriver() {
-	remove(File("temp.log"));
+	fs::remove("temp.log");		// // //
 
-	remove(File("asm/main.bin"));
+	fs::remove("asm/main.bin");
 	std::string patch;
 	openTextFile("asm/main.asm", patch);
 	programPos = scanInt(patch, "base ");
@@ -397,9 +395,9 @@ void assembleSPCDriver() {
 	reuploadPos = scanInt(temptxt, "ReuploadPos: ");
 	SRCNTableCodePos = scanInt(temptxt, "SRCNTableCodePos: ");
 
-	remove("temp.log");
+	fs::remove("temp.log");
 
-	programSize = getFileSize("asm/main.bin");
+	programSize = fs::file_size("asm/main.bin");		// // //
 }
 
 void loadMusicList() {
@@ -868,7 +866,7 @@ void compileGlobalData() {
 
 	writeTextFile("asm/tempmain.asm", str);
 
-	remove(File("asm/main.bin"));
+	fs::remove("asm/main.bin");		// // //
 
 	if (verbose)
 		std::cout << "Compiling main SPC program, pass 2." << std::endl;
@@ -878,7 +876,7 @@ void compileGlobalData() {
 	if (!asarCompileToBIN("asm/tempmain.asm", "asm/main.bin"))
 		printError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n", true);
 
-	programSize = getFileSize("asm/main.bin");
+	programSize = fs::file_size("asm/main.bin");		// // //
 
 	std::cout << "Total size of main program + all sound effects: 0x" << hex4 << programSize << std::dec << std::endl;
 }
@@ -1028,18 +1026,7 @@ void fixMusicPointers() {
 			untilJump--;
 		}
 
-		int normalChannelsSize = 0;		// // //
-		for (int j = 0; j < CHANNELS; ++j)
-			normalChannelsSize += musics[i].tracks[j].data.size();
-
-		for (Track &t : musics[i].tracks) {		// // //
-			for (unsigned short x : t.loopLocations) {
-				int temp = (t.data[x] & 0xFF) | (t.data[x + 1] << 8);
-				temp += musics[i].posInARAM + normalChannelsSize + musics[i].spaceForPointersAndInstrs;
-				t.data[x] = temp & 0xFF;
-				t.data[x + 1] = temp >> 8;
-			}
-		}
+		musics[i].adjustLoopPointers();		// // //
 
 		std::vector<uint8_t> final;		// // //
 
@@ -1068,7 +1055,7 @@ void fixMusicPointers() {
 		// // //
 		final.insert(final.end(), musics[i].allPointersAndInstrs.cbegin(), musics[i].allPointersAndInstrs.cend());
 		for (const auto &x : musics[i].tracks)
-			final.insert(final.end(), x.data.cbegin(), x.data.cend());
+			x.InsertData(final);		// // //
 
 		if (musics[i].minSize > 0 && i <= highestGlobalSong)
 			while (final.size() < musics[i].minSize)
@@ -1162,7 +1149,7 @@ void fixMusicPointers() {
 			printError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n", true);
 	}
 
-	programSize = getFileSize("asm/SNES/bin/main.bin");
+	programSize = fs::file_size("asm/SNES/bin/main.bin");		// // //
 
 	std::vector<uint8_t> temp;		// // //
 	openFile("asm/SNES/bin/main.bin", temp);
@@ -1249,23 +1236,22 @@ void generateSPCs() {
 
 	time_t recentMod = 0;			// If any main program modifications were made, we need to update all SPCs.
 	for (int i = 1; i <= highestGlobalSong; i++)
-		recentMod = std::max(recentMod, getTimeStamp((File)("music/" + musics[i].getFileName())));		// // //
+		recentMod = std::max(recentMod, getTimeStamp("music/" + musics[i].getFileName()));		// // //
 
-	recentMod = std::max(recentMod, getTimeStamp((File)"asm/main.asm"));
-	recentMod = std::max(recentMod, getTimeStamp((File)"asm/commands.asm"));
-	recentMod = std::max(recentMod, getTimeStamp((File)"asm/InstrumentData.asm"));
-	recentMod = std::max(recentMod, getTimeStamp((File)"asm/CommandTable.asm"));
-	recentMod = std::max(recentMod, getTimeStamp((File)"Addmusic_sound effects.txt"));
-	recentMod = std::max(recentMod, getTimeStamp((File)"Addmusic_sample groups.txt"));
-	recentMod = std::max(recentMod, getTimeStamp((File)"AddmusicK.exe"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/main.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/commands.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/InstrumentData.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/CommandTable.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sound effects.txt"));
+	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sample groups.txt"));
+	recentMod = std::max(recentMod, getTimeStamp("AddmusicK.exe"));
 
-	for (int i = 1; i < 256; i++)
+	for (int i = 1; i < 256; i++) {		// // //
 		if (soundEffects[0][i].exists)
-			recentMod = std::max(recentMod, getTimeStamp((File)((std::string)"1DF9/" + soundEffects[0][i].getEffectiveName())));
-
-	for (int i = 1; i < 256; i++)
+			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DF9") / soundEffects[0][i].getEffectiveName()));
 		if (soundEffects[1][i].exists)
-			recentMod = std::max(recentMod, getTimeStamp((File)((std::string)"1DFC/" + soundEffects[1][i].getEffectiveName())));
+			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DFC") / soundEffects[1][i].getEffectiveName()));
+	}
 
 	int maxMode = 0;	// 0 = dump music, 1 = dump SFX1, 2 = dump SFX2
 	if (sfxDump == true) maxMode = 2;
@@ -1295,19 +1281,17 @@ void generateSPCs() {
 					y--;
 					continue;
 				}
-				SPC.clear();
+				SPC = SPCBase;		// // //
 				SPC.resize(0x10200);
 
-				for (unsigned int j = 0; j < SPCBase.size(); j++)
-					SPC[j] = SPCBase[j];
+				if (mode == 0) {		// // //
+					std::copy_n(musics[i].title.cbegin(), std::min(32u, musics[i].title.size()), SPC.begin() + 0x2E);
+					std::copy_n(musics[i].game.cbegin(), std::min(32u, musics[i].game.size()), SPC.begin() + 0x4E);
+					std::copy_n(musics[i].comment.cbegin(), std::min(32u, musics[i].comment.size()), SPC.begin() + 0x7E);
+					std::copy_n(musics[i].author.cbegin(), std::min(32u, musics[i].author.size()), SPC.begin() + 0xB1);
+				}
 
-				if (mode == 0) { for (unsigned int j = 0; j < 32; j++) if (j < musics[i].title.length())    SPC[j + 0x2E] = musics[i].title[j];    else SPC[j + 0x2E] = 0; }
-				if (mode == 0) { for (unsigned int j = 0; j < 32; j++) if (j < musics[i].game.length())     SPC[j + 0x4E] = musics[i].game[j];     else SPC[j + 0x4E] = 0; }
-				if (mode == 0) { for (unsigned int j = 0; j < 32; j++) if (j < musics[i].comment.length())  SPC[j + 0x7E] = musics[i].comment[j];  else SPC[j + 0x7E] = 0; }
-				if (mode == 0) { for (unsigned int j = 0; j < 32; j++) if (j < musics[i].author.length())   SPC[j + 0xB1] = musics[i].author[j];   else SPC[j + 0xB1] = 0; }
-
-				for (int j = 0; j < programSize; j++)
-					SPC[0x100 + programPos + j] = programData[j];
+				std::copy_n(programData.cbegin(), programSize, SPC.begin() + 0x100 + programPos);
 
 				int backupIndex = i;
 				if (mode != 0)
@@ -1474,12 +1458,10 @@ void assembleSNESDriver2() {
 
 	for (int i = 0; i < songCount; i++) {
 		if (musics[i].exists == true && i > highestGlobalSong) {
-			int requestSize;
-			int freeSpace;
 			std::stringstream musicBinPath;
 			musicBinPath << "asm/SNES/bin/music" << hex2 << i << ".bin";
-			requestSize = getFileSize(musicBinPath.str());
-			freeSpace = findFreeSpace(requestSize, bankStart, rom);
+			unsigned requestSize = fs::file_size(musicBinPath.str());		// // //
+			int freeSpace = findFreeSpace(requestSize, bankStart, rom);
 			if (freeSpace == -1) {
 				printError("Error: Your ROM is out of free space.", true);
 			}
@@ -1516,7 +1498,7 @@ void assembleSNESDriver2() {
 			filename << "asm/SNES/bin/brr" << hex2 << i << ".bin";
 			writeFile(filename.str(), temp);
 
-			int requestSize = getFileSize(filename.str());
+			unsigned requestSize = fs::file_size(filename.str());		// // //
 			int freeSpace = findFreeSpace(requestSize, bankStart, rom);
 			if (freeSpace == -1) {
 				printError("Error: Your ROM is out of free space.", true);
@@ -1596,17 +1578,15 @@ void assembleSNESDriver2() {
 		final.insert(final.cend(), tempsfc.cbegin(), tempsfc.cend());		// // //
 
 		// // //
-		fs::remove((std::string)ROMName + "~");
-		fs::rename((std::string)ROMName, (std::string)ROMName + "~");
+		fs::remove(ROMName.string() + "~");
+		fs::rename(ROMName, ROMName.string() + "~");
 
 		writeFile(ROMName, final);
 	}
 }
 
 void generateMSC() {
-	std::string mscname = ((std::string)ROMName).substr(0, (unsigned int)((std::string)ROMName).find_last_of('.'));
-
-	mscname += ".msc";
+	fs::path mscname = ROMName.replace_extension(".msc");		// // //
 
 	std::stringstream text;
 
@@ -1681,10 +1661,11 @@ void tryToCleanAM4Data() {
 			printError("Addmusic 4.05 ROMs can only be cleaned if they have a header. This does not\napply to any other aspect of the program.", true);
 
 		char **am405argv;
+		std::string ROMstr = ROMName.string();		// // //
 		am405argv = (char **)malloc(sizeof(char **) * 2);
-		am405argv[1] = (char *)malloc(ROMName.size() + 1);
-		strcpy(am405argv[1], ROMName.cStr());
-		am405argv[1][ROMName.size()] = 0;
+		am405argv[1] = (char *)malloc(ROMstr.size() + 1);
+		strcpy(am405argv[1], ROMstr.c_str());
+		am405argv[1][ROMstr.size()] = 0;
 		std::cout << "Attempting to erase data from Addmusic 4.05:" << std::endl;
 		removeAM405Data(2, am405argv);
 		openFile(ROMName, rom);					// Reopen the file.
@@ -1704,14 +1685,14 @@ void tryToCleanAMMData() {
 			printError("AddmusicM ROMs can only be cleaned if they have a header. This does not\n"
 					   "apply to any other aspect of the program.", true);
 
-		if (fileExists("INIT.asm") == false)
+		if (!fs::exists("INIT.asm"))		// // //
 			printError("AddmusicM was detected.  In order to remove it from this ROM, you must put\n"
 					   "AddmusicM's INIT.asm as well as xkasAnti and a clean ROM (named clean.smc) in\n"
 					   "the same folder as this program. Then attempt to run this program once more.", true);
 
 		std::cout << "AddmusicM detected.  Attempting to remove..." << std::endl;
-		execute(((std::string)("perl addmusicMRemover.pl ")) + (std::string)ROMName);
-		execute(((std::string)("xkasAnti clean.smc ")) + (std::string)ROMName + "INIT.asm");
+		execute("perl addmusicMRemover.pl " + ROMName.string());		// // //
+		execute("xkasAnti clean.smc " + ROMName.string() + " INIT.asm");
 	}
 }
 
