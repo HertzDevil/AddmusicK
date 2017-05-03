@@ -60,8 +60,7 @@ int main(int argc, char* argv[]) {
 	std::vector<std::string> arguments;
 
 	if (fs::exists("Addmusic_options.txt")) {		// // //
-		std::string optionsString;
-		openTextFile("Addmusic_options.txt", optionsString);
+		std::string optionsString = openTextFile("Addmusic_options.txt");		// // //
 		unsigned int osPos = 0;
 		while (osPos < optionsString.size()) {
 			// This is probably a catastrophicly bad idea on several levels, but I don't have the time do redo this entire section of code.
@@ -170,7 +169,7 @@ int main(int argc, char* argv[]) {
 			ROMName = sfc;
 		else if (!fs::exists(ROMName))
 			printError("ROM not found.", true);
-		openFile(ROMName, rom);
+		rom = openFile(ROMName);		// // //
 
 		tryToCleanAM4Data();
 		tryToCleanAMMData();
@@ -368,18 +367,14 @@ void cleanROM() {
 }
 
 void assembleSNESDriver() {
-	std::string patch;
-	openTextFile("asm/SNES/patch.asm", patch);
-	programUploadPos = scanInt(patch, "!DefARAMRet = ");
+	programUploadPos = scanInt(openTextFile("asm/SNES/patch.asm"), "!DefARAMRet = ");		// // //
 }
 
 void assembleSPCDriver() {
 	fs::remove("temp.log");		// // //
-
 	fs::remove("asm/main.bin");
-	std::string patch;
-	openTextFile("asm/main.asm", patch);
-	programPos = scanInt(patch, "base ");
+
+	programPos = scanInt(openTextFile("asm/main.asm"), "base ");		// // //
 	if (verbose)
 		std::cout << "Compiling main SPC program, pass 1." << std::endl;
 
@@ -389,8 +384,7 @@ void assembleSPCDriver() {
 	if (!asarCompileToBIN("asm/main.asm", "asm/main.bin"))
 		printError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n", true);
 
-	std::string temptxt;
-	openTextFile("temp.txt", temptxt);
+	std::string temptxt = openTextFile("temp.txt");		// // //
 	mainLoopPos = scanInt(temptxt, "MainLoopPos: ");
 	reuploadPos = scanInt(temptxt, "ReuploadPos: ");
 	SRCNTableCodePos = scanInt(temptxt, "SRCNTableCodePos: ");
@@ -401,11 +395,9 @@ void assembleSPCDriver() {
 }
 
 void loadMusicList() {
-	std::string musicFile;
-	openTextFile("Addmusic_list.txt", musicFile);
-
-	if (musicFile[musicFile.length() - 1] != '\n')
-		musicFile += '\n';
+	std::string musicFile = openTextFile("Addmusic_list.txt");		// // //
+	if (musicFile.empty() || musicFile.back() != '\n')
+		musicFile.push_back('\n');
 
 	unsigned int i = 0;
 
@@ -466,9 +458,8 @@ void loadMusicList() {
 		else {
 			if (musicFile[i] == '\n' || musicFile[i] == '\r') {
 				musics[index].name = tempName;
-				if (inLocals && justSPCsPlease == false) {
-					openTextFile((std::string("music/") + tempName), musics[index].text);
-				}
+				if (inLocals && !justSPCsPlease)
+					musics[index].text = openTextFile(fs::path("music") / tempName);		// // //
 				musics[index].exists = true;
 				index = -1;
 				i++;
@@ -495,8 +486,7 @@ void loadMusicList() {
 }
 
 void loadSampleList() {
-	std::string str;
-	openTextFile("Addmusic_sample groups.txt", str);
+	std::string str = openTextFile("Addmusic_sample groups.txt");		// // //
 
 	std::string groupName;
 	std::string tempName;
@@ -611,8 +601,7 @@ void loadSampleList() {
 }
 
 void loadSFXList() {		// Very similar to loadMusicList, but with a few differences.
-	std::string str;
-	openTextFile("Addmusic_sound effects.txt", str);
+	std::string str = openTextFile("Addmusic_sound effects.txt");		// // //
 
 	if (str[str.length() - 1] != '\n')
 		str += '\n';
@@ -694,7 +683,7 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 						soundEffects[0][index].add0 = true;
 
 					if (!isPointer)
-						openTextFile((std::string("1DF9/") + tempName), soundEffects[0][index].text);
+						soundEffects[0][index].text = openTextFile(fs::path("1DF9") / tempName);		// // //
 				}
 				else {
 					if (!isPointer)
@@ -710,7 +699,7 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 						soundEffects[1][index].add0 = true;
 
 					if (!isPointer)
-						openTextFile((std::string("1DFC/") + tempName), soundEffects[1][index].text);
+						soundEffects[1][index].text = openTextFile(fs::path("1DFC") / tempName);		// // //
 				}
 
 				index = -1;
@@ -852,8 +841,7 @@ void compileGlobalData() {
 
 	writeFile("asm/SFXData.bin", allSFXData);
 
-	std::string str;
-	openTextFile("asm/main.asm", str);
+	std::string str = openTextFile("asm/main.asm");		// // //
 
 	int pos;
 	pos = str.find("SFXTable0:");
@@ -1130,8 +1118,7 @@ void fixMusicPointers() {
 	}
 
 	if (recompileMain) {
-		std::string patch;
-		openTextFile("asm/tempmain.asm", patch);
+		std::string patch = openTextFile("asm/tempmain.asm");		// // //
 
 		patch += globalPointers.str() + "\n" + incbins.str();
 
@@ -1149,10 +1136,8 @@ void fixMusicPointers() {
 			printError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n", true);
 	}
 
+	std::vector<uint8_t> temp = openFile("asm/SNES/bin/main.bin");		// // //
 	programSize = fs::file_size("asm/SNES/bin/main.bin");		// // //
-
-	std::vector<uint8_t> temp;		// // //
-	openFile("asm/SNES/bin/main.bin", temp);
 	std::vector<uint8_t> temp2;
 	temp2.resize(temp.size() + 4);
 	temp2[0] = programSize & 0xFF;
@@ -1212,8 +1197,7 @@ void generateSPCs() {
 		return;			// In this case, trying to generate an SPC would crash.
 	//byte base[0x10000];
 
-	std::vector<uint8_t> programData;		// // //
-	openFile("asm/SNES/bin/main.bin", programData);
+	std::vector<uint8_t> programData = openFile("asm/SNES/bin/main.bin");		// // //
 	programData.erase(programData.begin(), programData.begin() + 4);	// Erase the upload data.
 
 	unsigned int localPos;
@@ -1225,33 +1209,16 @@ void generateSPCs() {
 
 	localPos = programData.size() + programPos;
 
-	std::vector<uint8_t> SPC, SPCBase, DSPBase;		// // //
-	openFile("asm/SNES/SPCBase.bin", SPCBase);
-	openFile("asm/SNES/SPCDSPBase.bin", DSPBase);
+	std::vector<uint8_t> SPC;		// // //
+	std::vector<uint8_t> SPCBase = openFile("asm/SNES/SPCBase.bin");
+	std::vector<uint8_t> DSPBase = openFile("asm/SNES/SPCDSPBase.bin");
 	SPC.resize(0x10200);
 
 	int SPCsGenerated = 0;
 
 	bool forceAll = false;
 
-	time_t recentMod = 0;			// If any main program modifications were made, we need to update all SPCs.
-	for (int i = 1; i <= highestGlobalSong; i++)
-		recentMod = std::max(recentMod, getTimeStamp("music/" + musics[i].getFileName()));		// // //
-
-	recentMod = std::max(recentMod, getTimeStamp("asm/main.asm"));
-	recentMod = std::max(recentMod, getTimeStamp("asm/commands.asm"));
-	recentMod = std::max(recentMod, getTimeStamp("asm/InstrumentData.asm"));
-	recentMod = std::max(recentMod, getTimeStamp("asm/CommandTable.asm"));
-	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sound effects.txt"));
-	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sample groups.txt"));
-	recentMod = std::max(recentMod, getTimeStamp("AddmusicK.exe"));
-
-	for (int i = 1; i < 256; i++) {		// // //
-		if (soundEffects[0][i].exists)
-			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DF9") / soundEffects[0][i].getEffectiveName()));
-		if (soundEffects[1][i].exists)
-			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DFC") / soundEffects[1][i].getEffectiveName()));
-	}
+	time_t recentMod = getLastModifiedTime();		// // // If any main program modifications were made, we need to update all SPCs.
 
 	int maxMode = 0;	// 0 = dump music, 1 = dump SFX1, 2 = dump SFX2
 	if (sfxDump == true) maxMode = 2;
@@ -1407,10 +1374,9 @@ void assembleSNESDriver2() {
 	if (verbose)
 		std::cout << "\nGenerating SNES driver...\n" << std::endl;
 
-	std::string patch;
+	std::string patch = openTextFile("asm/SNES/patch.asm");		// // //
 
 	//removeFile("asm/SNES/temppatch.sfc");
-	//openTextFile("asm/SNES/patch.asm", patch);
 
 	//writeTextFile("asm/SNES/temppatch.asm", patch);
 
@@ -1423,8 +1389,6 @@ void assembleSNESDriver2() {
 
 	//std::vector<uint8_t> patchBin;		// // //
 	//openFile("asm/SNES/temppatch.sfc", patchBin);
-
-	openTextFile("asm/SNES/patch.asm", patch);
 
 	insertValue(reuploadPos, 4, "!ExpARAMRet = ", patch);
 	insertValue(SRCNTableCodePos, 4, "!TabARAMRet = ", patch);
@@ -1439,13 +1403,7 @@ void assembleSNESDriver2() {
 		quit(1);
 	}
 
-	patch = patch.substr(0, pos);
-
-	{
-		std::string patch2;
-		openTextFile("asm/SNES/patch2.asm", patch2);
-		patch += patch2;
-	}
+	patch = patch.substr(0, pos) + openTextFile("asm/SNES/patch2.asm");		// // //
 
 	std::stringstream musicPtrStr; musicPtrStr << "MusicPtrs: \ndl ";
 	std::stringstream samplePtrStr; samplePtrStr << "\n\nSamplePtrs:\ndl ";
@@ -1546,9 +1504,8 @@ void assembleSNESDriver2() {
 
 	remove("asm/SNES/temppatch.sfc");
 
-	std::string undoPatch;
-	openTextFile("asm/SNES/AMUndo.asm", undoPatch);
-	patch.insert(patch.begin(), undoPatch.begin(), undoPatch.end());
+	std::string undoPatch = openTextFile("asm/SNES/AMUndo.asm");		// // //
+	patch.insert(patch.cbegin(), undoPatch.cbegin(), undoPatch.cend());
 
 	writeTextFile("asm/SNES/temppatch.asm", patch);
 
@@ -1573,8 +1530,7 @@ void assembleSNESDriver2() {
 		std::vector<uint8_t> final;		// // //
 		final = romHeader;
 
-		std::vector<uint8_t> tempsfc;
-		openFile("asm/SNES/temp.sfc", tempsfc);
+		std::vector<uint8_t> tempsfc = openFile("asm/SNES/temp.sfc");		// // //
 		final.insert(final.cend(), tempsfc.cbegin(), tempsfc.cend());		// // //
 
 		// // //
@@ -1622,7 +1578,6 @@ void tryToCleanSampleToolData() {
 	bool found = false;
 
 	for (i = 0; i < rom.size() - 50; i++) {
-
 		if (strncmp((char *)rom.data() + i, "New Super Mario World Sample Utility 2.0 by smkdan", 50) == 0) {
 			found = true;
 			break;
@@ -1668,7 +1623,7 @@ void tryToCleanAM4Data() {
 		am405argv[1][ROMstr.size()] = 0;
 		std::cout << "Attempting to erase data from Addmusic 4.05:" << std::endl;
 		removeAM405Data(2, am405argv);
-		openFile(ROMName, rom);					// Reopen the file.
+		rom = openFile(ROMName);		// // // Reopen the file.
 		if (rom[0x255] == 0x5C) {
 			int moreASMData = ((rom[0x255 + 3] << 16) | (rom[0x255 + 2] << 8) | (rom[0x255 + 1])) - 8;
 			clearRATS(SNESToPC(moreASMData));
@@ -1702,52 +1657,19 @@ void checkMainTimeStamps()			// Disabled for now, as this only works if the ROM 
 	return;
 
 /*
-	if (!fileExists("asm/SNES/bin/main.bin"))
-	{
-		goto recompile;				// Laziness!
-	}
-	if (strncmp((char *)(rom.data() + 0x70000), "@AMK", 4) != 0)
-	{
-		goto recompile;				// More laziness!
-	}
-
-	for (int i = 1; i <= highestGlobalSong; i++)
-		mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)("music/" + musics[i].getFileName())));		// // //
-
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"asm/main.asm"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"asm/commands.asm"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"asm/InstrumentData.asm"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"asm/CommandTable.asm"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"asm/SNES/patch.asm"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"asm/SNES/patch2.asm"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"asm/SNES/tweaks.asm"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"Addmusic_list.txt"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"Addmusic_sound effects.txt"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"Addmusic_sample groups.txt"));
-	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp((File)"AddmusicK.exe"));
-
-	for (int i = 1; i < 256; i++)
-	{
-		if (soundEffects[0][i].exists)
-			std::max(mostRecentMainModification, getTimeStamp((File)((std::string)"1DF9/" + soundEffects[0][i].getEffectiveName())));
-	}
-
-	for (int i = 1; i < 256; i++)
-	{
-		if (soundEffects[1][i].exists)
-			std::max(mostRecentMainModification, getTimeStamp((File)((std::string)"1DFC/" + soundEffects[1][i].getEffectiveName())));
-	}
-
-	if (mostRecentMainModification > getTimeStamp((File)"asm/SNES/bin/main.bin"))
-	{
-		std::cout << "Changes have been made to the global program.  Recompiling...\n" << std::endl;
-recompile:
+	if (!fs::exists("asm/SNES/bin/main.bin") || 0 != ::strncmp((char *)(rom.data() + 0x70000), "@AMK", 4)) {		// // //
 		recompileMain = true;
+		return;
 	}
-	else
-	{
-		recompileMain = false;
-	}
+
+	mostRecentMainModification = std::max(mostRecentMainModification, getLastModifiedTime());		// // //
+	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp("asm/SNES/patch.asm"));
+	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp("asm/SNES/patch2.asm"));
+	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp("asm/SNES/tweaks.asm"));
+	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp("Addmusic_list.txt"));
+
+	if (recompileMain = (mostRecentMainModification > getTimeStamp("asm/SNES/bin/main.bin")))
+		std::cout << "Changes have been made to the global program.  Recompiling...\n" << std::endl;
 */
 }
 

@@ -99,8 +99,8 @@ extern bool useAsarDLL;
 bool asarCompileToBIN(const fs::path &patchName, const fs::path &binOutput, bool dieOnError = true);
 bool asarPatchToROM(const fs::path &patchName, const fs::path &romName, bool dieOnError = true);
 
-void openFile(const fs::path &fileName, std::vector<uint8_t> &vector);		// // //
-void openTextFile(const fs::path &fileName, std::string &string);
+std::vector<uint8_t> openFile(const fs::path &fileName);		// // //
+std::string openTextFile(const fs::path &fileName);		// // //
 
 // // //
 class hex_formatter
@@ -134,7 +134,8 @@ int execute(const std::string &command, bool prepentDotSlash = true);
 void printError(const std::string &error, bool isFatal, const std::string &fileName = "", int line = -1);
 void printWarning(const std::string &error, const std::string &fileName = "", int line = -1);
 
-void quit(int code);
+[[noreturn]] void fatalError(const std::string &error, const std::string &fileName = "", int line = -1);		// // //
+[[noreturn]] void quit(int code);		// // //
 
 int scanInt(const std::string &str, const std::string &value);
 
@@ -177,3 +178,4 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 int strToInt(const std::string &str);
 
 time_t getTimeStamp(const fs::path &file);
+time_t getLastModifiedTime();		// // //

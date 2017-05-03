@@ -492,9 +492,7 @@ void SoundEffect::compileASM()
 		if (!asarCompileToBIN("temp.asm", "temp.bin"))
 			error2("asar reported an error.  Refer to temp.log for details.");
 
-		std::vector<uint8_t> temp;		// // //
-
-		openFile("temp.bin", temp);
+		std::vector<uint8_t> temp = openFile("temp.bin");		// // //
 
 		temp.erase(temp.begin(), temp.begin() + 0x08000);
 

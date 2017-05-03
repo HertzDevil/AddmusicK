@@ -40,7 +40,7 @@ T requires(T x, T min, T max, U&& err) {
 // // //
 static int line;
 [[noreturn]] void Music::fatalError(const std::string &str) {
-	printError(str, true, name, line);
+	::fatalError(str, name, line);
 }
 
 static int channel, prevChannel, octave, prevNoteLength, defaultNoteLength;
@@ -231,7 +231,7 @@ Music::Music() {
 void Music::init() {
 	basepath = "./";
 	prevChannel = 0;
-	openTextFile((std::string)"music/" + name, text);
+	text = openTextFile((std::string)"music/" + name);		// // //
 	manualNoteWarning = true;
 	tempoDefined = false;
 	//am4silence = 0;

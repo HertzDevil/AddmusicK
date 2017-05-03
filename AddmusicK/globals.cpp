@@ -42,7 +42,7 @@ unsigned programUploadPos;
 unsigned mainLoopPos;
 unsigned reuploadPos;
 unsigned SRCNTableCodePos;
-unsigned programSize;
+unsigned programSize;		// // //
 int highestGlobalSong;
 int totalSampleCount;
 int songCount = 0;
@@ -51,35 +51,24 @@ bool useAsarDLL;
 
 
 
-void openFile(const fs::path &fileName, std::vector<uint8_t> &v)		// // //
-{
+std::vector<uint8_t> openFile(const fs::path &fileName) {		// // //
 	std::ifstream is(fileName, std::ios::binary);
 	if (!is)
-		printError(std::string("Error: File \"") + fileName.string() + std::string("\" not found."), true);
+		printError("Error: File \"" + fileName.string() + "\" not found.", true);
 
-	is.seekg(0, std::ios::end);
-	unsigned int length = (unsigned int)is.tellg();
-	is.seekg(0, std::ios::beg);
-	v.clear();
-	v.reserve(length);
-
-	while (length > 0) {
-		char temp;
-		is.read(&temp, 1);
-		v.push_back(temp);
-		length--;
-	}
+	std::vector<uint8_t> buf;		// // //
+	buf.reserve(static_cast<size_t>(fs::file_size(fileName)));
+	buf.insert(buf.cend(), std::istreambuf_iterator<char> {is}, std::istreambuf_iterator<char> { });		// // //
 
 	is.close();
+	return buf;
 }
 
-void openTextFile(const fs::path &fileName, std::string &s) {
+std::string openTextFile(const fs::path &fileName) {		// // //
 	std::ifstream is(fileName);
-
 	if (!is)
-		printError(std::string("Error: File \"") + fileName.string() + std::string("\" not found."), true);
-
-	s.assign(std::istreambuf_iterator<char> {is}, std::istreambuf_iterator<char> { });
+		printError("Error: File \"" + fileName.string() + "\" not found.", true);		// // //
+	return std::string(std::istreambuf_iterator<char> {is}, std::istreambuf_iterator<char> { });
 }
 
 time_t getTimeStamp(const fs::path &file) {
@@ -89,6 +78,30 @@ time_t getTimeStamp(const fs::path &file) {
 		return 0;
 	}
 	return fs::last_write_time(file).time_since_epoch().count();
+}
+
+// // //
+time_t getLastModifiedTime() {
+	time_t recentMod = 0;			// If any main program modifications were made, we need to update all SPCs.
+	for (int i = 1; i <= highestGlobalSong; i++)
+		recentMod = std::max(recentMod, getTimeStamp(fs::path("music") / musics[i].getFileName()));		// // //
+
+	recentMod = std::max(recentMod, getTimeStamp("asm/main.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/commands.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/InstrumentData.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/CommandTable.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sound effects.txt"));
+	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sample groups.txt"));
+	recentMod = std::max(recentMod, getTimeStamp("AddmusicK.exe"));
+
+	for (int i = 1; i < 256; i++) {		// // //
+		if (soundEffects[0][i].exists)
+			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DF9") / soundEffects[0][i].getEffectiveName()));
+		if (soundEffects[1][i].exists)
+			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DFC") / soundEffects[1][i].getEffectiveName()));
+	}
+
+	return recentMod;
 }
 
 void printError(const std::string &error, bool isFatal, const std::string &fileName, int line) {
@@ -106,6 +119,11 @@ void printWarning(const std::string &error, const std::string &fileName, int lin
 		oss << "File: " << fileName << " Line: " << line << ":\n";
 	puts((oss.str() + error).c_str());
 	putchar('\n');
+}
+
+// // //
+void fatalError(const std::string &error, const std::string &fileName, int line) {
+	printError(error, true, fileName, line);
 }
 
 void quit(int code) {
@@ -173,7 +191,10 @@ void writeTextFile(const fs::path &fileName, const std::string &string) {
 
 void insertValue(int value, int length, const std::string &find, std::string &str) {
 	int pos = str.find(find);
-	if (pos == -1) { std::cout << "Error: \"" << find << "\" could not be found." << std::endl; quit(1); }
+	if (pos == -1) {		// // //
+		std::cerr << "Error: \"" << find << "\" could not be found." << std::endl;
+		quit(1);
+	}
 	pos += find.length();
 
 	std::stringstream ss;
@@ -334,19 +355,15 @@ int clearRATS(int offset) {
 }
 
 void addSample(const fs::path &fileName, Music *music, bool important) {
-	std::vector<uint8_t> temp;		// // //
-	fs::path actualPath = getSamplePath(fileName, music->name);
-	openFile(actualPath, temp);
+	fs::path actualPath = getSamplePath(fileName, music->name);		// // //
+	std::vector<uint8_t> temp = openFile(actualPath);
 	addSample(temp, actualPath.string(), music, important, false);
 }
 
 // // //
 void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint) {
 	Sample newSample;
-	if (important)
-		newSample.important = true;
-	else
-		newSample.important = false;
+	newSample.important = important;		// // //
 
 	if (sample.size() != 0) {
 		if (!noLoopHeader) {
@@ -407,10 +424,7 @@ void addSampleGroup(const fs::path &groupName, Music *music) {
 int bankSampleCount = 0;			// Used to give unique names to sample bank brrs.
 
 void addSampleBank(const fs::path &fileName, Music *music) {
-	std::vector<uint8_t> bankFile;		// // //
-
-	fs::path actualPath = getSamplePath(fileName, music->name);		// // //
-	openFile(actualPath, bankFile);
+	std::vector<uint8_t> bankFile = openFile(getSamplePath(fileName, music->name));		// // //
 
 	if (bankFile.size() != 0x8000)
 		printError("The specified bank file was an illegal size.", true);
@@ -457,20 +471,20 @@ int getSample(const fs::path &name, Music *music) {
 	return -1;
 }
 
+// // //
 fs::path getSamplePath(const fs::path &name, const std::string &musicName) {
-	fs::path actualPath;
 	fs::path absoluteDir = "samples" / name;
-	fs::path relativeDir = (fs::path("music") / musicName).parent_path();
-	relativeDir.append(name);
+	fs::path relativeDir = (fs::path("music") / musicName).parent_path() / name;
 
 	if (fs::exists(relativeDir))
-		actualPath = relativeDir;
-	else if (fs::exists(absoluteDir))
-		actualPath = absoluteDir;
-	else
-		printError("Could not find sample " + name.string(), true, musicName);
+		return relativeDir;
+	if (fs::exists(absoluteDir))
+		return absoluteDir;
+	fatalError("Could not find sample " + name.string(), musicName);
 
-	return actualPath;
+//	return fs::exists(relativeDir) ? relativeDir :
+//		fs::exists(absoluteDir) ? absoluteDir :
+//		throw AMKd::Utility::Exception("Could not find sample " + name.string(), true, musicName);
 }
 
 // // //
@@ -525,7 +539,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 	bool okayToAdd = true;
 	std::stack<bool> okayStatus;
 
-	if (str.substr(0, 3) == "\xEF\xBB\xBF")		// // // utf-8 bom
+	if (std::string_view(str.c_str(), 3) == "\xEF\xBB\xBF")		// // // utf-8 bom
 		i = 3;
 	if (std::any_of(str.cbegin() + i, str.cend(), [] (char ch) { return static_cast<unsigned char>(ch) > 0x7Fu; }))
 		printWarning("Non-ASCII characters detected.");
@@ -790,12 +804,9 @@ bool asarPatchToROM(const fs::path &patchName, const fs::path &romName, bool die
 	removeFile("temp.txt");
 
 	if (useAsarDLL) {
+		std::vector<uint8_t> patchrom = openFile(romName);		// // //
 		int binlen = 0;
-		int buflen;
-
-		std::vector<uint8_t> patchrom;		// // //
-		openFile(romName, patchrom);
-		buflen = patchrom.size();
+		int buflen = patchrom.size();
 
 		asar_patch(patchName.string().c_str(), (char *)patchrom.data(), buflen, &buflen);		// // //
 		int count = 0, currentCount = 0;
