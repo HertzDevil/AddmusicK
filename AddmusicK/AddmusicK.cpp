@@ -6,8 +6,7 @@
 #include <iomanip>
 // // //
 #include "../AM405Remover/AM405Remover.h"
-#include <filesystem>		// // //
-namespace fs = std::experimental::filesystem;
+#include "Utility/fs.h"		// // //
 #include <cstdint>
 #include "lodepng.h"
 #include <thread>

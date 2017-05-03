@@ -48,9 +48,7 @@ struct SampleGroup;
 #include <iomanip>		// // //
 #include "asardll.h"
 
-#include <experimental/filesystem>		// // //
-namespace fs = std::experimental::filesystem;
-
+#include "Utility/fs.h"		// // //
 
 
 //extern ROM rom;

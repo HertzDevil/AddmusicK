@@ -148,7 +148,6 @@
     <ClInclude Include="BankDefine.h" />
     <ClInclude Include="D:\C++\lodepng\lodepng.h" />
     <ClInclude Include="Binary\Defines.h" />
-    <ClInclude Include="Directory.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="MML\Lexer.h" />
     <ClInclude Include="MML\SourceFile.h" />
@@ -157,6 +156,7 @@
     <ClInclude Include="SampleGroup.h" />
     <ClInclude Include="SoundEffect.h" />
     <ClInclude Include="Utility\Exception.h" />
+    <ClInclude Include="Utility\fs.h" />
     <ClInclude Include="Utility\Trie.h" />
   </ItemGroup>
   <ItemGroup>
