@@ -4,7 +4,6 @@
 #include <utility>
 #include <initializer_list>
 #include <cstdlib>
-#include <cerrno>
 #include "SourceFile.h"
 
 namespace AMKd::MML {
@@ -25,11 +24,10 @@ inline constexpr bool conjunction(std::initializer_list<bool> bl) {
 template <typename T, typename U, std::size_t I>
 bool get_step(SourceFile &file, U &tup) {
 	file.SkipSpaces();
-	std::pair<typename T::arg_type, bool> ret = T()(file);
-	if (!ret.second)
-		return false;
-	std::get<I>(tup) = ret.first;
-	return true;
+	std::optional<typename T::arg_type> ret = T()(file);
+	if (ret.has_value())
+		std::get<I>(tup) = *ret;
+	return ret.has_value();
 }
 
 template <typename T, typename... L, std::size_t... I>
@@ -39,6 +37,7 @@ bool get_impl(SourceFile &file, T &tup, std::index_sequence<I...>) {
 
 } // namespace details
 
+// skips spaces before each token
 template <typename... Arg>
 std::optional<std::tuple<typename Arg::arg_type...>>
 GetParameters(SourceFile &file) {
@@ -50,22 +49,21 @@ GetParameters(SourceFile &file) {
 
 	// file.PrintError(...);
 	file.SetReadCount(p);
-	return { };
+	return std::nullopt;
 }
 
 #define LEXER_DECL(T, U) \
 	struct T \
 	{ \
 		using arg_type = U; \
-		std::pair<arg_type, bool> operator()(SourceFile &file); \
+		std::optional<arg_type> operator()(SourceFile &file); \
 	};
 
 #define LEXER_FUNC_START(T) \
-	std::pair<Lexer::T::arg_type, bool> \
-	Lexer::T::operator()(SourceFile &file) {
+	typename std::optional<typename T::arg_type> T::operator()(SourceFile &file) {
 
 #define LEXER_FUNC_END(...) \
-		return {arg_type(), false}; \
+		return std::nullopt; \
 	}
 
 LEXER_DECL(Int, unsigned)
@@ -79,26 +77,10 @@ template <typename T>
 struct Opt
 {
 	using arg_type = std::optional<typename T::arg_type>;
-	std::pair<arg_type, bool> operator()(SourceFile &file) {
-		auto v = T()(file);
-		if (v.second)
-			return {v.first, true};
-		return {std::nullopt, true};
-	}
-};
-
-template <size_t N>
-struct Hex
-{
-	static_assert(N <= 8, "Invalid hex lexer size");
-	using arg_type = unsigned;
-	std::pair<arg_type, bool> operator()(SourceFile &file) {
-		constexpr const char fmt[] = {
-			'[', '[', ':', 'x', 'd', 'i', 'g', 'i', 't', ':', ']', ']', '{', '0' + N, '}', '\0',
-		};
-		if (auto x = file.Trim(fmt))
-			return {static_cast<arg_type>(std::strtol(x->c_str(), nullptr, 16)), true};
-		return {'\0', false};
+	std::optional<arg_type> operator()(SourceFile &file) {
+		if (auto v = T()(file))
+			return *v;
+		return std::nullopt;
 	}
 };
 
@@ -106,14 +88,28 @@ template <char C>
 struct Sep
 {
 	using arg_type = char;
-	std::pair<arg_type, bool> operator()(SourceFile &file) {
+	std::optional<arg_type> operator()(SourceFile &file) {
 		if (file.Trim(C))
-			return {C, true};
-		return {'\0', false};
+			return C;
+		return std::nullopt;
 	}
 };
-
 using Comma = Sep<','>;
+
+template <size_t N>
+struct Hex
+{
+	static_assert(N > 0u && N <= 8u, "Invalid hex lexer size");
+	static constexpr char fmt[] = {
+		'[', '[', ':', 'x', 'd', 'i', 'g', 'i', 't', ':', ']', ']', '{', '0' + N, '}', '\0',
+	}; // "[[:xdigit:]]{N}"
+	using arg_type = unsigned;
+	std::optional<arg_type> operator()(SourceFile &file) {
+		if (auto x = file.Trim(fmt))
+			return static_cast<arg_type>(std::strtol(x->c_str(), nullptr, 16));
+		return std::nullopt;
+	}
+};
 
 } // namespace Lexer
 
