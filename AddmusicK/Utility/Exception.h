@@ -5,54 +5,33 @@
 
 namespace AMKd::Utility {
 
-// base class
-
-class Exception : public std::runtime_error
+// base struct
+struct Exception : public std::runtime_error
 {
-public:
-	using std::runtime_error::runtime_error;
+	template <typename T>
+	Exception(T &&str, bool fatal = false) :
+		std::runtime_error(std::forward<T>(str)), isFatal(fatal) { }
+	const bool isFatal;
 };
+
+#define SUBCLASS_EXCEPTION(D, B) \
+	struct D : public B \
+	{ \
+		using B::B; \
+	};
 
 // thrown for logical errors while compiling
-
-class MMLException : public Exception
-{
-public:
-	using Exception::Exception;
-	MMLException &Fatal() {
-		fatal_ = true;
-		return *this;
-	}
-	bool IsFatal() const {
-		return fatal_;
-	}
-
-private:
-	bool fatal_ = false;
-};
+SUBCLASS_EXCEPTION(MMLException, Exception)
 
 // thrown when parsing fails
-
-class SyntaxException : public MMLException
-{
-public:
-	using MMLException::MMLException;
-};
+SUBCLASS_EXCEPTION(SyntaxException, MMLException)
 
 // thrown when parsing succeeds but parameters are illegal
-
-class ParamException : public MMLException
-{
-public:
-	using MMLException::MMLException;
-};
+SUBCLASS_EXCEPTION(ParamException, MMLException)
 
 // thrown for logical errors while inserting music / generating spc files
+SUBCLASS_EXCEPTION(InsertException, Exception)
 
-class InsertException : public Exception
-{
-public:
-	using Exception::Exception;
-};
+#undef SUBCLASS_EXCEPTION
 
 } // namespace AMKd::Utility

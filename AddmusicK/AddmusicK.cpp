@@ -4,8 +4,6 @@
 #include <fstream>
 #include <vector>
 #include <iomanip>
-#include <cstring>
-#include <cstdlib>
 // // //
 #include "../AM405Remover/AM405Remover.h"
 #include <filesystem>		// // //
@@ -51,6 +49,12 @@ bool justSPCsPlease = false;
 std::vector<std::string> textFilesToCompile;
 
 int main(int argc, char* argv[]) {
+/*
+	const std::locale loc {"en_US.UTF8"};		// // //
+	std::locale::global(loc);
+	std::cout.imbue(loc);
+	std::cerr.imbue(loc);
+*/
 	std::clock_t startTime = clock();
 
 	std::cout << "AddmusicK version " << AMKVERSION << "." << AMKMINOR << "." << AMKREVISION << " by Kipernal" << std::endl;
