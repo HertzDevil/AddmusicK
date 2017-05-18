@@ -255,14 +255,8 @@ void Music::init() {
 	
 	const auto stat = preprocess(openTextFile((std::string)"music/" + name), name);		// // //
 	mml_ = AMKd::MML::SourceFile {stat.result};
-	text = stat.result;
 	if (!stat.title.empty())
 		title = stat.title;
-	macroRecord_.clear();		// // //
-
-	//Preprocessor preprocessor;
-
-	//preprocessor.run(text, name);
 
 	if (stat.version == -1) {
 		songTargetProgram = TargetType::AM4;		// // //
@@ -489,26 +483,16 @@ void Music::parseQuantizationCommand() {
 }
 
 void Music::parsePanCommand() {
-	int pan = getInt();		// // //
-	while (pan != -1) {
-		pan = requires(pan, 0, 20, CMD_ILLEGAL("pan", "y"));
-
-		if (skipSpaces(), trimChar(',')) {		// // //
-			int l = getInt();
-			if (l == -1)
-				break;
-			if (skipSpaces(), !trimChar(','))
-				break;
-			int r = getInt();
-			if (r == -1)
-				break;
-
-			pan |= requires(l, 0, 1, CMD_ILLEGAL("pan", "y")) << 7;
-			pan |= requires(r, 0, 1, CMD_ILLEGAL("pan", "y")) << 6;
+	using namespace AMKd::MML::Lexer;
+	if (auto param = GetParameters<Int>(mml_)) {
+		unsigned pan = requires(std::get<0>(*param), 0u, 20u, CMD_ILLEGAL("pan", "y"));
+		if (auto panParam = GetParameters<Comma, Int, Comma, Int>(mml_)) {
+			if (requires(std::get<1>(*panParam), 0u, 1u, CMD_ILLEGAL("pan", "y")))
+				pan |= 1 << 7;
+			if (requires(std::get<3>(*panParam), 0u, 1u, CMD_ILLEGAL("pan", "y")))
+				pan |= 1 << 6;
 		}
-
-		append(AMKd::Binary::CmdType::Pan, pan);		// // //
-		return;
+		return append(AMKd::Binary::CmdType::Pan, pan);		// // //
 	}
 
 	error(CMD_ERROR("pan", "y"));		// // //
@@ -896,29 +880,17 @@ void Music::parseStarLoopCommand() {
 }
 
 void Music::parseVibratoCommand() {
-	int t1 = getInt();
-	while (t1 != -1) {		// // //
-		if (skipSpaces(), !trimChar(','))		// // //
-			break;
-		int t2 = getInt();
-		if (t2 == -1)
-			break;
-		int t3 = t2;
-		if (skipSpaces(), trimChar(',')) {		// // // The user has specified the delay.
-			t3 = getInt();
-			if (t3 == -1)
-				break;
-		}
-		else {		// // // The user has not specified the delay.
-			t2 = t1;
-			t1 = 0;
-		}
-
-		append(AMKd::Binary::CmdType::Vibrato,
-			   divideByTempoRatio(requires(t1, 0x00, 0xFF, "Illegal value for vibrato delay."), false),
-			   multiplyByTempoRatio(requires(t2, 0x00, 0xFF, "Illegal value for vibrato rate.")),
-			   requires(t3, 0x00, 0xFF, "Illegal value for vibrato extent."));		// // //
-		return;
+	using namespace AMKd::MML::Lexer;
+	if (auto param = GetParameters<Int, Comma, Int>(mml_)) {
+		int delay = 0, rate, depth;
+		if (auto param2 = GetParameters<Comma, Int>(mml_))
+			std::tie(delay, rate, depth) = std::tie(std::get<0>(*param), std::get<2>(*param), std::get<1>(*param2));
+		else
+			std::tie(rate, depth) = std::tie(std::get<0>(*param), std::get<2>(*param));
+		return append(AMKd::Binary::CmdType::Vibrato,
+			divideByTempoRatio(requires(delay, 0x00, 0xFF, "Illegal value for vibrato delay."), false),
+			multiplyByTempoRatio(requires(rate, 0x00, 0xFF, "Illegal value for vibrato rate.")),
+			requires(depth, 0x00, 0xFF, "Illegal value for vibrato extent."));		// // //
 	}
 
 	error(CMD_ERROR("vibrato", "p"));		// // //
@@ -1071,6 +1043,17 @@ void Music::parseHexCommand() {
 		currentHex = i;
 
 		switch (currentHex) {		// // //
+		case AMKd::Binary::CmdType::Vibrato: {
+			using namespace AMKd::MML::Lexer;		// // //
+			if (auto param = GetParameters<Byte, Byte, Byte>(mml_)) {
+				append(currentHex,
+					   divideByTempoRatio(std::get<0>(*param), false),
+					   multiplyByTempoRatio(std::get<1>(*param)),
+					   std::get<2>(*param));
+				return;
+			}
+			error("Unknown hex command.");
+		}
 		case AMKd::Binary::CmdType::TempoFade:
 			guessLength = false; // NOPE.  Nope nope nope nope nope nope nope nope nope nope.
 			break;
@@ -1216,12 +1199,6 @@ void Music::parseHexCommand() {
 				mml_ = backUpText;		// // //
 				i = divideByTempoRatio(i, false);
 			}
-			break;
-		case AMKd::Binary::CmdType::Vibrato:
-			if (hexLeft == 2)
-				i = divideByTempoRatio(i, false);
-			else if (hexLeft == 1)
-				i = multiplyByTempoRatio(i);
 			break;
 		case AMKd::Binary::CmdType::VolGlobalFade:
 			if (hexLeft == 1)

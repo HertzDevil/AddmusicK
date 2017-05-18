@@ -80,8 +80,6 @@ public:
 	bool hasIntro;
 	std::map<int, uint16_t> loopPointers;		// // //
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
-	std::string text;
-	std::vector<std::pair<std::string, std::string>> macroRecord_;		// // //
 	AMKd::MML::SourceFile mml_;		// // //
 	size_t totalSize;		// // //
 	int spaceForPointersAndInstrs;
