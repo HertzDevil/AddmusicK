@@ -14,13 +14,6 @@ namespace Lexer {
 
 namespace details {
 
-inline constexpr bool conjunction(std::initializer_list<bool> &&bl) {
-	for (bool b : bl)
-		if (!b)
-			return false;
-	return true;
-}
-
 template <typename T, typename U, std::size_t I>
 bool get_step(SourceFile &file, U &tup) {
 	file.SkipSpaces();
@@ -30,14 +23,22 @@ bool get_step(SourceFile &file, U &tup) {
 	return ret.has_value();
 }
 
+#if 0
 template <typename T, typename... L, std::size_t... I>
 bool get_impl(SourceFile &file, T &tup, std::index_sequence<I...>) {
-#if 0
 	return (... && get_step<L, T, I>(file, tup));
-#else
-	return conjunction({get_step<L, T, I>(file, tup)...});
-#endif
 }
+#else
+template <typename T, typename... L>
+bool get_impl(SourceFile &file, T &tup, std::index_sequence<>) {
+	return true;
+}
+
+template <typename T, typename L, typename... Ls, std::size_t I, std::size_t... Is>
+bool get_impl(SourceFile &file, T &tup, std::index_sequence<I, Is...>) {
+	return get_step<L, T, I>(file, tup) && get_impl<T, Ls...>(file, tup, std::index_sequence<Is...>());
+}
+#endif
 
 } // namespace details
 
@@ -51,7 +52,6 @@ GetParameters(SourceFile &file) {
 	if (details::get_impl<decltype(out), Arg...>(file, out, std::index_sequence_for<Arg...> { }))
 		return out;
 
-	// file.PrintError(...);
 	file.SetReadCount(p);
 	return std::nullopt;
 }
