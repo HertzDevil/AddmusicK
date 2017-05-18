@@ -14,6 +14,7 @@
 #include "Utility/Trie.h"		// // //
 #include "Utility/Exception.h"		// // //
 #include "Binary/Defines.h"		// // //
+#include "MML/Lexer.h"		// // //
 #include <functional>
 
 //#include "Preprocessor.h"
@@ -32,15 +33,17 @@ T requires(T x, T min, T max, U&& err) {
 		throw AMKd::Utility::ParamException {std::forward<U>(err)};
 }
 
-#define error(str) do {					\
-		printError(str, false, name, line);	\
-		return; 							\
+#define warn(str) if (false); else \
+	::printWarning(str, name, mml_.GetLineNumber())
+
+#define error(str) do { \
+		::printError(str, false, name, mml_.GetLineNumber()); \
+		return; \
 	} while (false)
 
 // // //
-static int line;
-[[noreturn]] void Music::fatalError(const std::string &str) {
-	::fatalError(str, name, line);
+void Music::fatalError(const std::string &str) {
+	::fatalError(str, name, mml_.GetLineNumber());		// // //
 }
 
 static int channel, prevChannel, octave, prevNoteLength, defaultNoteLength;
@@ -129,89 +132,37 @@ void Music::append(Args&&... value) {
 
 // // //
 bool Music::trimChar(char c) {
-	if (peek() == c) { // not safe for all inputs
-		skipChars(1);
-		return true;
-	}
-	return false;
+	return static_cast<bool>(mml_.Trim(c));
 }
 
 // // //
 bool Music::trimDirective(std::string_view str) {
-	size_t l = str.size();
-	auto &text_ = text;
-	if (text_.size() < l)
-		return false;
-	auto prefix = text_.substr(0, l);
-
-	// case-insensitive
-	std::use_facet<std::ctype<char>>(std::locale("")).tolower(&prefix[0], &prefix[0] + l);
-
-	if (prefix == str) { // no need to check that next character is a space
-		skipChars(l);
-		return true;
-	}
-
-	return false;
+	return static_cast<bool>(mml_.Trim(str, true));
 }
 
 // // //
 void Music::skipChars(size_t count) {
-	auto &text_ = text;
-	text_.erase(0, count);
+	mml_.SetReadCount(mml_.GetReadCount() + count);
 }
 
 // // //
 void Music::skipSpaces() {
-	auto *text_ = &text;
-	while (true) {		// // //
-		while (!text_->empty() && isspace(text_->front())) {
-			if (text_->front() == '\n')
-				++line;
-			skipChars(1);
-		}
-		if (!text_->empty())
-			break;
-		if (!popReplacement())
-			break;
-		text_ = &text;
-	}
+	mml_.SkipSpaces();
 }
 
 // // //
 bool Music::pushReplacement(const std::string &key, const std::string &value) {
-	for (const auto &x : macroRecord_)
-		if (x.first == key)
-			return false;
-	macroRecord_.emplace_back(key, text.substr(key.size()));
-	text = value;
-	return true;
+	return mml_.PushMacro(key, value);
 }
 
 // // //
 bool Music::popReplacement() {
-	if (macroRecord_.empty())
-		return false;
-	text = std::move(macroRecord_.back().second);
-	macroRecord_.pop_back();
-	return true;
+	return mml_.PopMacro();
 }
 
 // // //
 bool Music::doReplacement() {
-	auto &text_ = text;
-	while (true) {
-		auto it = std::find_if(replacements.cbegin(), replacements.cend(), [&] (const auto &x) {
-			const std::string &rhs = x.first;
-			return std::string_view(text_.c_str(), rhs.length()) == rhs;
-		});
-		if (it == replacements.cend())
-			break;
-		if (!pushReplacement(it->first, it->second))
-			return false;
-	}
-
-	return true;
+	return mml_.DoReplacement(replacements.cbegin(), replacements.cend());
 }
 
 Music::Music() {
@@ -231,7 +182,6 @@ Music::Music() {
 void Music::init() {
 	basepath = "./";
 	prevChannel = 0;
-	text = openTextFile((std::string)"music/" + name);		// // //
 	manualNoteWarning = true;
 	tempoDefined = false;
 	//am4silence = 0;
@@ -262,7 +212,7 @@ void Music::init() {
 	songTargetProgram = TargetType::AMK;		// // //
 	hTranspose = 0;
 	usingHTranspose = false;
-	line = 1;
+	// // //
 	channel = 0;
 	octave = 4;
 	prevNoteLength = -1;
@@ -302,9 +252,10 @@ void Music::init() {
 		title = name.substr(p);
 
 	//std::string backup = text;
-
-	const auto stat = preprocess(text, name);		// // //
-	text = stat.result;		// // //
+	
+	const auto stat = preprocess(openTextFile((std::string)"music/" + name), name);		// // //
+	mml_ = AMKd::MML::SourceFile {stat.result};
+	text = stat.result;
 	if (!stat.title.empty())
 		title = stat.title;
 	macroRecord_.clear();		// // //
@@ -358,8 +309,7 @@ void Music::compile() {
 	init();
 
 	while (hasNextToken()) {		// // //
-		char ch = ::tolower(peek());		// // //
-		skipChars(1);
+		char ch = ::tolower((*mml_.Trim("."))[0]);		// // //
 
 		if (hexLeft != 0 && ch != '$') {
 			if (songTargetProgram == TargetType::AM4 && currentHex == AMKd::Binary::CmdType::Subloop) {		// // //
@@ -412,7 +362,7 @@ void Music::compile() {
 			fatalError(e.what());
 		}
 		catch (AMKd::Utility::MMLException &e) {
-			printError(e.what(), false, name, line);
+			error(e.what());
 		}
 	}
 
@@ -428,11 +378,8 @@ size_t Music::getDataSize() const {
 }
 
 void Music::parseComment() {
-	if (songTargetProgram == TargetType::AMM) {		// // //
-		while (peek() != std::string::npos && peek() != '\n')		// // //
-			skipChars(1);
-		++line;
-	}
+	if (songTargetProgram == TargetType::AMM)		// // //
+		mml_.Trim(".*?\\n");
 	else
 		error("Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2.");		// // //
 }
@@ -464,8 +411,7 @@ void Music::parseQMarkDirective() {
 }
 
 void Music::parseExMarkDirective() {
-	text.clear();		// // //
-	macroRecord_.clear();		// // //
+	mml_.Clear();
 }
 
 void Music::parseChannelDirective() {
@@ -587,7 +533,7 @@ void Music::parseIntroDirective() {
 }
 
 void Music::parseT() {
-	if (trimDirective("uning["))		// // //
+	if (trimDirective("uning\\["))		// // //
 		parseTransposeDirective();
 	else
 		parseTempoCommand();
@@ -1197,7 +1143,7 @@ void Music::parseHexCommand() {
 					printWarning("Warning: A hex command was found that will act as a note instead of a special\n"
 								 "effect. If this is a song you're using from someone else, you can most likely\n"
 								 "ignore this message, though it may indicate that a necessary #amm or #am4 is\n"
-								 "missing.", name, line);
+								 "missing.", name, mml_.GetLineNumber());		// // //
 					manualNoteWarning = false;
 					return;
 				}
@@ -1246,28 +1192,28 @@ void Music::parseHexCommand() {
 			if (hexLeft == 2)
 				i = divideByTempoRatio(i, false);
 			else if (hexLeft == 1) {		// Hack allowing the $DD command to accept a note as a parameter.
-					std::string backUpText = text;		// // //
-					bool finished = false;
-					while (!finished) {
-						skipSpaces();
-						switch (peek()) {
-						case 'o':
-							getInt(); break;
-						case 'c': case 'd': case 'e': case 'f': case 'g': case 'a': case 'b':
-						case 'C': case 'D': case 'E': case 'F': case 'G': case 'A': case 'B':
-							if (tracks[channel].updateQ)		// // //
-								error("You cannot use a note as the last parameter of the $DD command if you've also\n"
-									  "used the qXX command just before it.");		// // //
-							hexLeft = 0;
-							nextNoteIsForDD = true;
-							finished = true; break;
-						case '<': case '>':
-							skipChars(1); break;
-						default:
-							finished = true; break;
-						}
+				AMKd::MML::SourceFile backUpText {mml_};		// // //
+				bool finished = false;
+				while (!finished) {
+					skipSpaces();
+					switch (peek()) {
+					case 'o':
+						getInt(); break;
+					case 'c': case 'd': case 'e': case 'f': case 'g': case 'a': case 'b':
+					case 'C': case 'D': case 'E': case 'F': case 'G': case 'A': case 'B':
+						if (tracks[channel].updateQ)		// // //
+							error("You cannot use a note as the last parameter of the $DD command if you've also\n"
+							      "used the qXX command just before it.");		// // //
+						hexLeft = 0;
+						nextNoteIsForDD = true;
+						finished = true; break;
+					case '<': case '>':
+						skipChars(1); break;
+					default:
+						finished = true; break;
 					}
-					text = backUpText;		// // //
+				}
+				mml_ = backUpText;		// // //
 				i = divideByTempoRatio(i, false);
 			}
 			break;
@@ -1560,7 +1506,7 @@ void Music::parseNote(int ch) {		// // //
 	skipSpaces();
 
 	while (true) {
-		std::string temptext = text;		// // //
+		AMKd::MML::SourceFile temptext(mml_);		// // //
 		if (!trimChar('^') && !(i == AMKd::Binary::CmdType::Rest && trimChar('r')))
 			break;
 
@@ -1568,9 +1514,9 @@ void Music::parseNote(int ch) {		// // //
 		j += getNoteLength();
 		skipSpaces();
 
-		if (strnicmp(text.c_str(), "$DD", 3) == 0) {
+		if (mml_.Trim("$DD", true)) {
 			j = tempsize;		//
-			text = temptext;		// // // "Rewind" so we forcibly place a tie before the bend.
+			mml_ = temptext;		// // // "Rewind" so we forcibly place a tie before the bend.
 			break;			//
 		}
 	}
@@ -1673,11 +1619,11 @@ void Music::parseOptionDirective() {
 			usingSMWVTable = true;
 		}
 		else
-			printWarning("This song is already using the SMW V Table. This command is just wasting three bytes...", name, line);
+			warn("This song is already using the SMW V Table. This command is just wasting three bytes...");		// // //
 	else if (trimDirective("nspcvtable")) {		// // //
 		append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, 0x01);		// // //
 		usingSMWVTable = false;
-		printWarning("This song uses the N-SPC V by default. This command is just wasting two bytes...", name, line);
+		warn("This song uses the N-SPC V by default. This command is just wasting two bytes...");		// // //
 	}
 	else if (trimDirective("tempoimmunity"))		// // //
 		append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::TempoImmunity);		// // //
@@ -1690,7 +1636,7 @@ void Music::parseOptionDirective() {
 		if (i == 0)
 			error("Argument for #option dividetempo cannot be 0.");		// // //
 		if (i == 1)
-			printWarning("#option dividetempo 1 has no effect besides printing this warning.", name, line);
+			warn("#option dividetempo 1 has no effect besides printing this warning.");		// // //
 		if (i < 0)
 			error("#halvetempo has been used too many times...what are you even doing?");		// // //
 
@@ -1750,7 +1696,7 @@ void Music::parseReplacementDirective() {
 	std::string s = getEscapedString();		// // //
 	int i = s.find('=');
 	if (i == -1)
-		printError("Error parsing replacement directive; could not find '='", true, name, line);
+		fatalError("Error parsing replacement directive; could not find '='");		// // //
 
 	std::string findStr = s.substr(0, i);
 	std::string replStr = s.substr(i + 1);
@@ -1909,11 +1855,10 @@ void Music::parseSampleDefinitions() {
 }
 
 void Music::parsePadDefinition() {
-	skipSpaces();
-	if (trimChar('$')) {		// // //
-		int i = getHex(true);
-		if (i != -1) {
-			minSize = i;
+	if (hasNextToken() && trimChar('$')) {		// // //
+		using namespace AMKd::MML::Lexer;
+		if (auto param = HexInt()(mml_)) {
+			minSize = *param;
 			return;
 		}
 	}
@@ -1937,21 +1882,17 @@ void Music::parsePath() {
 
 // // //
 bool Music::hasNextToken() {
-	auto &text_ = text;
 	skipSpaces();
 	if (!doReplacement())
 		fatalError("Infinite replacement macro substitution.");
 
 	skipSpaces();
-	return !text_.empty();
+	return static_cast<bool>(mml_);
 }
 
 // // //
 int Music::peek() {
-	auto &text_ = text;
-	if (text_.empty())
-		return std::string::npos;
-	return text_.front();
+	return mml_.Peek();
 }
 
 int Music::getInt() {
@@ -1961,107 +1902,52 @@ int Music::getInt() {
 	// l8r$ED$00$00
 	// Yeah. Oh well.
 	// Attempt to do a replacement.  (So things like "ab = 8"    [c1]ab    are valid).
-	auto &text_ = text;
-	if (!hasNextToken())		// // //
-		return -1;
-
-	int i = 0;
-	int d = 0;
-
-	while (!text_.empty() && text_.front() >= '0' && text_.front() <= '9') {		// // //
-		d++;
-		i = (i * 10) + text_.front() - '0';
-		skipChars(1);
-	}
-
-	return d ? i : -1;
+	if (hasNextToken())		// // //
+		if (auto param = AMKd::MML::Lexer::Int()(mml_))
+			return *param;
+	return -1;
 }
 
 int Music::getInt(const std::string &str, int &p) {
-	int i = 0;
-	int d = 0;
-
-	while (p < static_cast<int>(str.size()) && str[p] >= '0' && str[p] <= '9') {		// // //
-		d++;
-		i = (i * 10) + str[p] - '0';
-		p++;
-	}
-
-	if (d == 0) return -1; else return i;
+	AMKd::MML::SourceFile mmlstr {str};		// // //
+	mmlstr.SetReadCount(p);
+	if (auto param = AMKd::MML::Lexer::Int()(mml_))
+		return *param;
+	return -1;
 }
 
 int Music::getIntWithNegative() {
-	auto &text_ = text;
-	if (!hasNextToken())		// // //
-		return -1;
-
-	int i = 0;
-	int d = 0;
-	bool n = trimChar('-');		// // //
-
-	while (!text_.empty() && text_.front() >= '0' && text_.front() <= '9') {		// // //
-		d++;
-		i = (i * 10) + text_.front() - '0';
-		skipChars(1);
-	}
-
-	if (d == 0)
-		throw "Invalid number";
-	return n ? -i : i;
+	if (hasNextToken())		// // //
+		if (auto param = AMKd::MML::Lexer::SInt()(mml_))
+			return *param;
+	throw "Invalid number";
 }
 
 int Music::getHex(bool anyLength) {
-	auto &text_ = text;
-	if (!hasNextToken())		// // //
-		return -1;
-
-	int i = 0;
-	int d = 0;
-	int j;
-
-	while (!text_.empty()) {		// // //
-		if (d >= 2 && (!anyLength || songTargetProgram == TargetType::AM4))
-			break;
-
-		char ch = text_.front();
-		if ('0' <= ch && ch <= '9')
-			j = ch - '0';
-		else if ('A' <= ch && ch <= 'F')
-			j = ch - '7';
-		else if ('a' <= ch && ch <= 'f')
-			j = ch - ('7' + 'a' - 'A');
-		else
-			break;
-		skipChars(1);
-
-		++d;
-		i = i * 16 + j;
-	}
-
-	return d != 0 ? i : -1;
+	if (hasNextToken())		// // //
+		if (auto param = AMKd::MML::Lexer::Hex<2>()(mml_))
+			return *param;
+	return -1;
 }
 
 // // //
 bool Music::getHexByte(int &out) {
-	auto &text_ = text;
-	if (!hasNextToken())		// // //
-		return false;
-
-	if (!trimChar('$'))
-		return false;
-	int x = getHex();
-	if (x < 0 || x > 0xFF)
-		return false;
-	out = x;
-	return true;
+	if (hasNextToken())		// // //
+		if (auto param = AMKd::MML::Lexer::Byte()(mml_)) {
+			out = *param;
+			return true;
+		}
+	return false;
 }
 
 int Music::getPitch(int i) {
 	static const int pitches[] = {9, 11, 0, 2, 4, 5, 7};
 
 	i = pitches[i - 'a'] + (octave - 1) * 12 + 0x80;		// // //
-	if (trimChar('+')) ++i;
-	else if (trimChar('-')) --i;
+	if (trimChar('+'))
+		++i;
+	else if (trimChar('-'))
+		--i;
 
 	/*if (i < 0x80)
 	return -1;
@@ -2080,7 +1966,7 @@ int Music::getNoteLength() {
 	if (len == -1 && trimChar('=')) {		// // //
 		len = getInt();
 		if (len == -1 || len == 0)		// // // do not allow zero duration
-			printError("Error parsing note", false, name, line);
+			[&] { error("Error parsing note"); }();
 		return len;
 		//if (len < 1) still = false; else return len;
 	}
@@ -2108,44 +1994,18 @@ int Music::getNoteLength() {
 
 // // //
 std::string Music::getIdentifier() {
-	std::string str;
-	auto &text_ = text;
-	size_t pos = 0, n = text_.size();
-	while (pos < n && !::isspace(text_[pos]))
-		str += text_[pos++];
-	skipChars(pos);
-	return str;
+	if (auto param = AMKd::MML::Lexer::Ident()(mml_))
+		return *param;
+	printError("Error while parsing identifier.", false);
+	return "";
 }
 
 // // //
 std::string Music::getEscapedString() {
-	std::string tempstr;	
-	auto &text_ = text;
-
-	while (true) {
-		if (text_.empty()) {
-			printError("Unexpected end of file found.", false);
-			return tempstr;
-		}
-
-		if (trimChar('\"'))
-			break;
-
-		char ch = text_.front();
-		skipChars(1);
-		if (ch == '\\') {
-			if (trimChar('\"'))
-				tempstr += '\"';
-			else {
-				printError(R"(Error: The only escape sequence allowed is "\"".)", false);		// // //
-				return tempstr;
-			}
-		}
-		else
-			tempstr += ch;
-	}
-
-	return tempstr;
+	if (auto param = AMKd::MML::Lexer::QString()(mml_))
+		return *param;
+	printError("Unexpected end of file found.", false);
+	return "";
 }
 
 // // //
@@ -2286,7 +2146,7 @@ void Music::pointersFirstPass() {
 		for (size_t z = 0, n = tempoChanges.size() - 1; z < n; ++z)		// // //
 		{
 			if (tempoChanges[z].first > totalLength) {
-				printWarning("A tempo change was found beyond the end of the song.", name, line);
+				warn("A tempo change was found beyond the end of the song.");		// // //
 				break;
 			}
 
@@ -2333,8 +2193,11 @@ void Music::pointersFirstPass() {
 			   echoBufferSize << 11, spaceUsedBySamples);
 	}
 	//}
-	if (totalSize > minSize && minSize > 0)
-		std::cout << "File " << name << ", line " << line << ": Warning: Song was larger than it could pad out by 0x" << hex4 << totalSize - minSize << " bytes." << std::dec << std::endl;
+	if (totalSize > minSize && minSize > 0) {
+		std::stringstream err;		// // //
+		err << "Song was larger than it could pad out by 0x" << hex4 << totalSize - minSize << " bytes.";
+		warn(err.str());		// // //
+	}
 
 	std::stringstream statStrStream;
 
@@ -2527,17 +2390,13 @@ void Music::parseSPCInfo() {
 				guessLength = true;
 			else {
 				guessLength = false;
-				int p = 0;
-				int m = getInt(parameter, p);
-				if (parameter[p] != ':' || m == -1)
+				AMKd::MML::SourceFile field {parameter};		// // //
+				auto param = AMKd::MML::Lexer::Time()(field);
+				field.SkipSpaces();
+				if (param && !field)
+					seconds = *param;
+				else
 					error("Error parsing SPC length field.  Format must be m:ss or \"auto\".");		// // //
-
-				p++;
-				int s = getInt(parameter, p);
-				if (s == -1 || p != parameter.length())
-					error("Error parsing SPC length field.  Format must be m:ss or \"auto\".");		// // //
-
-				seconds = m * 60 + s;
 
 				if (seconds > 999)
 					error("Songs longer than 16:39 are not allowed by the SPC format.");		// // //
@@ -2669,7 +2528,7 @@ int Music::divideByTempoRatio(int value, bool fractionIsError) {
 int Music::multiplyByTempoRatio(int value) {
 	int temp = value * tempoRatio;
 	if (temp >= 256)
-		printError("Using the tempo ratio on this value would cause it to overflow.", false, name, line);
+		[&] { error("Using the tempo ratio on this value would cause it to overflow."); }();
 
 	return temp;
 }

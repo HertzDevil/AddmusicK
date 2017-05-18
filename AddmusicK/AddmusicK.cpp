@@ -461,8 +461,8 @@ void loadMusicList() {
 		else {
 			if (musicFile[i] == '\n' || musicFile[i] == '\r') {
 				musics[index].name = tempName;
-				if (inLocals && !justSPCsPlease)
-					musics[index].text = openTextFile(fs::path("music") / tempName);		// // //
+//				if (inLocals && !justSPCsPlease)
+//					musics[index].text = openTextFile(fs::path("music") / tempName);		// // //
 				musics[index].exists = true;
 				index = -1;
 				i++;

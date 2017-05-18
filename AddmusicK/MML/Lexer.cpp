@@ -14,6 +14,14 @@ LEXER_FUNC_START(Lexer::Int)
 	}
 LEXER_FUNC_END()
 
+LEXER_FUNC_START(Lexer::HexInt)
+	if (auto x = file.Trim("[[:xdigit:]]+")) {
+		auto ret = static_cast<arg_type>(std::strtoul(x->c_str(), nullptr, 16));
+		if (errno != ERANGE)
+			return ret;
+	}
+LEXER_FUNC_END()
+
 LEXER_FUNC_START(Lexer::SInt)
 	if (auto x = file.Trim("-?[[:digit:]]+")) {
 		auto ret = static_cast<arg_type>(std::strtol(x->c_str(), nullptr, 10));
@@ -38,8 +46,12 @@ LEXER_FUNC_END()
 LEXER_FUNC_START(Lexer::QString)
 	const std::regex ESC1 {R"(\\\\)"};
 	const std::regex ESC2 {R"(\\")"};
-	if (auto x = file.Trim(R"/("([^\\"]|\\\\|\\")*")/"))
-		return std::regex_replace(std::regex_replace(*x, ESC1, "\\"), ESC2, "\"");
+//	if (auto x = file.Trim(R"/("([^\\"]|\\\\|\\")*")/"))
+	if (auto x = file.Trim(R"/(([^\\"]|\\\\|\\")*")/")) {
+		auto str = std::regex_replace(std::regex_replace(*x, ESC1, "\\"), ESC2, "\"");
+		str.pop_back(); // final quotation mark
+		return str;
+	}
 LEXER_FUNC_END()
 
 LEXER_FUNC_START(Lexer::Time)

@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <cstdint>		// // //
+#include "MML/SourceFile.h"		// // //
 
 const size_t CHANNELS = 8;		// // //
 
@@ -81,6 +82,7 @@ public:
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
 	std::string text;
 	std::vector<std::pair<std::string, std::string>> macroRecord_;		// // //
+	AMKd::MML::SourceFile mml_;		// // //
 	size_t totalSize;		// // //
 	int spaceForPointersAndInstrs;
 	std::vector<uint8_t> allPointersAndInstrs;		// // //

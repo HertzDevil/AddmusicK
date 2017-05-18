@@ -14,7 +14,7 @@ namespace Lexer {
 
 namespace details {
 
-inline constexpr bool conjunction(std::initializer_list<bool> bl) {
+inline constexpr bool conjunction(std::initializer_list<bool> &&bl) {
 	for (bool b : bl)
 		if (!b)
 			return false;
@@ -32,7 +32,11 @@ bool get_step(SourceFile &file, U &tup) {
 
 template <typename T, typename... L, std::size_t... I>
 bool get_impl(SourceFile &file, T &tup, std::index_sequence<I...>) {
+#if 0
+	return (... && get_step<L, T, I>(file, tup));
+#else
 	return conjunction({get_step<L, T, I>(file, tup)...});
+#endif
 }
 
 } // namespace details
@@ -67,6 +71,7 @@ GetParameters(SourceFile &file) {
 	}
 
 LEXER_DECL(Int, unsigned)
+LEXER_DECL(HexInt, unsigned)
 LEXER_DECL(SInt, int)
 LEXER_DECL(Byte, int)
 LEXER_DECL(Ident, std::string)
