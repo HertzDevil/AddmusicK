@@ -7,18 +7,12 @@ const std::regex &get_re(std::string_view re, bool ignoreCase) {
 	static std::unordered_map<std::string_view, std::regex> regex_cache;
 	auto flag = std::regex::ECMAScript | std::regex::optimize | (ignoreCase ? std::regex::icase : (std::regex_constants::syntax_option_type)0);
 
-	if (regex_cache.empty()) {
-		std::regex cache {re.data(), flag};
-		auto result = regex_cache.insert(std::make_pair(re, cache));
-		return result.first->second;
-	}
 	auto it = regex_cache.find(re);
-	if (it == regex_cache.cend()) {
-		std::regex cache {re.data(), flag};
-		auto result = regex_cache.insert(std::make_pair(re, cache));
-		return result.first->second;
-	}
-	return it->second;
+	if (it != regex_cache.cend())
+		return it->second;
+	std::regex cache {re.data(), flag};
+	auto result = regex_cache.insert(std::make_pair(re, cache));
+	return result.first->second;
 }
 
 using namespace AMKd::MML;

@@ -132,12 +132,12 @@ void Music::append(Args&&... value) {
 
 // // //
 bool Music::trimChar(char c) {
-	return static_cast<bool>(mml_.Trim(c));
+	return mml_.Trim(c).has_value();
 }
 
 // // //
 bool Music::trimDirective(std::string_view str) {
-	return static_cast<bool>(mml_.Trim(str, true));
+	return mml_.Trim(str, true).has_value();
 }
 
 // // //
@@ -148,21 +148,6 @@ void Music::skipChars(size_t count) {
 // // //
 void Music::skipSpaces() {
 	mml_.SkipSpaces();
-}
-
-// // //
-bool Music::pushReplacement(const std::string &key, const std::string &value) {
-	return mml_.PushMacro(key, value);
-}
-
-// // //
-bool Music::popReplacement() {
-	return mml_.PopMacro();
-}
-
-// // //
-bool Music::doReplacement() {
-	return mml_.DoReplacement(replacements.cbegin(), replacements.cend());
 }
 
 Music::Music() {
@@ -485,11 +470,11 @@ void Music::parseQuantizationCommand() {
 void Music::parsePanCommand() {
 	using namespace AMKd::MML::Lexer;
 	if (auto param = GetParameters<Int>(mml_)) {
-		unsigned pan = requires(std::get<0>(*param), 0u, 20u, CMD_ILLEGAL("pan", "y"));
+		unsigned pan = requires(param.get<0>(), 0u, 20u, CMD_ILLEGAL("pan", "y"));
 		if (auto panParam = GetParameters<Comma, Int, Comma, Int>(mml_)) {
-			if (requires(std::get<1>(*panParam), 0u, 1u, CMD_ILLEGAL("pan", "y")))
+			if (requires(panParam.get<0>(), 0u, 1u, CMD_ILLEGAL("pan", "y")))
 				pan |= 1 << 7;
-			if (requires(std::get<3>(*panParam), 0u, 1u, CMD_ILLEGAL("pan", "y")))
+			if (requires(panParam.get<1>(), 0u, 1u, CMD_ILLEGAL("pan", "y")))
 				pan |= 1 << 6;
 		}
 		return append(AMKd::Binary::CmdType::Pan, pan);		// // //
@@ -542,21 +527,18 @@ void Music::parseTempoCommand() {
 }
 
 void Music::parseTransposeDirective() {
-	int i = getInt();		// // //
-	if ((skipSpaces(), trimChar(']')) && (skipSpaces(), trimChar('='))) {
-		do {
-			bool plus = (skipSpaces(), !trimChar('-'));
-			if (plus)
-				trimChar('+');
-
-			int j = getInt();		// // //
-			if (j == -1)
-				error(DIR_ERROR("tuning"));
-			if (!plus) j = -j;
-
-			transposeMap[requires(i++, 0x00, 0xFF, DIR_ILLEGAL("tuning"))] = j;
-		} while (skipSpaces(), trimChar(','));
-		return;
+	using namespace AMKd::MML::Lexer;		// // //
+	if (auto param = GetParameters<Int, Sep<']'>, Sep<'='>, SInt>(mml_)) {
+		unsigned inst; int trsp;
+		std::tie(inst, trsp) = *param;
+		while (true) {
+			transposeMap[requires(inst++, 0u, 0xFFu, DIR_ILLEGAL("tuning"))] = trsp;
+			if (auto ext = GetParameters<Comma, SInt>(mml_)) {
+				std::tie(trsp) = *ext;
+				continue;
+			}
+			return;
+		}
 	}
 
 	error(DIR_ERROR("tuning"));
@@ -882,15 +864,19 @@ void Music::parseStarLoopCommand() {
 void Music::parseVibratoCommand() {
 	using namespace AMKd::MML::Lexer;
 	if (auto param = GetParameters<Int, Comma, Int>(mml_)) {
-		int delay = 0, rate, depth;
-		if (auto param2 = GetParameters<Comma, Int>(mml_))
-			std::tie(delay, rate, depth) = std::tie(std::get<0>(*param), std::get<2>(*param), std::get<1>(*param2));
-		else
-			std::tie(rate, depth) = std::tie(std::get<0>(*param), std::get<2>(*param));
+		unsigned delay, rate, depth;
+		if (auto param2 = GetParameters<Comma, Int>(mml_)) {
+			std::tie(delay, rate) = *param;
+			std::tie(depth) = *param2;
+		}
+		else {
+			delay = 0;
+			std::tie(rate, depth) = *param;
+		}
 		return append(AMKd::Binary::CmdType::Vibrato,
-			divideByTempoRatio(requires(delay, 0x00, 0xFF, "Illegal value for vibrato delay."), false),
-			multiplyByTempoRatio(requires(rate, 0x00, 0xFF, "Illegal value for vibrato rate.")),
-			requires(depth, 0x00, 0xFF, "Illegal value for vibrato extent."));		// // //
+			divideByTempoRatio(requires(delay, 0x00u, 0xFFu, "Illegal value for vibrato delay."), false),
+			multiplyByTempoRatio(requires(rate, 0x00u, 0xFFu, "Illegal value for vibrato rate.")),
+			requires(depth, 0x00u, 0xFFu, "Illegal value for vibrato extent."));		// // //
 	}
 
 	error(CMD_ERROR("vibrato", "p"));		// // //
@@ -1046,10 +1032,9 @@ void Music::parseHexCommand() {
 		case AMKd::Binary::CmdType::Vibrato: {
 			using namespace AMKd::MML::Lexer;		// // //
 			if (auto param = GetParameters<Byte, Byte, Byte>(mml_)) {
-				append(currentHex,
-					   divideByTempoRatio(std::get<0>(*param), false),
-					   multiplyByTempoRatio(std::get<1>(*param)),
-					   std::get<2>(*param));
+				unsigned delay, rate, depth;
+				std::tie(delay, rate, depth) = *param;
+				append(currentHex, divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);
 				return;
 			}
 			error("Unknown hex command.");
@@ -1860,7 +1845,7 @@ void Music::parsePath() {
 // // //
 bool Music::hasNextToken() {
 	skipSpaces();
-	if (!doReplacement())
+	if (!mml_.DoReplacement(replacements.cbegin(), replacements.cend()))
 		fatalError("Infinite replacement macro substitution.");
 
 	skipSpaces();
@@ -1882,14 +1867,6 @@ int Music::getInt() {
 	if (hasNextToken())		// // //
 		if (auto param = AMKd::MML::Lexer::Int()(mml_))
 			return *param;
-	return -1;
-}
-
-int Music::getInt(const std::string &str, int &p) {
-	AMKd::MML::SourceFile mmlstr {str};		// // //
-	mmlstr.SetReadCount(p);
-	if (auto param = AMKd::MML::Lexer::Int()(mml_))
-		return *param;
 	return -1;
 }
 
@@ -2369,7 +2346,6 @@ void Music::parseSPCInfo() {
 				guessLength = false;
 				AMKd::MML::SourceFile field {parameter};		// // //
 				auto param = AMKd::MML::Lexer::Time()(field);
-				field.SkipSpaces();
 				if (param && !field)
 					seconds = *param;
 				else

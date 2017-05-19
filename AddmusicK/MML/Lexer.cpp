@@ -23,7 +23,7 @@ LEXER_FUNC_START(Lexer::HexInt)
 LEXER_FUNC_END()
 
 LEXER_FUNC_START(Lexer::SInt)
-	if (auto x = file.Trim("-?[[:digit:]]+")) {
+	if (auto x = file.Trim("[+-]?[[:digit:]]+")) {
 		auto ret = static_cast<arg_type>(std::strtol(x->c_str(), nullptr, 10));
 		if (errno != ERANGE)
 			return ret;

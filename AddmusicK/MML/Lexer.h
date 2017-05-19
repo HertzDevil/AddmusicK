@@ -12,21 +12,105 @@ class SourceFile;
 
 namespace Lexer {
 
+template <typename>
+struct Bypass : std::false_type { };
+
+template <typename... Args>
+struct LexerResult
+{
+	std::optional<std::tuple<Args...>> result;
+	const std::tuple<Args...> &operator*() const {
+		return *result;
+	}
+	template <std::size_t N>
+	const auto &get() const &noexcept {
+		return std::get<N>(*result);
+	};
+	template <std::size_t N>
+	auto &&get() &&noexcept {
+		return std::move(std::get<N>(*result));
+	}
+	constexpr explicit operator bool() const noexcept {
+		return result.has_value();
+	}
+};
+template <typename... Args> // for c++17 structured binding support
+struct std::tuple_size<LexerResult<Args...>> :
+	std::integral_constant<std::size_t, sizeof...(Args)> { };
+
 namespace details {
 
+template <std::size_t, typename>
+struct prepend;
+template <std::size_t X, std::size_t... Ys>
+struct prepend<X, std::index_sequence<Ys...>>
+{
+	using type = std::index_sequence<X, Ys...>;
+};
+
+template <typename...>
+struct res_prepend;
+template <typename T, typename... Us>
+struct res_prepend<T, LexerResult<Us...>>
+{
+	using type = LexerResult<T, Us...>;
+};
+
+template <std::size_t, typename, typename...>
+struct lexer_info;
+template <std::size_t X>
+struct lexer_info<X, void>
+{
+	static constexpr std::size_t count = 0;
+	using type = std::index_sequence<>;
+	using result_type = LexerResult<>;
+};
+template <std::size_t X, typename T, typename... Us>
+struct lexer_info<X, std::enable_if_t<!Bypass<T>::value>, T, Us...>
+{
+private:
+	using next = lexer_info<X + 1, void, Us...>;
+public:
+	static constexpr std::size_t count = 1 + next::count;
+	using type = typename prepend<X, typename next::type>::type;
+	using result_type = typename res_prepend<
+		typename T::arg_type, typename next::result_type>::type;
+};
+template <std::size_t X, typename T, typename... Us>
+struct lexer_info<X, std::enable_if_t<Bypass<T>::value>, T, Us...>
+{
+private:
+	using next = lexer_info<X, void, Us...>;
+public:
+	static constexpr std::size_t count = next::count;
+	using type = typename prepend<-1, typename next::type>::type;
+	using result_type = typename next::result_type;
+};
+
 template <typename T, typename U, std::size_t I>
-bool get_step(SourceFile &file, U &tup) {
-	file.SkipSpaces();
-	std::optional<typename T::arg_type> ret = T()(file);
-	if (ret.has_value())
-		std::get<I>(tup) = *ret;
-	return ret.has_value();
-}
+struct tup_assigner
+{
+	bool operator()(SourceFile &file, U &tup) const {
+		file.SkipSpaces();
+		std::optional<typename T::arg_type> ret = T()(file);
+		if (ret.has_value())
+			std::get<I>(tup) = *ret;
+		return ret.has_value();
+	}
+};
+template <typename T, typename U>
+struct tup_assigner<T, U, -1>
+{
+	bool operator()(SourceFile &file, U &tup) const {
+		file.SkipSpaces();
+		return T()(file).has_value();
+	}
+};
 
 #if 0
 template <typename T, typename... L, std::size_t... I>
 bool get_impl(SourceFile &file, T &tup, std::index_sequence<I...>) {
-	return (... && get_step<L, T, I>(file, tup));
+	return (... && tup_assigner<L, T, I>()(file, tup));
 }
 #else
 template <typename T, typename... L>
@@ -36,7 +120,7 @@ bool get_impl(SourceFile &file, T &tup, std::index_sequence<>) {
 
 template <typename T, typename L, typename... Ls, std::size_t I, std::size_t... Is>
 bool get_impl(SourceFile &file, T &tup, std::index_sequence<I, Is...>) {
-	return get_step<L, T, I>(file, tup) && get_impl<T, Ls...>(file, tup, std::index_sequence<Is...>());
+	return tup_assigner<L, T, I>()(file, tup) && get_impl<T, Ls...>(file, tup, std::index_sequence<Is...>());
 }
 #endif
 
@@ -44,24 +128,29 @@ bool get_impl(SourceFile &file, T &tup, std::index_sequence<I, Is...>) {
 
 // skips spaces before each token
 template <typename... Arg>
-std::optional<std::tuple<typename Arg::arg_type...>>
+typename details::lexer_info<0, void, Arg...>::result_type
 GetParameters(SourceFile &file) {
-	std::tuple<typename Arg::arg_type...> out;
+	using info = details::lexer_info<0, void, Arg...>;
+	typename decltype(std::declval<typename info::result_type>().result)::value_type out;
 	std::size_t p = file.GetReadCount();
 
-	if (details::get_impl<decltype(out), Arg...>(file, out, std::index_sequence_for<Arg...> { }))
-		return out;
+	if (details::get_impl<decltype(out), Arg...>(file, out, typename info::type { }))
+		return typename info::result_type {out};
 
 	file.SetReadCount(p);
-	return std::nullopt;
+	return typename info::result_type {std::nullopt};
 }
+
+#define BYPASS_DECL(T) \
+	template <> \
+	struct Bypass<T> : std::true_type { }
 
 #define LEXER_DECL(T, U) \
 	struct T \
 	{ \
 		using arg_type = U; \
 		std::optional<arg_type> operator()(SourceFile &file); \
-	};
+	}
 
 #define LEXER_FUNC_START(T) \
 	typename std::optional<typename T::arg_type> T::operator()(SourceFile &file) {
@@ -70,13 +159,13 @@ GetParameters(SourceFile &file) {
 		return std::nullopt; \
 	}
 
-LEXER_DECL(Int, unsigned)
-LEXER_DECL(HexInt, unsigned)
-LEXER_DECL(SInt, int)
-LEXER_DECL(Byte, int)
-LEXER_DECL(Ident, std::string)
-LEXER_DECL(QString, std::string)
-LEXER_DECL(Time, int)
+LEXER_DECL(Int, unsigned);
+LEXER_DECL(HexInt, unsigned);
+LEXER_DECL(SInt, int);
+LEXER_DECL(Byte, unsigned);
+LEXER_DECL(Ident, std::string);
+LEXER_DECL(QString, std::string);
+LEXER_DECL(Time, unsigned);
 
 template <typename T>
 struct Opt
@@ -99,7 +188,10 @@ struct Sep
 		return std::nullopt;
 	}
 };
+template <char C>
+struct Bypass<Sep<C>> : std::true_type { };
 using Comma = Sep<','>;
+BYPASS_DECL(Comma);
 
 template <size_t N>
 struct Hex

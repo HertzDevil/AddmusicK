@@ -197,14 +197,10 @@ private:
 	void skipChars(size_t count);		// // //
 	void skipSpaces();		// // //
 
-	bool pushReplacement(const std::string &key, const std::string &value);		// // //
-	bool popReplacement();		// // //
-	bool doReplacement();		// // //
 	bool hasNextToken();		// // //
 	int peek();		// // //
 
 	int getInt();
-	int getInt(const std::string &str, int &p);
 	int getIntWithNegative();
 	int getHex(bool anyLength = false);
 	bool getHexByte(int &out);		// // //
