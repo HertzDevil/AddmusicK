@@ -380,13 +380,18 @@ void Music::printChannelDataNonVerbose(int totalSize) {
 }
 
 void Music::parseQMarkDirective() {
-	int i = getInt();		// // //
-	switch (i) {
-	case -1:
-	case 0: doesntLoop = true; break;
-	case 1: tracks[channel].noMusic[0] = true; break;		// // //
-	case 2: tracks[channel].noMusic[1] = true; break;
+	using namespace AMKd::MML::Lexer;
+	if (auto param = GetParameters<Int>(mml_)) {
+		switch (param.get<0>()) {
+		case 0: doesntLoop = true; break;
+		case 1: tracks[channel].noMusic[0] = true; break;		// // //
+		case 2: tracks[channel].noMusic[1] = true; break;
+		default:
+			error(DIR_ERROR("\"?\""));
+		}
 	}
+	else
+		doesntLoop = true;
 }
 
 void Music::parseExMarkDirective() {
@@ -422,25 +427,25 @@ void Music::parseChannelDirective() {
 }
 
 void Music::parseLDirective() {
-	int i = getInt();		// // //
-	if (i != -1)
-		defaultNoteLength = requires(i, 1, 192, DIR_ILLEGAL("note length (\"l\")"));
+	using namespace AMKd::MML::Lexer;
+	if (auto param = GetParameters<Int>(mml_))
+		defaultNoteLength = requires(param.get<0>(), 1u, 192u, DIR_ILLEGAL("note length (\"l\")"));		// // //
 	else
 		error(DIR_ERROR("note length (\"l\")"));
 }
 
 void Music::parseGlobalVolumeCommand() {
-	int i = getInt();		// // //
-	if (i != -1)
-		append(AMKd::Binary::CmdType::VolGlobal, requires(i, 0x00, 0xFF, CMD_ILLEGAL("global volume", "w")));		// // //
+	using namespace AMKd::MML::Lexer;
+	if (auto param = GetParameters<Int>(mml_))
+		append(AMKd::Binary::CmdType::VolGlobal, requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("global volume", "w")));		// // //
 	else
 		error(CMD_ERROR("global volume", "w"));		// // //
 }
 
 void Music::parseVolumeCommand() {
-	int i = getInt();		// // //
-	if (i != -1)
-		append(AMKd::Binary::CmdType::Vol, requires(i, 0x00, 0xFF, CMD_ILLEGAL("volume", "v")));		// // //
+	using namespace AMKd::MML::Lexer;
+	if (auto param = GetParameters<Int>(mml_))
+		append(AMKd::Binary::CmdType::Vol, requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("volume", "v")));		// // //
 	else
 		error(CMD_ERROR("volume", "v"));		// // //
 }
@@ -509,10 +514,10 @@ void Music::parseT() {
 }
 
 void Music::parseTempoCommand() {
-	int i = getInt();		// // //
-	if (i != -1) {
-		i = divideByTempoRatio(requires(i, 0x00, 0xFF, CMD_ILLEGAL("tempo", "t")), false);
-		tempo = requires(i, 0x01, 0xFF, "Tempo has been zeroed out by #halvetempo");		// // //
+	using namespace AMKd::MML::Lexer;		// // //
+	if (auto param = GetParameters<Int>(mml_)) {
+		tempo = requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("tempo", "t"));
+		tempo = requires(divideByTempoRatio(tempo, false), 0x01, 0xFF, "Tempo has been zeroed out by #halvetempo");		// // //
 		tempoDefined = true;
 		append(AMKd::Binary::CmdType::Tempo, tempo);		// // //
 
@@ -545,9 +550,9 @@ void Music::parseTransposeDirective() {
 }
 
 void Music::parseOctaveDirective() {
-	int i = getInt();		// // //
-	if (i != -1)
-		octave = requires(i, 1, 6, DIR_ILLEGAL("octave (\"o\")"));
+	using namespace AMKd::MML::Lexer;		// // //
+	if (auto param = GetParameters<Int>(mml_))
+		octave = requires(param.get<0>(), 1u, 6u, DIR_ILLEGAL("octave (\"o\")"));
 	else
 		error(DIR_ERROR("octave (\"o\")"));
 }
@@ -594,56 +599,44 @@ void Music::parseInstrumentCommand() {
 }
 
 void Music::parseOpenParenCommand() {
-	int i;		// // //
-	if (skipSpaces(), trimChar('@')) {		// // //
-		i = getInt();
-		i = instrToSample[i];
-		if (skipSpaces(), !trimChar(','))		// // //
-			error("Error parsing sample load command.");
-	}
-	else if (trimChar('\"')) {		// // //
-		std::string s = getEscapedString();		// // //
-		if (skipSpaces(), !trimChar(','))		// // //
-			error("Error parsing sample load command.");
-
-		s = basepath + s;
-
+	int sampID;
+	using namespace AMKd::MML::Lexer;
+	if (auto param = GetParameters<Sep<'@'>, Int>(mml_))
+		sampID = instrToSample[requires(param.get<0>(), 0u, 29u, "Illegal instrument number for sample load command.")];
+	else if (auto param = GetParameters<Sep<'\"'>, QString>(mml_)) {
+		std::string s = basepath + param.get<0>();		// // //
 		auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(s, this));		// // //
 		if (it == mySamples.cend())
 			error("The specified sample was not included in this song.");
-		i = std::distance(mySamples.cbegin(), it);
+		sampID = std::distance(mySamples.cbegin(), it);
 	}
 	else {
 		parseLabelLoopCommand();
 		return;
 	}
 
-	int j;		// // //
-	if (!getHexByte(j))		// // //
-		error("Error parsing sample load command.");
-	if (skipSpaces(), !trimChar(')'))
-		error("Error parsing sample load command.");
+	if (auto ext = GetParameters<Comma, Byte, Sep<')'>>(mml_)) {
+		if (optimizeSampleUsage)
+			usedSamples[sampID] = true;
+		append(AMKd::Binary::CmdType::SampleLoad, sampID, ext.get<0>());		// // //
+		return;
+	}
 
-	if (optimizeSampleUsage)
-		usedSamples[i] = true;
-
-	append(AMKd::Binary::CmdType::SampleLoad, i, j);		// // //
+	error("Error parsing sample load command.");
 }
 
 void Music::parseLabelLoopCommand() {
+	using namespace AMKd::MML::Lexer;
 	if (trimChar('!')) {		// // //
 		if (targetAMKVersion < 2)
 			error("Unrecognized character '!'.");
-
-		skipSpaces();
 
 		if (channelDefined) {						// A channel's been defined, we're parsing a remote 
 			//bool negative = false;
 			int i = getInt();		// // //
 			if (i == -1)
 				error("Error parsing remote code setup.");		// // //
-			skipSpaces();
-			if (!trimChar(','))		// // //
+			if (skipSpaces(), !trimChar(','))		// // //
 				error("Error parsing code setup.");
 			//if (peek() == '-') negative = true, skipChars(1);
 			int j;		// // //
@@ -654,13 +647,11 @@ void Music::parseLabelLoopCommand() {
 				error("Error parsing remote code setup. Remember that remote code cannot be defined within a channel.");
 			}
 			//if (negative) j = -j;
-			skipSpaces();
 			int k = 0;
 			if (j == 1 || j == 2) {
-				if (!trimChar(','))		// // //
+				if (skipSpaces(), !trimChar(','))		// // //
 					error("Error parsing remote code setup. Missing the third argument.");
-				skipSpaces();
-				if (trimChar('$')) {		// // //
+				if (skipSpaces(), trimChar('$')) {		// // //
 					k = getHex();
 					if (k == -1) error("Error parsing remote code setup. Could not parse the third argument as a hex command.");		// // //
 				}
@@ -671,15 +662,13 @@ void Music::parseLabelLoopCommand() {
 					else if (k == 0x100)
 						k = 0;
 				}
-
-				skipSpaces();
 			}
 
-			if (!trimChar(')'))		// // //
+			if (skipSpaces(), !trimChar(')'))		// // //
 				error("Error parsing remote setup.");
-
 			if (trimChar('['))		// // //
 				error("Remote code cannot be defined within a channel.");
+
 			tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
 			if (loopPointers.find(i) == loopPointers.cend())		// // //
 				loopPointers.insert({i, -1});
@@ -690,8 +679,7 @@ void Music::parseLabelLoopCommand() {
 			int i = getInt();		// // //
 			if (i == -1)
 				error("Error parsing remote code definition.");
-			skipSpaces();
-			if (!trimChar(')'))		// // //
+			if (skipSpaces(), !trimChar(')'))		// // //
 				error("Error parsing remote code definition.");
 
 			if (peek() == '[') {
@@ -862,7 +850,7 @@ void Music::parseStarLoopCommand() {
 }
 
 void Music::parseVibratoCommand() {
-	using namespace AMKd::MML::Lexer;
+	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Int, Comma, Int>(mml_)) {
 		unsigned delay, rate, depth;
 		if (auto param2 = GetParameters<Comma, Int>(mml_)) {
@@ -883,38 +871,29 @@ void Music::parseVibratoCommand() {
 }
 
 void Music::parseTripletOpenDirective() {
-	if (triplet == false)
-		triplet = true;
-	else
+	if (triplet)		// // //
 		error("Triplet on directive found within a triplet block.");
+	triplet = true;
 }
 
 void Music::parseTripletCloseDirective() {
-	if (triplet == true)
-		triplet = false;
-	else
+	if (!triplet)		// // //
 		error("Triplet off directive found outside of a triplet block.");
+	triplet = false;
 }
 
 void Music::parseRaiseOctaveDirective() {
-	if (++octave > 6) {		// // //
-		octave = 6;
-		error("The octave has been raised too high.");
-	}
+	octave = requires(octave + 1, 1, 6, "The octave has been raised too high.");		// // //
 }
 
 void Music::parseLowerOctaveDirective() {
-	if (--octave < 1) {		// // //
-		octave = 1;
-		error("The octave has been dropped too low.");
-	}
+	octave = requires(octave - 1, 1, 6, "The octave has been dropped too low.");		// // //
 }
 
 void Music::parsePitchSlideCommand() {
-	if (!inPitchSlide)
-		inPitchSlide = true;
-	else
+	if (inPitchSlide)		// // //
 		error("Pitch slide directive specified multiple times in a row.");
+	inPitchSlide = true;
 }
 
 void Music::parseHFDInstrumentHack(int addr, int bytes) {
@@ -1538,24 +1517,15 @@ void Music::parseNote(int ch) {		// // //
 }
 
 void Music::parseHDirective() {
-	//bool negative = false;
-
-	//if (peek() == '-') 
-	//{
-	//	negative = true;
-	//	skipChars(1);
-	//}
-	try {
-		int i = getIntWithNegative();		// // //
-		//if (negative) i = -i;
-		//transposeMap[tracks[channe].instrument] = -i;		// // //
-		//htranspose[tracks[channe].instrument] = true;
-		hTranspose = i;
+	using namespace AMKd::MML::Lexer;		// // //
+	if (auto param = GetParameters<SInt>(mml_)) {
+		hTranspose = param.get<0>();
 		usingHTranspose = true;
+		//transposeMap[tracks[channel].instrument] = -param.get<0>();		// // //
+		//htranspose[tracks[channel].instrument] = true;
+		return;
 	}
-	catch (...) {
-		error(DIR_ERROR("h transpose"));
-	}
+	error(DIR_ERROR("transpose (\"h\")"));
 }
 
 void Music::parseNCommand() {
@@ -1680,12 +1650,10 @@ void Music::parseReplacementDirective() {
 }
 
 void Music::parseInstrumentDefinitions() {
-	skipSpaces();
-	if (!trimChar('{'))		// // //
+	if (skipSpaces(), !trimChar('{'))		// // //
 		fatalError("Could not find opening curly brace in instrument definition.");
 
-	skipSpaces();
-	while (!trimChar('}')) {
+	while (skipSpaces(), !trimChar('}')) {
 		int i;		// // //
 		if (trimChar('\"')) {		// // //
 			std::string brrName = getEscapedString();
@@ -1728,7 +1696,6 @@ void Music::parseInstrumentDefinitions() {
 				fatalError("Error parsing instrument definition; there were too few bytes following the sample (there must be 6).");
 			instrumentData.push_back(i);
 		}
-		skipSpaces();
 	}
 
 	/*
@@ -1787,14 +1754,11 @@ void Music::parseInstrumentDefinitions() {
 }
 
 void Music::parseSampleDefinitions() {
-	skipSpaces();
-
-	if (!trimChar('{'))		// // //
+	if (skipSpaces(), !trimChar('{'))		// // //
 		fatalError("Unexpected character in sample group definition.  Expected \"{\".");
 
 	while (true) {		// // //
-		skipSpaces();
-		if (trimChar('\"')) {		// // //
+		if (skipSpaces(), trimChar('\"')) {		// // //
 			std::string tempstr = basepath + getEscapedString();		// // //
 			auto tmppos = tempstr.find_last_of(".");
 			if (tmppos == -1)
@@ -1833,8 +1797,7 @@ void Music::parseLouderCommand() {
 }
 
 void Music::parsePath() {
-	skipSpaces();
-	if (!trimChar('\"'))
+	if (skipSpaces(), !trimChar('\"'))
 		fatalError("Unexpected symbol found in path command. Expected a quoted string.");
 	auto str = getEscapedString();		// // //
 	if (str.empty())
@@ -1877,7 +1840,7 @@ int Music::getIntWithNegative() {
 	throw "Invalid number";
 }
 
-int Music::getHex(bool anyLength) {
+int Music::getHex() {		// // //
 	if (hasNextToken())		// // //
 		if (auto param = AMKd::MML::Lexer::Hex<2>()(mml_))
 			return *param;
@@ -2313,12 +2276,10 @@ void Music::parseEndif() {
 }
 
 void Music::parseSPCInfo() {
-	skipSpaces();
-	if (!trimChar('{'))
+	if (skipSpaces(), !trimChar('{'))
 		error("Could not find opening brace in SPC info command.");
-	skipSpaces();
 
-	while (!trimChar('}')) {
+	while (skipSpaces(), !trimChar('}')) {
 		if (!trimChar('#'))		// // //
 			error("Unexpected symbol found in SPC info command.  Expected \'#\'.");
 		std::string typeName = getIdentifier();		// // //
@@ -2326,8 +2287,7 @@ void Music::parseSPCInfo() {
 		if (typeName != "author" && typeName != "comment" && typeName != "title" && typeName != "game" && typeName != "length")
 			error("Unexpected type name found in SPC info command.  Only \"author\", \"comment\", \"title\", \"game\", and \"length\" are allowed.");
 
-		skipSpaces();
-		if (!trimChar('\"'))
+		if (skipSpaces(), !trimChar('\"'))
 			error("Error while parsing parameter for SPC info command.");
 		std::string parameter = getEscapedString();		// // //
 
@@ -2358,8 +2318,6 @@ void Music::parseSPCInfo() {
 				knowsLength = true;
 			}
 		}
-
-		skipSpaces();
 	}
 
 	if (author.length() > 32) {

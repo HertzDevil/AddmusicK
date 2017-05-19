@@ -202,7 +202,7 @@ private:
 
 	int getInt();
 	int getIntWithNegative();
-	int getHex(bool anyLength = false);
+	int getHex();		// // //
 	bool getHexByte(int &out);		// // //
 	int getPitch(int j);
 	int getNoteLength();		// // //

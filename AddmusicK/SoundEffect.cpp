@@ -10,22 +10,22 @@ static bool triplet;
 static int defaultNoteValue;
 static bool inDefineBlock;
 
-#define skipSpaces				\
-while (isspace(text[pos])) {	\
-	if (text[pos] == '\n')		\
-		line++;					\
-	pos++;						\
-}								\
+#define skipSpaces() \
+	while (isspace(text[pos])) { \
+		if (text[pos] == '\n') \
+			++line; \
+		++pos; \
+	}
 
-#define error(str) if (false); else {	\
-	printError(str, false, name, line);	\
-	continue;							\
-}
+#define error(str) if (false); else { \
+		printError(str, false, name, line); \
+		continue; \
+	}
 
-#define error2(str) do {				\
-	printError(str, false, name, line);	\
-	return; 							\
-} while (false)
+#define error2(str) do { \
+		printError(str, false, name, line); \
+		return; \
+	} while (false)
 
 #define append(value) (soundEffects[bank][index].data.push_back(value))
 
@@ -190,12 +190,12 @@ void SoundEffect::compile()
 
 			volume[0] = i;
 			volume[1] = i;
-			skipSpaces;
+			skipSpaces();		// // //
 
 			if (text[pos] == ',')
 			{
 				pos++;
-				skipSpaces;
+				skipSpaces();		// // //
 				i = getInt();			
 				if (i == -1) error("Error parsing volume command.")
 				if (i > 0x7F) error("Illegal value for volume command.  Only values between 0 and 127 are allowed.")
@@ -220,12 +220,12 @@ void SoundEffect::compile()
 		
 			j = -1;
 
-			skipSpaces;
+			skipSpaces();		// // //
 
 			if (text[pos] == ',')
 			{
 				pos++;
-				skipSpaces;
+				skipSpaces();		// // //
 				j = getInt();
 				if (j < 0) error("Error parsing noise instrument ('@,') command.")
 				if (j > 0x1F) error("Illegal value for noise instrument ('@,') command.  Only values between 0 and 31")
@@ -437,7 +437,7 @@ void SoundEffect::parseASM()
 	if (isspace(text[pos]) == false)
 		error2("Error parsing asm directive.");		// // //
 
-	skipSpaces;
+	skipSpaces();		// // //
 
 	std::string tempname;
 
@@ -449,7 +449,7 @@ void SoundEffect::parseASM()
 		tempname += text[pos++];
 	}
 
-	skipSpaces;
+	skipSpaces();		// // //
 
 	if (text[pos] != '{')
 		error2("Error parsing asm directive.");		// // //
@@ -526,7 +526,7 @@ void SoundEffect::parseJSR()
 	if (isspace(text[pos]) == false)
 		error2("Error parsing jsr command.");		// // //
 
-	skipSpaces;
+	skipSpaces();		// // //
 
 	std::string tempname;
 
@@ -548,7 +548,7 @@ void SoundEffect::parseJSR()
 void SoundEffect::parseDefine()
 {
 	pos += 7;
-	skipSpaces;
+	skipSpaces();		// // //
 	std::string defineName;
 	while (!isspace(text[pos]) && pos < text.length())
 	{
@@ -565,7 +565,7 @@ void SoundEffect::parseDefine()
 void SoundEffect::parseUndef()
 {
 	pos += 6;
-	skipSpaces;
+	skipSpaces();		// // //
 	std::string defineName;
 	while (!isspace(text[pos]) && pos < text.length())
 	{
@@ -587,7 +587,7 @@ void SoundEffect::parseIfdef()
 {	
 	pos+=6;
 	inDefineBlock = true;
-	skipSpaces;
+	skipSpaces();		// // //
 	std::string defineName;
 	while (!isspace(text[pos]) && pos < text.length())
 	{
@@ -616,7 +616,7 @@ void SoundEffect::parseIfndef()
 {
 	pos+=7;
 	inDefineBlock = true;
-	skipSpaces;
+	skipSpaces();		// // //
 	std::string defineName;
 	while (!isspace(text[pos]) && pos < text.length())
 	{
