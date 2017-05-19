@@ -18,9 +18,13 @@ struct Bypass : std::false_type { };
 template <typename... Args>
 struct LexerResult
 {
-	std::optional<std::tuple<Args...>> result;
-	const std::tuple<Args...> &operator*() const {
+	using tuple_type = std::tuple<Args...>;
+	std::optional<tuple_type> result;
+	const tuple_type &operator*() const & {
 		return *result;
+	}
+	tuple_type &&operator*() && {
+		return std::move(*result);
 	}
 	template <std::size_t N>
 	const auto &get() const &noexcept {
@@ -62,7 +66,7 @@ template <std::size_t X>
 struct lexer_info<X, void>
 {
 	static constexpr std::size_t count = 0;
-	using type = std::index_sequence<>;
+	using index_type = std::index_sequence<>;
 	using result_type = LexerResult<>;
 };
 template <std::size_t X, typename T, typename... Us>
@@ -72,7 +76,7 @@ private:
 	using next = lexer_info<X + 1, void, Us...>;
 public:
 	static constexpr std::size_t count = 1 + next::count;
-	using type = typename prepend<X, typename next::type>::type;
+	using index_type = typename prepend<X, typename next::index_type>::type;
 	using result_type = typename res_prepend<
 		typename T::arg_type, typename next::result_type>::type;
 };
@@ -83,7 +87,7 @@ private:
 	using next = lexer_info<X, void, Us...>;
 public:
 	static constexpr std::size_t count = next::count;
-	using type = typename prepend<-1, typename next::type>::type;
+	using index_type = typename prepend<-1, typename next::index_type>::type;
 	using result_type = typename next::result_type;
 };
 
@@ -131,10 +135,11 @@ template <typename... Arg>
 typename details::lexer_info<0, void, Arg...>::result_type
 GetParameters(SourceFile &file) {
 	using info = details::lexer_info<0, void, Arg...>;
-	typename decltype(std::declval<typename info::result_type>().result)::value_type out;
+	typename info::result_type::tuple_type out;
+	typename info::index_type indices;
 	std::size_t p = file.GetReadCount();
 
-	if (details::get_impl<decltype(out), Arg...>(file, out, typename info::type { }))
+	if (details::get_impl<decltype(out), Arg...>(file, out, indices))
 		return typename info::result_type {out};
 
 	file.SetReadCount(p);

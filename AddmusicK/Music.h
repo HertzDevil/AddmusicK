@@ -190,6 +190,10 @@ private:
 
 	void parseSPCInfo();
 
+	// // // action methods, these will become objects later
+	void doVibrato(int delay, int rate, int depth);
+	void doTempo(int speed);
+
 	template <typename... Args>		// // //
 	void append(Args&&... value);
 	bool trimChar(char c);		// // //

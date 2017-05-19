@@ -515,19 +515,8 @@ void Music::parseT() {
 
 void Music::parseTempoCommand() {
 	using namespace AMKd::MML::Lexer;		// // //
-	if (auto param = GetParameters<Int>(mml_)) {
-		tempo = requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("tempo", "t"));
-		tempo = requires(divideByTempoRatio(tempo, false), 0x01, 0xFF, "Tempo has been zeroed out by #halvetempo");		// // //
-		tempoDefined = true;
-		append(AMKd::Binary::CmdType::Tempo, tempo);		// // //
-
-		if (inNormalLoop || inE6Loop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
-			guessLength = false;
-		else
-			tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
-		return;
-	}
-
+	if (auto param = GetParameters<Int>(mml_))
+		return doTempo(requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("tempo", "t")));
 	error(CMD_ERROR("tempo", "t"));
 }
 
@@ -861,10 +850,7 @@ void Music::parseVibratoCommand() {
 			delay = 0;
 			std::tie(rate, depth) = *param;
 		}
-		return append(AMKd::Binary::CmdType::Vibrato,
-			divideByTempoRatio(requires(delay, 0x00u, 0xFFu, "Illegal value for vibrato delay."), false),
-			multiplyByTempoRatio(requires(rate, 0x00u, 0xFFu, "Illegal value for vibrato rate.")),
-			requires(depth, 0x00u, 0xFFu, "Illegal value for vibrato extent."));		// // //
+		return doVibrato(delay, rate, depth);		// // //
 	}
 
 	error(CMD_ERROR("vibrato", "p"));		// // //
@@ -1007,17 +993,19 @@ void Music::parseHexCommand() {
 		//validateTremolo = true;
 		currentHex = i;
 
+		using namespace AMKd::MML::Lexer;		// // //
 		switch (currentHex) {		// // //
-		case AMKd::Binary::CmdType::Vibrato: {
-			using namespace AMKd::MML::Lexer;		// // //
+		case AMKd::Binary::CmdType::Vibrato:
 			if (auto param = GetParameters<Byte, Byte, Byte>(mml_)) {
 				unsigned delay, rate, depth;
 				std::tie(delay, rate, depth) = *param;
-				append(currentHex, divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);
-				return;
+				return doVibrato(delay, rate, depth);		// // //
 			}
 			error("Unknown hex command.");
-		}
+		case AMKd::Binary::CmdType::Tempo:
+			if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
+				return doTempo(param.get<0>());
+			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::TempoFade:
 			guessLength = false; // NOPE.  Nope nope nope nope nope nope nope nope nope nope.
 			break;
@@ -1166,10 +1154,6 @@ void Music::parseHexCommand() {
 			break;
 		case AMKd::Binary::CmdType::VolGlobalFade:
 			if (hexLeft == 1)
-				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::Tempo:
-			if (hexLeft == 0)
 				i = divideByTempoRatio(i, false);
 			break;
 		case AMKd::Binary::CmdType::TempoFade:
@@ -2423,17 +2407,15 @@ void Music::addNoteLength(double ticks) {
 }
 
 int Music::divideByTempoRatio(int value, bool fractionIsError) {
-	return value;
-	/*
 	int temp = value / tempoRatio;
+/*
 	if (temp * tempoRatio != value)
 		if (fractionIsError)
 			printError("Using the tempo ratio on this value would result in a fractional value.", false, name, line);
 		else
 			printWarning("The tempo ratio resulted in a fractional value.", name, line);
-
+*/
 	return temp;
-	*/
 }
 
 int Music::multiplyByTempoRatio(int value) {
@@ -2447,6 +2429,27 @@ int Music::multiplyByTempoRatio(int value) {
 // // //
 const std::string &Music::getFileName() const {
 	return name;
+}
+
+
+
+// // //
+void Music::doVibrato(int delay, int rate, int depth) {
+	append(AMKd::Binary::CmdType::Vibrato,
+		divideByTempoRatio(requires(delay, 0x00, 0xFF, "Illegal value for vibrato delay."), false),
+		multiplyByTempoRatio(requires(rate, 0x00, 0xFF, "Illegal value for vibrato rate.")),
+		requires(depth, 0x00, 0xFF, "Illegal value for vibrato extent."));		// // //
+}
+
+void Music::doTempo(int speed) {
+	tempo = requires(divideByTempoRatio(speed, false), 0x01, 0xFF, "Tempo has been zeroed out by #halvetempo");		// // //
+	tempoDefined = true;
+	append(AMKd::Binary::CmdType::Tempo, tempo);		// // //
+
+	if (inNormalLoop || inE6Loop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
+		guessLength = false;
+	else
+		tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
 }
 
 
