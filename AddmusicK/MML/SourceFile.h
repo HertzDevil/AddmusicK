@@ -2,10 +2,17 @@
 
 #include <string_view>
 #include <vector>
+#include <map>
 #include <optional>
 #include <algorithm>
 
 namespace AMKd::MML {
+
+// // //
+const auto replComp = [] (const std::string &a, const std::string &b) {
+	size_t al = a.length(), bl = b.length();
+	return std::tie(al, b) > std::tie(bl, a);
+};
 
 // A SourceFile wraps around an MML string with methods for tokenization. It
 // also handles replacement macros.
@@ -32,31 +39,21 @@ public:
 	void SkipSpaces();
 
 	void Clear();
+	bool IsEmpty() const;
 	void Unput();
+
+	void AddMacro(const std::string &key, const std::string &repl);
 	bool PushMacro(std::string_view key, std::string_view repl);
 	bool PopMacro();
+	bool HasNextToken();
 
 	std::size_t GetLineNumber() const;
 	std::size_t GetReadCount() const;
 	void SetReadCount(std::size_t count);
 	explicit operator bool() const;
 
-	template <typename Iter>
-	bool DoReplacement(Iter b, Iter e) {
-		while (true) {
-			auto it = std::find_if(b, e, [&] (const auto &x) {
-				const std::string &rhs = x.first;
-				return std::string_view(sv_.data(), rhs.length()) == rhs;
-			});
-			if (it == e)
-				break;
-			if (!PushMacro(it->first, it->second))
-				return false;
-		}
-		return true;
-	}
-
 private:
+	bool DoReplacement();
 	void SetInitReadCount(std::size_t count);
 
 //	std::string filename_;
@@ -64,6 +61,8 @@ private:
 	std::string_view sv_;
 	std::string_view prev_;
 	std::vector<MacroState> macros_;
+
+	std::map<std::string, std::string, decltype(replComp)> repl_ {replComp};		// // //
 };
 
 } // namespace AMKd::MML

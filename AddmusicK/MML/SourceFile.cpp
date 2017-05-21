@@ -1,6 +1,6 @@
 #include "SourceFile.h"
+#include "../Utility/Exception.h"
 #include <regex>
-
 #include <unordered_map>
 
 const std::regex &get_re(std::string_view re, bool ignoreCase) {
@@ -97,8 +97,16 @@ void SourceFile::Clear() {
 	SetInitReadCount(mml_.size());
 }
 
+bool SourceFile::IsEmpty() const {
+	return sv_.empty();
+}
+
 void SourceFile::Unput() {
 	sv_ = prev_;
+}
+
+void SourceFile::AddMacro(const std::string &key, const std::string &repl) {
+	repl_[key] = repl;
 }
 
 bool SourceFile::PushMacro(std::string_view key, std::string_view repl) {
@@ -117,6 +125,28 @@ bool SourceFile::PopMacro() {
 	mml_ = std::move(macros_.back().mml);
 	SetInitReadCount(macros_.back().charCount);
 	macros_.pop_back();
+	return true;
+}
+
+bool SourceFile::HasNextToken() {
+	SkipSpaces();
+	if (!DoReplacement())		// // //
+		throw AMKd::Utility::SyntaxException {"Infinite replacement macro substitution."};
+	SkipSpaces();
+	return !IsEmpty();
+}
+
+bool SourceFile::DoReplacement() {
+	while (true) {
+		auto it = std::find_if(repl_.cbegin(), repl_.cend(), [&] (const auto &x) {
+			const std::string &rhs = x.first;
+			return std::string_view(sv_.data(), rhs.length()) == rhs;
+		});
+		if (it == repl_.cend())
+			break;
+		if (!PushMacro(it->first, it->second))
+			return false;
+	}
 	return true;
 }
 

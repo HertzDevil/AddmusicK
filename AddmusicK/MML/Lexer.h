@@ -124,7 +124,8 @@ bool get_impl(SourceFile &file, T &tup, std::index_sequence<>) {
 
 template <typename T, typename L, typename... Ls, std::size_t I, std::size_t... Is>
 bool get_impl(SourceFile &file, T &tup, std::index_sequence<I, Is...>) {
-	return tup_assigner<L, T, I>()(file, tup) && get_impl<T, Ls...>(file, tup, std::index_sequence<Is...>());
+	return tup_assigner<L, T, I>()(file, tup) &&
+		get_impl<T, Ls...>(file, tup, std::index_sequence<Is...>());
 }
 #endif
 

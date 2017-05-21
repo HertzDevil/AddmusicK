@@ -1630,7 +1630,7 @@ void Music::parseReplacementDirective() {
 //	if (it != replacements.end())
 //		replacements.erase(it);
 
-	replacements[findStr] = replStr;
+	mml_.AddMacro(findStr, replStr);		// // //
 }
 
 void Music::parseInstrumentDefinitions() {
@@ -1791,12 +1791,7 @@ void Music::parsePath() {
 
 // // //
 bool Music::hasNextToken() {
-	skipSpaces();
-	if (!mml_.DoReplacement(replacements.cbegin(), replacements.cend()))
-		fatalError("Infinite replacement macro substitution.");
-
-	skipSpaces();
-	return static_cast<bool>(mml_);
+	return mml_.HasNextToken();
 }
 
 // // //

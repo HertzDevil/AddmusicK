@@ -52,12 +52,6 @@ private:
 	bool isDefiningLabelLoop = false;		// // //
 };
 
-// // //
-const auto replacementComp = [] (const std::string &a, const std::string &b) {
-	size_t al = a.length(), bl = b.length();
-	return std::tie(al, b) > std::tie(bl, a);
-};
-
 class Music
 {
 
@@ -131,7 +125,6 @@ public:
 	bool inRemoteDefinition;
 	//int remoteDefinitionArg;
 
-	std::map<std::string, std::string, decltype(replacementComp)> replacements {replacementComp};		// // //
 	Music();
 
 	void init();
