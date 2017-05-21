@@ -129,7 +129,7 @@ void writeFile(const fs::path &fileName, const std::vector<T> &vector) {		// // 
 void writeTextFile(const fs::path &fileName, const std::string &string);
 int execute(const std::string &command, bool prepentDotSlash = true);
 
-void printError(const std::string &error, bool isFatal, const std::string &fileName = "", int line = -1);
+void printError(const std::string &error, const std::string &fileName = "", int line = -1);		// // //
 void printWarning(const std::string &error, const std::string &fileName = "", int line = -1);
 
 [[noreturn]] void fatalError(const std::string &error, const std::string &fileName = "", int line = -1);		// // //

@@ -27,7 +27,7 @@ class Track
 {
 public:
 	friend class Music;
-	void InsertData(std::vector<uint8_t> &buf) const;
+	void FlushData(std::vector<uint8_t> &buf) const;
 
 private:
 	std::vector<uint8_t> data;		// // //

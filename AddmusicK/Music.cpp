@@ -37,7 +37,7 @@ T requires(T x, T min, T max, U&& err) {
 	::printWarning(str, name, mml_.GetLineNumber())
 
 #define error(str) do { \
-		::printError(str, false, name, mml_.GetLineNumber()); \
+		::printError(str, name, mml_.GetLineNumber()); \
 		return; \
 	} while (false)
 
@@ -1892,7 +1892,7 @@ int Music::getNoteLength() {
 std::string Music::getIdentifier() {
 	if (auto param = AMKd::MML::Lexer::Ident()(mml_))
 		return *param;
-	printError("Error while parsing identifier.", false);
+	printError("Error while parsing identifier.");		// // //
 	return "";
 }
 
@@ -1900,7 +1900,7 @@ std::string Music::getIdentifier() {
 std::string Music::getEscapedString() {
 	if (auto param = AMKd::MML::Lexer::QString()(mml_))
 		return *param;
-	printError("Unexpected end of file found.", false);
+	printError("Unexpected end of file found.");		// // //
 	return "";
 }
 
@@ -2450,6 +2450,6 @@ void Music::doTempo(int speed) {
 
 
 // // //
-void Track::InsertData(std::vector<uint8_t> &buf) const {
+void Track::FlushData(std::vector<uint8_t> &buf) const {
 	buf.insert(buf.cend(), data.cbegin(), data.cend());
 }

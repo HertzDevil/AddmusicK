@@ -54,7 +54,7 @@ bool useAsarDLL;
 std::vector<uint8_t> openFile(const fs::path &fileName) {		// // //
 	std::ifstream is(fileName, std::ios::binary);
 	if (!is)
-		printError("Error: File \"" + fileName.string() + "\" not found.", true);
+		fatalError("Error: File \"" + fileName.string() + "\" not found.");		// // //
 
 	std::vector<uint8_t> buf;		// // //
 	buf.reserve(static_cast<size_t>(fs::file_size(fileName)));
@@ -67,7 +67,7 @@ std::vector<uint8_t> openFile(const fs::path &fileName) {		// // //
 std::string openTextFile(const fs::path &fileName) {		// // //
 	std::ifstream is(fileName);
 	if (!is)
-		printError("Error: File \"" + fileName.string() + "\" not found.", true);		// // //
+		fatalError("Error: File \"" + fileName.string() + "\" not found.");		// // //
 	return std::string(std::istreambuf_iterator<char> {is}, std::istreambuf_iterator<char> { });
 }
 
@@ -104,26 +104,22 @@ time_t getLastModifiedTime() {
 	return recentMod;
 }
 
-void printError(const std::string &error, bool isFatal, const std::string &fileName, int line) {
-	if (line >= 0)		// // //
-		std::cerr << std::dec << "File: " << fileName << " Line: " << line << ":\n";
+// // //
+void printError(const std::string &error, const std::string &fileName, int line) {
+	printWarning(error, fileName, line);		// // //
 	++errorCount;
-	std::cerr << error << '\n';
-	if (isFatal)
-		quit(1);
 }
 
 void printWarning(const std::string &error, const std::string &fileName, int line) {
-	std::ostringstream oss;
-	if (line >= 0)
-		oss << "File: " << fileName << " Line: " << line << ":\n";
-	puts((oss.str() + error).c_str());
-	putchar('\n');
+	if (line >= 0)		// // //
+		std::cerr << std::dec << "File: " << fileName << " Line: " << line << ":\n";
+	std::cerr << error << '\n';
 }
 
 // // //
 void fatalError(const std::string &error, const std::string &fileName, int line) {
-	printError(error, true, fileName, line);
+	printWarning(error, fileName, line);		// // //
+	quit(1);
 }
 
 void quit(int code) {
@@ -149,11 +145,10 @@ int execute(const std::string &command, bool prepend) {
 	return system(tempstr.c_str());
 }
 
-int scanInt(const std::string &str, const std::string &value)		// Scans an integer value that comes after the specified string within another string.  Must be in $XXXX format (or $XXXXXX, etc.).
-{
+int scanInt(const std::string &str, const std::string &value) {		// Scans an integer value that comes after the specified string within another string.  Must be in $XXXX format (or $XXXXXX, etc.).
 	int i, ret;
 	if ((i = str.find(value)) == -1)
-		printError(std::string("Error: Could not find \"") + value + "\"", true);
+		fatalError(std::string("Error: Could not find \"") + value + "\"");		// // //
 
 	std::sscanf(str.c_str() + i + value.length(), "$%X", &ret);	// Woo C functions in C++ code!
 	return ret;
@@ -253,12 +248,11 @@ void insertValue(int value, int length, const std::string &find, std::string &st
 //	srcn->exists = true;
 //}
 
-int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM)		// // //
-{
+int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM) {		// // //
 	if (size == 0)
-		printError("Internal error: Requested free ROM space cannot be 0 bytes.", true);
+		fatalError("Internal error: Requested free ROM space cannot be 0 bytes.");		// // //
 	if (size > 0x7FF8)
-		printError("Internal error: Requested free ROM space cannot exceed 0x7FF8 bytes.", true);
+		fatalError("Internal error: Requested free ROM space cannot exceed 0x7FF8 bytes.");
 
 	size_t pos = 0;
 	size_t runningSpace = 0;
@@ -371,7 +365,7 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 				std::stringstream errstream;
 
 				errstream << "The sample \"" + name + "\" was of an invalid length (the filesize - 2 should be a multiple of 9).  Did you forget the loop header?" << std::endl;
-				printError(errstream.str(), true);
+				fatalError(errstream.str());		// // //
 			}
 
 			newSample.loopPoint = (sample[1] << 8) | (sample[0]);
@@ -427,7 +421,7 @@ void addSampleBank(const fs::path &fileName, Music *music) {
 	std::vector<uint8_t> bankFile = openFile(getSamplePath(fileName, music->name));		// // //
 
 	if (bankFile.size() != 0x8000)
-		printError("The specified bank file was an illegal size.", true);
+		fatalError("The specified bank file was an illegal size.");		// // //
 	bankFile.erase(bankFile.begin(), bankFile.begin() + 12);
 	//Sample bankSamples[0x40];
 	Sample tempSample;
@@ -489,8 +483,6 @@ fs::path getSamplePath(const fs::path &name, const std::string &musicName) {
 
 // // //
 
-#define error(str) printError(str, true, filename, line)
-
 std::string getArgument(const std::string &str, char endChar, unsigned int &pos, bool breakOnNewLines) {		// // //
 	std::string temp;
 
@@ -504,7 +496,7 @@ std::string getArgument(const std::string &str, char endChar, unsigned int &pos,
 				break;
 
 		if (pos == str.length())
-			printError("Unexpected end of file found.", true);		// // //
+			fatalError("Unexpected end of file found.");		// // //
 		if (breakOnNewLines) if (str[pos] == '\r' || str[pos] == '\n') break;			// Break on new lines.
 		temp += str[pos];
 		pos++;
@@ -579,7 +571,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.empty())
-					error("#define was missing its argument.");
+					fatalError("#define was missing its argument.");
 
 				skipSpaces();		// // //
 				std::string temp3 = getArgument(str, ' ', i, true);		// // //
@@ -591,7 +583,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 						defines[temp2] = j;		// // //
 					}
 					catch (...) {
-						error("Could not parse integer for #define.");
+						fatalError("Could not parse integer for #define.");
 					}
 				}
 			}
@@ -601,7 +593,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.empty())
-					error("#undef was missing its argument.");
+					fatalError("#undef was missing its argument.");
 				defines.erase(temp2);
 			}
 			else if (temp == "ifdef") {
@@ -610,7 +602,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.empty())
-					error("#ifdef was missing its argument.");
+					fatalError("#ifdef was missing its argument.");
 
 				okayStatus.push(okayToAdd);
 				okayToAdd = (defines.find(temp2) != defines.end());
@@ -623,7 +615,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.empty())
-					error("#ifndef was missing its argument.");
+					fatalError("#ifndef was missing its argument.");
 
 				okayStatus.push(okayToAdd);
 				okayToAdd = (defines.find(temp2) == defines.end());
@@ -636,20 +628,20 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 				skipSpaces();		// // //
 				std::string temp2 = getArgument(str, ' ', i, true);		// // //
 				if (temp2.length() == 0)
-					error("#if was missing its first argument.");
+					fatalError("#if was missing its first argument.");
 
 				if (defines.find(temp2) == defines.end())
-					error("First argument for #if was never defined.");
+					fatalError("First argument for #if was never defined.");
 
 				skipSpaces();		// // //
 				std::string temp3 = getArgument(str, ' ', i, true);		// // //
 				if (temp3.length() == 0)
-					error("#if was missing its comparison operator.");
+					fatalError("#if was missing its comparison operator.");
 
 				skipSpaces();		// // //
 				std::string temp4 = getArgument(str, ' ', i, true);		// // //
 				if (temp4.length() == 0)
-					error("#if was missing its second argument.");
+					fatalError("#if was missing its second argument.");
 
 				okayStatus.push(okayToAdd);
 
@@ -668,10 +660,10 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 					else if (temp3 == "<=")
 						okayToAdd = (defines[temp2] <= j);
 					else
-						error("Unknown operator for #if.");
+						fatalError("Unknown operator for #if.");
 				}
 				catch (...) {
-					error("Could not parse integer for #if.");
+					fatalError("Could not parse integer for #if.");		// // //
 				}
 
 				level++;
@@ -683,21 +675,21 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 					okayStatus.pop();
 				}
 				else
-					error("There was an #endif without a matching #ifdef, #ifndef, or #if.");
+					fatalError("There was an #endif without a matching #ifdef, #ifndef, or #if.");
 			}
 			else if (temp == "amk") {
 				if (stat.version >= 0) {
 					skipSpaces();		// // //
 					std::string temp = getArgument(str, ' ', i, true);		// // //
 					if (temp.empty())
-						printError("#amk must have an integer argument specifying the version.", false, filename, line);
+						printWarning("#amk must have an integer argument specifying the version.", filename, line);		// // //
 					else {
 						int j;
 						try {
 							j = strToInt(temp);
 						}
 						catch (...) {
-							error("Could not parse integer for #amk.");
+							fatalError("Could not parse integer for #amk.");
 						}
 						stat.version = j;
 					}
@@ -725,7 +717,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 	}
 
 	if (level != 0)
-		error("There was an #ifdef, #ifndef, or #if without a matching #endif.");
+		fatalError("There was an #ifdef, #ifndef, or #if without a matching #endif.");		// // //
 
 	if (stat.version != -2) {		// For now, skip comment erasing for #amm songs.  #amk songs will follow suit in a later version.
 		while (true) {

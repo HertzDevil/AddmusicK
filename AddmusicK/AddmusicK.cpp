@@ -120,7 +120,8 @@ int main(int argc, char* argv[]) {
 		}
 		else if (arg == "-norom") {
 			if (!ROMName.empty())		// // //
-				printError("Error: -norom cannot be used after a filepath has already been used. Input your text files /after/ the -norom option.", true);
+				fatalError("Error: -norom cannot be used after a filepath has already been used.\n"		// // //
+						   "Input your text files /after/ the -norom option.");
 			justSPCsPlease = true;
 		}
 		else if (ROMName.empty() && arg[0] != '-')
@@ -163,15 +164,15 @@ int main(int argc, char* argv[]) {
 		fs::path smc = fs::path {ROMName} += ".smc";		// // //
 		fs::path sfc = fs::path {ROMName} += ".sfc";
 		if (fs::exists(smc) && fs::exists(sfc))
-			printError("Error: Ambiguity detected; there were two ROMs with the specified name (one\n"
+			fatalError("Error: Ambiguity detected; there were two ROMs with the specified name (one\n"
 					   "with a .smc extension and one with a .sfc extension). Either delete one or\n"
-					   "include the extension in your filename.", true);
+					   "include the extension in your filename.");
 		else if (fs::exists(smc))
 			ROMName = smc;
 		else if (fs::exists(sfc))
 			ROMName = sfc;
 		else if (!fs::exists(ROMName))
-			printError("ROM not found.", true);
+			fatalError("ROM not found.");
 		rom = openFile(ROMName);		// // //
 
 		tryToCleanAM4Data();
@@ -184,7 +185,8 @@ int main(int argc, char* argv[]) {
 		//rom.openFromFile(ROMName);
 
 		if (rom.size() <= 0x80000)
-			printError("Error: Your ROM is too small. Save a level in Lunar Magic or expand it with\nLunar Expand, then try again.", true);
+			fatalError("Error: Your ROM is too small. Save a level in Lunar Magic or expand it with\n"
+					   "Lunar Expand, then try again.");		// // //
 
 		if (rom[SNESToPC(0xFFD5)] == 0x23 && allowSA1)
 			usingSA1 = true;
@@ -213,7 +215,7 @@ int main(int argc, char* argv[]) {
 
 		for (int i = 0, n = textFilesToCompile.size(); i < n; ++i) {		// // //
 			if (highestGlobalSong + i >= 256)
-				printError("Error: The total number of requested music files to compile exceeded 255.", true);
+				fatalError("Error: The total number of requested music files to compile exceeded 255.");		// // //
 			musics[highestGlobalSong + 1 + i].exists = true;
 			// // //
 			musics[highestGlobalSong + 1 + i].name = textFilesToCompile[i];
@@ -385,7 +387,7 @@ void assembleSPCDriver() {
 
 	//if (fileExists("temp.log"))
 	if (!asarCompileToBIN("asm/main.asm", "asm/main.bin"))
-		printError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n", true);
+		fatalError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.");		// // //
 
 	std::string temptxt = openTextFile("temp.txt");		// // //
 	mainLoopPos = scanInt(temptxt, "MainLoopPos: ");
@@ -434,13 +436,13 @@ void loadMusicList() {
 		}
 
 		if (!inGlobals && !inLocals)
-			printError("Error: Could not find \"Globals:\" label in list.txt", true);
+			fatalError("Error: Could not find \"Globals:\" label in list.txt");		// // //
 
 		if (index < 0) {
 			if ('0' <= musicFile[i] && musicFile[i] <= '9') index = musicFile[i++] - '0';
 			else if ('A' <= musicFile[i] && musicFile[i] <= 'F') index = musicFile[i++] - 'A' + 10;
 			else if ('a' <= musicFile[i] && musicFile[i] <= 'f') index = musicFile[i++] - 'a' + 10;
-			else printError("Invalid number in list.txt.", true);
+			else fatalError("Invalid number in list.txt.");
 
 			index <<= 4;
 
@@ -448,15 +450,15 @@ void loadMusicList() {
 			else if ('A' <= musicFile[i] && musicFile[i] <= 'F') index |= musicFile[i++] - 'A' + 10;
 			else if ('a' <= musicFile[i] && musicFile[i] <= 'f') index |= musicFile[i++] - 'a' + 10;
 			else if (isspace(musicFile[i])) index >>= 4;
-			else printError("Invalid number in list.txt.", true);
+			else fatalError("Invalid number in list.txt.");
 
 			if (!isspace(musicFile[i]))
-				printError("Invalid number in list.txt.", true);
+				fatalError("Invalid number in list.txt.");
 			if (inGlobals)
 				highestGlobalSong = std::max(highestGlobalSong, index);
 			if (inLocals)
 				if (index <= highestGlobalSong)
-					printError("Error: Local song numbers must be lower than the largest global song number.", true);
+					fatalError("Error: Local song numbers must be lower than the largest global song number.");		// // //
 		}
 		else {
 			if (musicFile[i] == '\n' || musicFile[i] == '\r') {
@@ -523,7 +525,7 @@ void loadSampleList() {
 					continue;
 				}
 				else
-					printError("Error parsing sample groups.txt.  Expected opening curly brace.\n", true);
+					fatalError("Error parsing sample groups.txt.  Expected opening curly brace.");		// // //
 			}
 		}
 		else if (gettingGroupName == true) {
@@ -575,13 +577,13 @@ void loadSampleList() {
 				}
 				else if (str[i] == '!') {
 					if (bankDefines[bankDefines.size() - 1]->importants.size() == 0)
-						printError("Error parsing Addmusic_sample groups.txt: Importance specifier ('!') must come\n"
-								   "after asample declaration, not before it.", true);
+						fatalError("Error parsing Addmusic_sample groups.txt: Importance specifier ('!') must come\n"
+								   "after asample declaration, not before it.");		// // //
 					bankDefines[bankDefines.size() - 1]->importants[bankDefines[bankDefines.size() - 1]->importants.size() - 1] = true;
 					i++;
 				}
 				else
-					printError("Error parsing sample groups.txt.  Expected opening quote.\n", true);
+					fatalError("Error parsing sample groups.txt.  Expected opening quote.");
 			}
 		}
 	}
@@ -643,13 +645,13 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 		}
 
 		if (!in1DF9 && !in1DFC)
-			printError("Error: Could not find \"SFX1DF9:\" label in sound effects.txt", true);
+			fatalError("Error: Could not find \"SFX1DF9:\" label in sound effects.txt");		// // //
 
 		if (index < 0) {
 			if ('0' <= str[i] && str[i] <= '9') index = str[i++] - '0';
 			else if ('A' <= str[i] && str[i] <= 'F') index = str[i++] - 'A' + 10;
 			else if ('a' <= str[i] && str[i] <= 'f') index = str[i++] - 'a' + 10;
-			else printError("Invalid number in sound effects.txt.", true);
+			else fatalError("Invalid number in sound effects.txt.");
 
 			index <<= 4;
 
@@ -657,10 +659,10 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 			else if ('A' <= str[i] && str[i] <= 'F') index |= str[i++] - 'A' + 10;
 			else if ('a' <= str[i] && str[i] <= 'f') index |= str[i++] - 'a' + 10;
 			else if (isspace(str[i])) index >>= 4;
-			else printError("Invalid number in sound effects.txt.", true);
+			else fatalError("Invalid number in sound effects.txt.");
 
 			if (!isspace(str[i]))
-				printError("Invalid number in sound effects.txt.", true);
+				fatalError("Invalid number in sound effects.txt.");
 		}
 		else {
 			if (str[i] == '*' && tempName.length() == 0) {
@@ -739,8 +741,8 @@ void compileSFX() {
 				}
 				if (soundEffects[i][j].pointsTo == 0) {
 					std::ostringstream r;
-					r << std::hex << j;
-					printError(std::string("Error: The sound effect that sound effect 0x") + r.str() + std::string(" points to could not be found."), true);
+					r << "Error: The sound effect that sound effect 0x" << std::hex << j << " points to could not be found.";
+					fatalError(r.str());		// // //
 				}
 			}
 		}
@@ -778,19 +780,18 @@ void compileGlobalData() {
 			DF9Pointers.push_back(DF9DataTotal + (DF9Count + DFCCount) * 2 + programSize + programPos);
 			DF9DataTotal += soundEffects[0][i].data.size() + soundEffects[0][i].code.size();
 		}
-		else if (soundEffects[0][i].exists == false) {
+		else if (soundEffects[0][i].exists == false)
 			DF9Pointers.push_back(0xFFFF);
-		}
-		else {
-			if (i > soundEffects[0][i].pointsTo)
-				DF9Pointers.push_back(DF9Pointers[soundEffects[0][i].pointsTo]);
-			else
-				printError("Error: A sound effect that is a pointer to another sound effect must come after\nthe sound effect that it points to.", true);
-		}
+		else if (i > soundEffects[0][i].pointsTo)
+			DF9Pointers.push_back(DF9Pointers[soundEffects[0][i].pointsTo]);
+		else
+			fatalError("Error: A sound effect that is a pointer to another sound effect must come after\n"
+					   "the sound effect that it points to.");
 	}
 
 	if (errorCount > 0)
-		printError("There were errors when compiling the sound effects.  Compilation aborted.  Your\nROM has not been modified.", true);
+		fatalError("There were errors when compiling the sound effects.  Compilation aborted.  Your\n"
+				   "ROM has not been modified.");
 
 	for (int i = 0; i <= DFCCount; i++) {
 		if (soundEffects[1][i].exists && soundEffects[1][i].pointsTo == 0) {
@@ -801,16 +802,16 @@ void compileGlobalData() {
 		}
 		else if (!soundEffects[1][i].exists)
 			DFCPointers.push_back(0xFFFF);
-		else {
-			if (i > soundEffects[1][i].pointsTo)
-				DFCPointers.push_back(DFCPointers[soundEffects[1][i].pointsTo]);
-			else
-				printError("Error: A sound effect that is a pointer to another sound effect must come after\nthe sound effect that it points to.", true);
-		}
+		else if (i > soundEffects[1][i].pointsTo)
+			DFCPointers.push_back(DFCPointers[soundEffects[1][i].pointsTo]);
+		else
+			fatalError("Error: A sound effect that is a pointer to another sound effect must come after\n"
+					   "the sound effect that it points to.");
 	}
 
 	if (errorCount > 0)
-		printError("There were errors when compiling the sound effects.  Compilation aborted.  Your\nROM has not been modified.", true);
+		fatalError("There were errors when compiling the sound effects.  Compilation aborted.  Your\n"
+				   "ROM has not been modified.");
 
 	if (verbose) {
 		std::cout << "Total space used by 1DF9 sound effects: 0x" << hex4 << (DF9DataTotal + DF9Count * 2) << std::dec << std::endl;
@@ -848,11 +849,13 @@ void compileGlobalData() {
 
 	int pos;
 	pos = str.find("SFXTable0:");
-	if (pos == -1) printError("Error: SFXTable0 not found in main.asm.", true);
+	if (pos == -1)
+		fatalError("Error: SFXTable0 not found in main.asm.");
 	str.insert(pos + 10, "\r\nincbin \"SFX1DF9Table.bin\"\r\n");
 
 	pos = str.find("SFXTable1:");
-	if (pos == -1) printError("Error: SFXTable1 not found in main.asm.", true);
+	if (pos == -1)
+		fatalError("Error: SFXTable1 not found in main.asm.");
 	str.insert(pos + 10, "\r\nincbin \"SFX1DFCTable.bin\"\r\nincbin \"SFXData.bin\"\r\n");
 
 	writeTextFile("asm/tempmain.asm", str);
@@ -865,7 +868,7 @@ void compileGlobalData() {
 	//execute("asar asm/tempmain.asm asm/main.bin 2> temp.log > temp.txt");
 	//if (fileExists("temp.log")) 
 	if (!asarCompileToBIN("asm/tempmain.asm", "asm/main.bin"))
-		printError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n", true);
+		fatalError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n");		// // //
 
 	programSize = fs::file_size("asm/main.bin");		// // //
 
@@ -1046,7 +1049,7 @@ void fixMusicPointers() {
 		// // //
 		final.insert(final.end(), musics[i].allPointersAndInstrs.cbegin(), musics[i].allPointersAndInstrs.cend());
 		for (const auto &x : musics[i].tracks)
-			x.InsertData(final);		// // //
+			x.FlushData(final);		// // //
 
 		if (musics[i].minSize > 0 && i <= highestGlobalSong)
 			while (final.size() < musics[i].minSize)
@@ -1136,7 +1139,7 @@ void fixMusicPointers() {
 
 		//if (fileExists("temp.log"))
 		if (!asarCompileToBIN("asm/tempmain.asm", "asm/SNES/bin/main.bin"))
-			printError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n", true);
+			fatalError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n");		// // //
 	}
 
 	std::vector<uint8_t> temp = openFile("asm/SNES/bin/main.bin");		// // //
@@ -1423,9 +1426,8 @@ void assembleSNESDriver2() {
 			musicBinPath << "asm/SNES/bin/music" << hex2 << i << ".bin";
 			unsigned requestSize = fs::file_size(musicBinPath.str());		// // //
 			int freeSpace = findFreeSpace(requestSize, bankStart, rom);
-			if (freeSpace == -1) {
-				printError("Error: Your ROM is out of free space.", true);
-			}
+			if (freeSpace == -1)
+				fatalError("Error: Your ROM is out of free space.");
 
 			freeSpace = PCToSNES(freeSpace);
 			musicPtrStr << "music" << hex2 << i << "+8";
@@ -1461,9 +1463,8 @@ void assembleSNESDriver2() {
 
 			unsigned requestSize = fs::file_size(filename.str());		// // //
 			int freeSpace = findFreeSpace(requestSize, bankStart, rom);
-			if (freeSpace == -1) {
-				printError("Error: Your ROM is out of free space.", true);
-			}
+			if (freeSpace == -1)
+				fatalError("Error: Your ROM is out of free space.");
 
 			freeSpace = PCToSNES(freeSpace);
 			samplePtrStr << "brr" << hex2 << i << "+8";
@@ -1520,15 +1521,15 @@ void assembleSNESDriver2() {
 		//execute("asar asm/SNES/temppatch.asm asm/SNES/temp.sfc 2> temp.log");
 		//if (fileExists("temp.log"))
 		if (!asarPatchToROM("asm/SNES/temppatch.asm", "asm/SNES/temp.sfc"))
-			printError("asar reported an error.  Refer to temp.log for details.", true);
+			fatalError("asar reported an error.  Refer to temp.log for details.");		// // //
 
 		//execute("asar asm/SNES/tweaks.asm asm/SNES/temp.sfc 2> temp.log");
 		//if (fileExists("temp.log"))
-		//	printError("asar reported an error.  Refer to temp.log for details.", true);
+		//	fatalError("asar reported an error.  Refer to temp.log for details.");
 
 		//execute("asar asm/SNES/NMIFix.asm asm/SNES/temp.sfc 2> temp.log");
 		//if (fileExists("temp.log"))
-		//	printError("asar reported an error.  Refer to temp.log for details.", true);
+		//	fatalError("asar reported an error.  Refer to temp.log for details.");
 
 		std::vector<uint8_t> final;		// // //
 		final = romHeader;
@@ -1616,7 +1617,8 @@ void tryToCleanSampleToolData() {
 void tryToCleanAM4Data() {
 	if ((rom.size() % 0x8000 != 0 && rom[0x1940] == 0x22) || (rom.size() % 0x8000 == 0 && rom[0x1740] == 0x22)) {
 		if (rom.size() % 0x8000 == 0)
-			printError("Addmusic 4.05 ROMs can only be cleaned if they have a header. This does not\napply to any other aspect of the program.", true);
+			fatalError("Addmusic 4.05 ROMs can only be cleaned if they have a header. This does not\n"
+					   "apply to any other aspect of the program.");		// // //
 
 		char **am405argv;
 		std::string ROMstr = ROMName.string();		// // //
@@ -1637,16 +1639,15 @@ void tryToCleanAM4Data() {
 }
 
 void tryToCleanAMMData() {
-	if ((rom.size() % 0x8000 != 0 && rom[0x078200] == 0x53) || (rom.size() % 0x8000 == 0 && rom[0x078000] == 0x53))		// Since RATS tags only need to be in banks 0x10+, a tag here signals AMM usage.
-	{
+	if ((rom.size() % 0x8000 != 0 && rom[0x078200] == 0x53) || (rom.size() % 0x8000 == 0 && rom[0x078000] == 0x53)) {		// Since RATS tags only need to be in banks 0x10+, a tag here signals AMM usage.
 		if (rom.size() % 0x8000 == 0)
-			printError("AddmusicM ROMs can only be cleaned if they have a header. This does not\n"
-					   "apply to any other aspect of the program.", true);
+			fatalError("AddmusicM ROMs can only be cleaned if they have a header. This does not\n"
+					   "apply to any other aspect of the program.");		// // //
 
 		if (!fs::exists("INIT.asm"))		// // //
-			printError("AddmusicM was detected.  In order to remove it from this ROM, you must put\n"
+			fatalError("AddmusicM was detected.  In order to remove it from this ROM, you must put\n"
 					   "AddmusicM's INIT.asm as well as xkasAnti and a clean ROM (named clean.smc) in\n"
-					   "the same folder as this program. Then attempt to run this program once more.", true);
+					   "the same folder as this program. Then attempt to run this program once more.");
 
 		std::cout << "AddmusicM detected.  Attempting to remove..." << std::endl;
 		execute("perl addmusicMRemover.pl " + ROMName.string());		// // //

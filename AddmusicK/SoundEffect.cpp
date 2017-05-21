@@ -18,12 +18,12 @@ static bool inDefineBlock;
 	}
 
 #define error(str) if (false); else { \
-		printError(str, false, name, line); \
+		printError(str, name, line); \
 		continue; \
 	}
 
 #define error2(str) do { \
-		printError(str, false, name, line); \
+		printError(str, name, line); \
 		return; \
 	} while (false)
 
@@ -101,7 +101,7 @@ int SoundEffect::getNoteLength(int i)
 	{
 		pos++;
 		i = getInt();
-		if (i == -1) printError("Error parsing note length.", false, name, line);
+		if (i == -1) printError("Error parsing note length.", name, line);		// // //
 		return i;
 	}
 
@@ -207,8 +207,8 @@ void SoundEffect::compile()
 		case 'l':
 			pos++;
 			i = getInt();
-			if (i == -1) { printError("Error parsing 'l' directive.", false, name, line); continue; }
-			if (i > 192) { printError("Illegal value for 'l' directive.", false, name, line); continue; }
+			if (i == -1) { printError("Error parsing 'l' directive.", name, line); continue; }		// // //
+			if (i > 192) { printError("Illegal value for 'l' directive.", name, line); continue; }
 			defaultNoteValue = i;
 			break;
 
