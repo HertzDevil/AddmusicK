@@ -25,6 +25,11 @@
 #define DIR_ERROR(name) "Error parsing " name " directive."
 #define DIR_ILLEGAL(name) "Illegal value for " name " directive."
 
+template <typename T, typename U, typename V>
+decltype(auto) apply_this(T &&fn, U pObj, V &&tup) {
+	return std::apply(std::forward<T>(fn), std::tuple_cat(std::make_tuple(pObj), std::forward<V>(tup)));
+}
+
 template <typename T, typename U>
 T requires(T x, T min, T max, U&& err) {
 	return (x >= min && x <= max) ? x :
@@ -288,16 +293,8 @@ void Music::compile() {
 	while (hasNextToken()) {		// // //
 		char ch = ::tolower((*mml_.Trim("."))[0]);		// // //
 
-		if (hexLeft != 0 && ch != '$') {
-			if (songTargetProgram == TargetType::AM4 && currentHex == AMKd::Binary::CmdType::Subloop) {		// // //
-				// tremolo off
-				tracks[channel].data.pop_back();
-				append(AMKd::Binary::CmdType::Tremolo, 0x00, 0x00, 0x00);
-				hexLeft = 0;
-			}
-			else
-				error("Unknown hex command.");
-		}
+		if (hexLeft != 0 && ch != '$')
+			error("Unknown hex command.");
 
 		try {
 			switch (ch) {
@@ -525,11 +522,10 @@ void Music::parseTransposeDirective() {
 		std::tie(inst, trsp) = *param;
 		while (true) {
 			transposeMap[requires(inst++, 0u, 0xFFu, DIR_ILLEGAL("tuning"))] = trsp;
-			if (auto ext = GetParameters<Comma, SInt>(mml_)) {
-				std::tie(trsp) = *ext;
-				continue;
-			}
-			return;
+			auto ext = GetParameters<Comma, SInt>(mml_);
+			if (!ext)
+				return;
+			std::tie(trsp) = *ext;
 		}
 	}
 
@@ -587,7 +583,7 @@ void Music::parseInstrumentCommand() {
 
 void Music::parseOpenParenCommand() {
 	int sampID;
-	using namespace AMKd::MML::Lexer;
+	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Sep<'@'>, Int>(mml_))
 		sampID = instrToSample[requires(param.get<0>(), 0u, 29u, "Illegal instrument number for sample load command.")];
 	else if (auto param = GetParameters<Sep<'\"'>, QString>(mml_)) {
@@ -602,13 +598,8 @@ void Music::parseOpenParenCommand() {
 		return;
 	}
 
-	if (auto ext = GetParameters<Comma, Byte, Sep<')'>>(mml_)) {
-		if (optimizeSampleUsage)
-			usedSamples[sampID] = true;
-		append(AMKd::Binary::CmdType::SampleLoad, sampID, ext.get<0>());		// // //
-		return;
-	}
-
+	if (auto ext = GetParameters<Comma, Byte, Sep<')'>>(mml_))
+		return doSampleLoad(sampID, ext.get<0>());
 	error("Error parsing sample load command.");
 }
 
@@ -731,15 +722,9 @@ void Music::parseLoopCommand() {
 		if (trimChar('['))		// // //
 			fatalError("An ambiguous use of the [ and [[ loop delimiters was found (\"[[[\").  Separate\n"
 					   "the \"[[\" and \"[\" to clarify your intention.");
-		if (inE6Loop)
-			error("You cannot nest a subloop within another subloop.");
 		if (loopLabel > 0 && tracks[channel].isDefiningLabelLoop)		// // //
 			error("A label loop cannot define a subloop.  Use a standard or remote loop instead.");
-
-		handleSuperLoopEnter();
-
-		append(AMKd::Binary::CmdType::Subloop, 0x00);		// // //
-		return;
+		return doSubloopEnter();
 	}
 	else if (inNormalLoop)		// // //
 		error("You cannot nest standard [ ] loops.");
@@ -781,14 +766,7 @@ void Music::parseLoopEndCommand() {
 			//if (i == 0)
 			//	error("A subloop cannot loop 0 times.")
 
-		if (!inE6Loop)
-			error("A subloop end was found outside of a subloop.");		// // //
-		inE6Loop = false;
-
-		handleSuperLoopExit(i);
-
-		append(AMKd::Binary::CmdType::Subloop, i - 1);		// // //
-		return;
+		return doSubloopExit(i);
 	}
 	else if (!inNormalLoop)		// // //
 		error("Loop end found outside of a loop.");
@@ -848,7 +826,9 @@ void Music::parseVibratoCommand() {
 			delay = 0;
 			std::tie(rate, depth) = *param;
 		}
-		return doVibrato(delay, rate, depth);		// // //
+		return doVibrato(requires(delay, 0x00u, 0xFFu, "Illegal value for vibrato delay."),
+						 requires(rate, 0x00u, 0xFFu, "Illegal value for vibrato rate."),
+						 requires(depth, 0x00u, 0xFFu, "Illegal value for vibrato extent."));		// // //
 	}
 
 	error(CMD_ERROR("vibrato", "p"));		// // //
@@ -887,7 +867,6 @@ void Music::parseHFDInstrumentHack(int addr, int bytes) {
 		if (!getHexByte(i))		// // //
 			error("Unknown HFD hex command.");
 		instrumentData.push_back(i);
-		bytes--;
 		byteNum++;
 		addr++;
 		if (byteNum == 1) {
@@ -898,6 +877,7 @@ void Music::parseHFDInstrumentHack(int addr, int bytes) {
 			instrumentData.push_back(0);	// On the 5th byte, we need to add a 0 as the new sub-multiplier.
 			byteNum = 0;
 		}
+		bytes--;
 	} while (bytes >= 0);
 }
 
@@ -957,7 +937,8 @@ void Music::parseHFDHex() {
 	}
 
 	currentHex = AMKd::Binary::CmdType::Envelope;
-	hexLeft = hexLengths[currentHex - AMKd::Binary::CmdType::Inst] - 1 - 1;
+//	hexLeft = hexLengths[currentHex - AMKd::Binary::CmdType::Inst] - 1 - 1;
+	hexLeft = 1;
 	append(AMKd::Binary::CmdType::Envelope, i);		// // //
 }
 
@@ -973,8 +954,6 @@ void Music::removeRemoteConversion() {
 	tracks[channel].remoteGainInfo.pop_back();		// // //
 }
 
-//static bool validateTremolo;
-
 static bool nextNoteIsForDD;
 
 void Music::parseHexCommand() {
@@ -988,38 +967,54 @@ void Music::parseHexCommand() {
 	}
 
 	if (hexLeft == 0) {
-		//validateTremolo = true;
 		currentHex = i;
 
 		using namespace AMKd::MML::Lexer;		// // //
 		switch (currentHex) {		// // //
 		case AMKd::Binary::CmdType::Vibrato:
-			if (auto param = GetParameters<Byte, Byte, Byte>(mml_)) {
-				unsigned delay, rate, depth;
-				std::tie(delay, rate, depth) = *param;
-				return doVibrato(delay, rate, depth);		// // //
-			}
+			if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
+				return apply_this(&Music::doVibrato, this, *param);
 			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Tempo:
-			if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
-				return doTempo(param.get<0>());
+			if (auto param = GetParameters<Byte>(mml_))
+				return apply_this(&Music::doTempo, this, *param);
 			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::TempoFade:
 			guessLength = false; // NOPE.  Nope nope nope nope nope nope nope nope nope nope.
 			break;
 		case AMKd::Binary::CmdType::Tremolo:
-			if (songTargetProgram == TargetType::AM4) {
-				// Don't append yet.  We need to look at the next byte to determine whether to use 0xF3 or 0xE5.
-				hexLeft = 3;
-				return;
+			if (auto first = GetParameters<Byte>(mml_)) {		// // //
+				if (songTargetProgram == TargetType::AM4 && first.get<0>() >= 0x80) {
+					if (mySamples.empty() && (i & 0x7F) > 0x13)
+						error("This song uses custom samples, but has not yet defined its samples with the #samples command.");		// // //
+					auto param = GetParameters<Byte>(mml_);
+					return doSampleLoad(i - 0x80, param.get<0>());
+				}
+				if (auto remain = GetParameters<Byte, Byte>(mml_)) {
+					unsigned rate, depth;
+					std::tie(rate, depth) = *remain;
+					return doTremolo(first.get<0>(), rate, depth);
+				}
 			}
-			break;
+			error("Unknown hex command.");
+		case AMKd::Binary::CmdType::Subloop:
+			if (songTargetProgram == TargetType::AM4)		// // // N-SPC tremolo off
+				return doTremoloOff();		// // //
+			if (auto param = GetParameters<Byte>(mml_)) {
+				int repeats = param.get<0>();
+				return repeats ? doSubloopExit(repeats + 1) : doSubloopEnter();
+			}
+			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Envelope:
 			if (songTargetProgram == TargetType::AM4) {
 				parseHFDHex();
 				return;
 			}
 			break;
+		case AMKd::Binary::CmdType::SampleLoad:
+			if (auto param = GetParameters<Byte, Byte>(mml_))
+				return apply_this(&Music::doSampleLoad, this, *param);
+			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Arpeggio:
 		{
 			int j;
@@ -1125,28 +1120,22 @@ void Music::parseHexCommand() {
 			if (hexLeft == 2)
 				i = divideByTempoRatio(i, false);
 			else if (hexLeft == 1) {		// Hack allowing the $DD command to accept a note as a parameter.
-				AMKd::MML::SourceFile backUpText {mml_};		// // //
-				bool finished = false;
-				while (!finished) {
-					skipSpaces();
-					switch (peek()) {
-					case 'o':
-						getInt(); break;
-					case 'c': case 'd': case 'e': case 'f': case 'g': case 'a': case 'b':
-					case 'C': case 'D': case 'E': case 'F': case 'G': case 'A': case 'B':
+				AMKd::MML::SourceFile checkNote {mml_};		// // //
+				while (true) {
+					checkNote.SkipSpaces();
+					if (checkNote.Trim("[A-Ga-g]")) {
 						if (tracks[channel].updateQ)		// // //
 							error("You cannot use a note as the last parameter of the $DD command if you've also\n"
-							      "used the qXX command just before it.");		// // //
+								  "used the qXX command just before it.");		// // //
 						hexLeft = 0;
 						nextNoteIsForDD = true;
-						finished = true; break;
-					case '<': case '>':
-						skipChars(1); break;
-					default:
-						finished = true; break;
+						break;
 					}
+					else if (checkNote.Trim('o'))
+						AMKd::MML::Lexer::GetParameters<AMKd::MML::Lexer::Int>(checkNote);
+					else if (!checkNote.Trim('<') && !checkNote.Trim('>'))
+						break;
 				}
-				mml_ = backUpText;		// // //
 				i = divideByTempoRatio(i, false);
 			}
 			break;
@@ -1162,46 +1151,6 @@ void Music::parseHexCommand() {
 			if (hexLeft == 0 && songTargetProgram == TargetType::AM4) {	// // // AM4 seems to do something strange with $E4?
 				++i;
 				i &= 0xFF;
-			}
-			break;
-		case AMKd::Binary::CmdType::Tremolo:
-			// If we're on the last hex value for $E5 and this isn't an AMK song, then do some special stuff regarding tremolo.
-			// AMK doesn't use $E5 for the tremolo command or sample loading, so it has to emulate them.
-			if (hexLeft == 2) {		// // //
-				if (songTargetProgram == TargetType::AM4/*validateTremolo*/) {
-					//validateTremolo = false;
-					if (i >= 0x80) {
-						--hexLeft;
-						if (mySamples.empty() && (i & 0x7F) > 0x13)
-							error("This song uses custom samples, but has not yet defined its samples with the #samples command.");		// // //
-
-						if (optimizeSampleUsage)
-							usedSamples[i - 0x80] = true;
-						append(AMKd::Binary::CmdType::SampleLoad, i - 0x80);		// // //
-						return;
-					}
-					else
-						append(AMKd::Binary::CmdType::Tremolo);
-				}
-				i = divideByTempoRatio(i, false);
-			}
-			else if (hexLeft == 1)
-				i = multiplyByTempoRatio(i);
-			break;
-		case AMKd::Binary::CmdType::Subloop:
-			if (hexLeft == 0) {
-				if (i == 0) {
-					if (inE6Loop)
-						error("Cannot nest $E6 loops within other $E6 loops.");
-					inE6Loop = true;
-					handleSuperLoopEnter();
-				}
-				else {
-					if (!inE6Loop)
-						error("An E6 loop starting point has not yet been declared.");
-					inE6Loop = false;
-					handleSuperLoopExit(i + 1);
-				}
 			}
 			break;
 		case AMKd::Binary::CmdType::VolFade:
@@ -1237,11 +1186,6 @@ void Music::parseHexCommand() {
 		case AMKd::Binary::CmdType::EchoFade:
 			if (hexLeft == 2)
 				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::SampleLoad:
-			if (hexLeft == 1)
-				if (optimizeSampleUsage)
-					usedSamples[i] = true;
 			break;
 		case AMKd::Binary::CmdType::ExtF4:
 			if (hexLeft == 0)
@@ -1429,7 +1373,7 @@ void Music::parseNote(int ch) {		// // //
 	skipSpaces();
 
 	while (true) {
-		AMKd::MML::SourceFile temptext(mml_);		// // //
+		AMKd::MML::SourceFile temptext {mml_};		// // //
 		if (!trimChar('^') && !(i == AMKd::Binary::CmdType::Rest && trimChar('r')))
 			break;
 
@@ -2334,9 +2278,12 @@ void Music::handleNormalLoopEnter() {
 	}
 }
 
-void Music::handleSuperLoopEnter() {
+void Music::doSubloopEnter() {
+	if (inE6Loop)		// // //
+		error("You cannot nest a subloop within another subloop.");
 	superLoopLength = 0;
 	inE6Loop = true;
+
 	if (inNormalLoop) {		// // // We're entering a super loop that's nested in a normal loop
 		baseLoopIsNormal = true;
 		baseLoopIsSuper = false;
@@ -2349,6 +2296,8 @@ void Music::handleSuperLoopEnter() {
 		extraLoopIsNormal = false;
 		extraLoopIsSuper = false;
 	}
+
+	append(AMKd::Binary::CmdType::Subloop, 0x00);		// // //
 }
 
 void Music::handleNormalLoopExit(int loopCount) {
@@ -2367,8 +2316,11 @@ void Music::handleNormalLoopExit(int loopCount) {
 		loopLengths[loopLabel] = normalLoopLength;
 }
 
-void Music::handleSuperLoopExit(int loopCount) {
+void Music::doSubloopExit(int loopCount) {
+	if (!inE6Loop)		// // //
+		error("A subloop end was found outside of a subloop.");
 	inE6Loop = false;
+
 	if (extraLoopIsSuper) {				// We're leaving a super loop that's nested in a normal loop.
 		extraLoopIsNormal = false;
 		extraLoopIsSuper = false;
@@ -2379,6 +2331,8 @@ void Music::handleSuperLoopExit(int loopCount) {
 		baseLoopIsSuper = false;
 		tracks[channel].channelLength += superLoopLength * loopCount;		// // //
 	}
+
+	append(AMKd::Binary::CmdType::Subloop, loopCount - 1);		// // //
 }
 
 void Music::handleNormalLoopRemoteCall(int loopCount) {
@@ -2432,9 +2386,16 @@ const std::string &Music::getFileName() const {
 // // //
 void Music::doVibrato(int delay, int rate, int depth) {
 	append(AMKd::Binary::CmdType::Vibrato,
-		divideByTempoRatio(requires(delay, 0x00, 0xFF, "Illegal value for vibrato delay."), false),
-		multiplyByTempoRatio(requires(rate, 0x00, 0xFF, "Illegal value for vibrato rate.")),
-		requires(depth, 0x00, 0xFF, "Illegal value for vibrato extent."));		// // //
+		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);		// // //
+}
+
+void Music::doTremolo(int delay, int rate, int depth) {
+	append(AMKd::Binary::CmdType::Tremolo,
+		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);		// // //
+}
+
+void Music::doTremoloOff() {
+	append(AMKd::Binary::CmdType::Tremolo, 0x00, 0x00, 0x00);
 }
 
 void Music::doTempo(int speed) {
@@ -2446,6 +2407,12 @@ void Music::doTempo(int speed) {
 		guessLength = false;
 	else
 		tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
+}
+
+void Music::doSampleLoad(int index, int mult) {
+	if (optimizeSampleUsage)
+		usedSamples[index] = true;
+	append(AMKd::Binary::CmdType::SampleLoad, index, mult);		// // //
 }
 
 

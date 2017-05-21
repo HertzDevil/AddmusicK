@@ -185,7 +185,12 @@ private:
 
 	// // // action methods, these will become objects later
 	void doVibrato(int delay, int rate, int depth);
+	void doTremolo(int delay, int rate, int depth);
+	void doTremoloOff();
 	void doTempo(int speed);
+	void doSampleLoad(int index, int mult);
+	void doSubloopEnter();		// // // Call any time a definition of a super loop is entered.
+	void doSubloopExit(int loopCount);		// // // Call any time a definition of a super loop is exited.
 
 	template <typename... Args>		// // //
 	void append(Args&&... value);
@@ -230,10 +235,8 @@ private:
 	bool extraLoopIsSuper;
 
 	void handleNormalLoopEnter();					// Call any time a definition of a loop is entered.
-	void handleSuperLoopEnter();					// Call any time a definition of a super loop is entered.
 	void handleNormalLoopRemoteCall(int loopCount);			// Call any time a normal loop is called remotely.
 	void handleNormalLoopExit(int loopCount);			// Call any time a definition of a loop is exited.
-	void handleSuperLoopExit(int loopCount);			// Call any time a definition of a super loop is exited.
 
 	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
 };
