@@ -28,17 +28,11 @@ const int PARSER_VERSION = 2;			// Used to keep track of incompatible changes to
 const int DATA_VERSION = 0;				// Used to keep track of incompatible changes to any and all compiled data, either to the SNES or to the PC
 
 // // //
-//class ROM;
-class Music;
 class SoundEffect;
-struct Sample;
-struct SampleGroup;
 
 //#include "ROM.h"
 #include "Music.h"
 #include "Sample.h"
-#include "SoundEffect.h"
-#include "SampleGroup.h"
 #include "BankDefine.h"
 #include <string>
 #include <vector>
@@ -46,7 +40,6 @@ struct SampleGroup;
 #include <map>
 #include <cstdint>		// // //
 #include <iomanip>		// // //
-#include "asardll.h"
 
 #include "Utility/fs.h"		// // //
 

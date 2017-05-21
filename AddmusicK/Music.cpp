@@ -4,8 +4,6 @@
 
 #include <iostream>
 #include <iomanip>
-#include <cstring>
-#include <cmath>
 #include <sstream>
 #include <algorithm>
 #include <locale>		// // //
@@ -364,19 +362,19 @@ void Music::parseComment() {
 }
 
 void Music::printChannelDataNonVerbose(int totalSize) {
-	int n = 60 - printf("%s: ", name.c_str());
-	for (int i = 0; i < n; i++)
-		putchar('.');
-	putchar(' ');
+	std::cout << name << ": ";		// // //
+	for (int i = 0, n = 58 - name.size(); i < n; ++i)
+		std::cout.put('.');
+	std::cout.put(' ');
 
 	if (knowsLength) {
-		int s = (unsigned int)std::floor((mainLength + introLength) / (2.0 * tempo) + 0.5);
-		printf("%d:%02d, 0x%04X bytes\n",
-			(int)(std::floor((introSeconds + mainSeconds) / 60) + 0.5),
-			(int)(std::floor(introSeconds + mainSeconds) + 0.5) % 60, totalSize);
+		// int s = (unsigned int)std::floor((mainLength + introLength) / (2.0 * tempo) + 0.5);
+		auto seconds = static_cast<int>(std::floor((introSeconds + mainSeconds + 0.5) / 60));		// // //
+		std::cout << seconds / 60 << ':' << std::setfill('0') << std::setw(2) << seconds % 60;
 	}
 	else
-		printf("?:??, 0x%04X bytes\n", totalSize);
+		std::cout << "?:??";
+	std::cout << ", 0x" << hex4 << totalSize << std::dec << " bytes\n";
 }
 
 void Music::parseQMarkDirective() {
@@ -1230,9 +1228,9 @@ void Music::parseHexCommand() {
 			// B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
 			else if (hexLeft == 0 && songTargetProgram == TargetType::AM4) {		// // //
 				if (i > 1) {
-					char buffer[4];		// // //
-					sprintf_s(buffer, "$%02X", i);
-					error(buffer + (std::string)" is not a valid FIR filter for the $F1 command. Must be either $00 or $01.");		// // //
+					std::stringstream ss;		// // //
+					ss << '$' << hex2 << i;
+					error(ss.str() + " is not a valid FIR filter for the $F1 command. Must be either $00 or $01.");
 				}
 			}
 			break;
@@ -2080,13 +2078,16 @@ void Music::pointersFirstPass() {
 	//for (int z = 0; z <= CHANNELS; z++)
 	//{
 	if (verbose) {
-		// // //
-		printf("\t#0: 0x%03X #1: 0x%03X #2: 0x%03X #3: 0x%03X Ptrs+Instrs: 0x%03X\n"
-			   "\t#4: 0x%03X #5: 0x%03X #6: 0x%03X #7: 0x%03X Loop:        0x%03X\n"
-			   "Space used by echo: 0x%04X bytes.  Space used by samples: 0x%04X bytes.\n\n",
-			   tracks[0].data.size(), tracks[1].data.size(), tracks[2].data.size(), tracks[3].data.size(), spaceForPointersAndInstrs,
-			   tracks[4].data.size(), tracks[5].data.size(), tracks[6].data.size(), tracks[7].data.size(), tracks[CHANNELS].data.size(),
-			   echoBufferSize << 11, spaceUsedBySamples);
+		const hex_formatter hex3 {3};
+		std::cout << '\t';		// // //
+		for (int i = 0; i < CHANNELS / 2; ++i)
+			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].data.size() << ' ';
+		std::cout << "Ptrs+Instrs: 0x" << hex3 << spaceForPointersAndInstrs << "\n\t";
+		for (int i = CHANNELS / 2; i < CHANNELS; ++i)
+			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].data.size() << ' ';
+		std::cout << "Loop:        0x" << hex3 << tracks[CHANNELS].data.size();
+		std::cout << "\nSpace used by echo: 0x" << hex4 << (echoBufferSize << 11) <<
+			" bytes.  Space used by samples: 0x" << hex4 << spaceUsedBySamples << " bytes.\n\n";
 	}
 	//}
 	if (totalSize > minSize && minSize > 0) {

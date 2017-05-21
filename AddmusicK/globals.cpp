@@ -1,10 +1,10 @@
 #include "globals.h"		// // //
 #include <sstream>
 #include <iostream>
-#include <cstdlib>
-#include <cstring>
 #include <map>
 #include <stack>
+#include "asardll.h"		// // //
+#include "SoundEffect.h"		// // //
 
 //ROM rom;
 std::vector<uint8_t> rom;		// // //
@@ -112,7 +112,7 @@ void printError(const std::string &error, const std::string &fileName, int line)
 
 void printWarning(const std::string &error, const std::string &fileName, int line) {
 	if (line >= 0)		// // //
-		std::cerr << std::dec << "File: " << fileName << " Line: " << line << ":\n";
+		std::cerr << "File: " << fileName << " Line: " << std::dec << line << ":\n";
 	std::cerr << error << '\n';
 }
 
@@ -157,10 +157,8 @@ int scanInt(const std::string &str, const std::string &value) {		// Scans an int
 // // //
 
 void removeFile(const fs::path &fileName) {
-	if (fs::exists(fileName) && !fs::remove(fileName)) {		// // //
-		std::cerr << "Could not delete critical file \"" << fileName << "\"." << std::endl;
-		quit(1);
-	}
+	if (fs::exists(fileName) && !fs::remove(fileName))		// // //
+		fatalError("Could not delete critical file \"" + fileName.string() + "\".");
 }
 
 void writeTextFile(const fs::path &fileName, const std::string &string) {
@@ -186,10 +184,8 @@ void writeTextFile(const fs::path &fileName, const std::string &string) {
 
 void insertValue(int value, int length, const std::string &find, std::string &str) {
 	int pos = str.find(find);
-	if (pos == -1) {		// // //
-		std::cerr << "Error: \"" << find << "\" could not be found." << std::endl;
-		quit(1);
-	}
+	if (pos == -1)		// // //
+		fatalError("Error: \"" + find + "\" could not be found.");
 	pos += find.length();
 
 	std::stringstream ss;
@@ -341,11 +337,9 @@ int PCToSNES(int addr) {
 }
 
 int clearRATS(int offset) {
-	int size = ((rom[offset + 5] << 8) | rom[offset + 4]) + 8;
-	int r = size;
-	while (size >= 0)
-		rom[offset + size--] = 0;
-	return r + 1;
+	size_t size = ((rom[offset + 5] << 8) | rom[offset + 4]) + 9;		// // //
+	std::fill(rom.begin() + offset, rom.begin() + offset + size, 0);
+	return size;
 }
 
 void addSample(const fs::path &fileName, Music *music, bool important) {
@@ -410,9 +404,10 @@ void addSampleGroup(const fs::path &groupName, Music *music) {
 			return;
 		}
 	}
-	std::cerr << music->name << ":\n";
-	std::cerr << "The specified sample group, \"" << groupName << "\", could not be found." << std::endl;
-	quit(1);
+	
+	std::stringstream ss;		// // //
+	ss << music->name << ":\nThe specified sample group, \"" << groupName << "\", could not be found.";
+	fatalError(ss.str());
 }
 
 int bankSampleCount = 0;			// Used to give unique names to sample bank brrs.
@@ -446,9 +441,9 @@ void addSampleBank(const fs::path &fileName, Music *music) {
 				break;
 		}
 
-		char temp[20];
-		sprintf(temp, "__SRCNBANKBRR%04X", bankSampleCount++);
-		tempSample.name = temp;
+		std::stringstream ss;		// // //
+		ss << "__SRCNBANKBRR" << hex4 << bankSampleCount++;
+		tempSample.name = ss.str();
 		addSample(tempSample.data, tempSample.name, music, true, true, tempSample.loopPoint);
 	}
 }
@@ -556,7 +551,7 @@ PreprocessStatus preprocess(const std::string &str, const std::string &filename)
 			std::string temp;
 			i++;
 
-			if (strncmp(str.c_str() + i, "amk=1", 5) == 0) {		// Special handling so that we can have #amk=1.
+			if (str.substr(i, 5) == "amk=1") {		// // // Special handling so that we can have #amk=1.
 				if (stat.version >= 0)		// // //
 					stat.version = 1;
 				i += 5;

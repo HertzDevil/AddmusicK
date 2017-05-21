@@ -1,6 +1,5 @@
 #include "SoundEffect.h"
 #include "globals.h"		// // //
-#include <cmath>
 #include <sstream>
 #include <iomanip>
 

@@ -6,10 +6,11 @@
 #include <iomanip>
 // // //
 #include "../AM405Remover/AM405Remover.h"
-#include "Utility/fs.h"		// // //
 #include <cstdint>
 #include "lodepng.h"
 #include <thread>
+#include "asardll.h"		// // //
+#include "SoundEffect.h"		// // //
 
 
 bool waitAtEnd = true;
@@ -131,19 +132,19 @@ int main(int argc, char* argv[]) {
 				textFilesToCompile.push_back(arg);
 		else {
 			if (arg != "-?")
-				printf("Unknown argument \"%s\".", arg.c_str());
+				std::cout << "Unknown argument \"%s\"." << arg << "\n\n";
 
-			puts("Options:\n"		// // //
-				 "\t-e: Turn off echo buffer checking.\n"
-				 "\t-c: Force off conversion from Addmusic 4.05 and AddmusicM\n"
-				 "\t-b: Do not attempt to save music data in bank 0x40 and above.\n"
-				 "\t-v: Turn verbosity on.  More information will be displayed using this.\n"
-				 "\t-a: Make free space finding more aggressive.\n"
-				 "\t-d: Turn off duplicate sample checking.\n"
-				 "\t-h: Turn off hex command validation.\n"
-				 "\t-p: Create a patch, but do not patch it to the ROM.\n"
-				 "\t-norom: Only generate SPC files, no ROM required.\n"
-				 "\t-?: Display this message.\n\n");
+			std::cout << "Options:\n"		// // //
+						 "\t-e: Turn off echo buffer checking.\n"
+						 "\t-c: Force off conversion from Addmusic 4.05 and AddmusicM\n"
+						 "\t-b: Do not attempt to save music data in bank 0x40 and above.\n"
+						 "\t-v: Turn verbosity on.  More information will be displayed using this.\n"
+						 "\t-a: Make free space finding more aggressive.\n"
+						 "\t-d: Turn off duplicate sample checking.\n"
+						 "\t-h: Turn off hex command validation.\n"
+						 "\t-p: Create a patch, but do not patch it to the ROM.\n"
+						 "\t-norom: Only generate SPC files, no ROM required.\n"
+						 "\t-?: Display this message.\n\n";
 
 			if (arg != "-?")
 				quit(1);
@@ -152,7 +153,7 @@ int main(int argc, char* argv[]) {
 
 	if (justSPCsPlease == false) {
 		if (ROMName.empty()) {		// // //
-			printf("Enter your ROM name: ");
+			std::cout << "Enter your ROM name: ";		// // //
 			std::string temp;
 			std::getline(std::cin, temp);
 			ROMName = temp;
@@ -396,7 +397,7 @@ void assembleSPCDriver() {
 
 	fs::remove("temp.log");
 
-	programSize = fs::file_size("asm/main.bin");		// // //
+	programSize = static_cast<unsigned>(fs::file_size("asm/main.bin"));		// // //
 }
 
 void loadMusicList() {
@@ -480,7 +481,7 @@ void loadMusicList() {
 	}
 
 	if (verbose)
-		printf("Read in all %d songs.\n", shallowSongCount);
+		std::cout << "Read in all " << shallowSongCount << " songs.\n";		// // //
 
 	for (int i = 255; i >= 0; i--) {
 		if (musics[i].exists) {
@@ -724,7 +725,7 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 	}
 
 	if (verbose)
-		printf("Read in all %d sound effects.\n", SFXCount);
+		std::cout << "Read in all " << SFXCount << " sound effects.\n";		// // //
 }
 
 void compileSFX() {
@@ -870,7 +871,7 @@ void compileGlobalData() {
 	if (!asarCompileToBIN("asm/tempmain.asm", "asm/main.bin"))
 		fatalError("asar reported an error while assembling asm/main.asm. Refer to temp.log for\ndetails.\n");		// // //
 
-	programSize = fs::file_size("asm/main.bin");		// // //
+	programSize = static_cast<unsigned>(fs::file_size("asm/main.bin"));		// // //
 
 	std::cout << "Total size of main program + all sound effects: 0x" << hex4 << programSize << std::dec << std::endl;
 }
@@ -1115,9 +1116,10 @@ void fixMusicPointers() {
 				}
 
 				if (checkPos > 0x10000) {
-					// // //
-					std::cerr << musics[i].getFileName() << ": Echo buffer exceeded total space in ARAM by 0x" << hex4 << checkPos - 0x10000 << " bytes." << std::dec << std::endl;
-					quit(1);
+					std::stringstream ss;		// // //
+					ss << musics[i].getFileName() << ":\nEcho buffer exceeded total space in ARAM by 0x" <<
+						hex4 << checkPos - 0x10000 << " bytes.";
+					fatalError(ss.str());
 				}
 			}
 		}
@@ -1143,7 +1145,7 @@ void fixMusicPointers() {
 	}
 
 	std::vector<uint8_t> temp = openFile("asm/SNES/bin/main.bin");		// // //
-	programSize = fs::file_size("asm/SNES/bin/main.bin");		// // //
+	programSize = static_cast<unsigned>(fs::file_size("asm/SNES/bin/main.bin"));		// // //
 	std::vector<uint8_t> temp2;
 	temp2.resize(temp.size() + 4);
 	temp2[0] = programSize & 0xFF;
@@ -1401,13 +1403,9 @@ void assembleSNESDriver2() {
 	insertValue(mainLoopPos, 4, "!DefARAMRet = ", patch);
 	insertValue(songCount, 2, "!SongCount = ", patch);
 
-	int pos;
-
-	pos = patch.find("MusicPtrs:");
-	if (pos == -1) {
-		std::cout << "Error: \"MusicPtrs:"" could not be found." << std::endl;
-		quit(1);
-	}
+	int pos = patch.find("MusicPtrs:");		// // //
+	if (pos == -1)
+		fatalError("Error: \"MusicPtrs:"" could not be found.");
 
 	patch = patch.substr(0, pos) + openTextFile("asm/SNES/patch2.asm");		// // //
 
@@ -1424,7 +1422,7 @@ void assembleSNESDriver2() {
 		if (musics[i].exists == true && i > highestGlobalSong) {
 			std::stringstream musicBinPath;
 			musicBinPath << "asm/SNES/bin/music" << hex2 << i << ".bin";
-			unsigned requestSize = fs::file_size(musicBinPath.str());		// // //
+			unsigned requestSize = static_cast<unsigned>(fs::file_size(musicBinPath.str()));		// // //
 			int freeSpace = findFreeSpace(requestSize, bankStart, rom);
 			if (freeSpace == -1)
 				fatalError("Error: Your ROM is out of free space.");
@@ -1461,7 +1459,7 @@ void assembleSNESDriver2() {
 			filename << "asm/SNES/bin/brr" << hex2 << i << ".bin";
 			writeFile(filename.str(), temp);
 
-			unsigned requestSize = fs::file_size(filename.str());		// // //
+			unsigned requestSize = static_cast<unsigned>(fs::file_size(filename.str()));		// // //
 			int freeSpace = findFreeSpace(requestSize, bankStart, rom);
 			if (freeSpace == -1)
 				fatalError("Error: Your ROM is out of free space.");
@@ -1554,8 +1552,6 @@ void generateMSC() {
 		if (musics[i].exists) {
 			text << hex2 << i << "\t" << 0 << "\t" << musics[i].title << "\n";
 			text << hex2 << i << "\t" << 1 << "\t" << musics[i].title << "\n";
-			//fprintf(fout, "%2X\t0\t%s\n", i, musics[i].title.c_str());
-			//fprintf(fout, "%2X\t1\t%s\n", i, musics[i].title.c_str());
 		}
 	}
 	writeTextFile(mscname, text.str());
@@ -1578,29 +1574,21 @@ void cleanUpTempFiles() {
 }
 
 void tryToCleanSampleToolData() {
-	unsigned int i;
-	bool found = false;
-
-	for (i = 0; i < rom.size() - 50; i++) {
-		if (strncmp((char *)rom.data() + i, "New Super Mario World Sample Utility 2.0 by smkdan", 50) == 0) {
-			found = true;
-			break;
-		}
-	}
-
-	if (found == false) return;
+	const char HEADER_STR[] = "New Super Mario World Sample Utility 2.0 by smkdan";		// // //
+	auto it = std::search(rom.cbegin(), rom.cend(), std::cbegin(HEADER_STR), std::cend(HEADER_STR));
+	if (it == rom.cend())
+		return;
 
 	std::cout << "Sample Tool detected.  Erasing data..." << std::endl;
 
+	unsigned int i = std::distance(rom.cbegin(), it);
 	int hackPos = i - 8;
 
 	i += 0x36;
 
 	int sizeOfErasedData = 0;
 
-	bool removed[0x100];
-	for (int j = 0; j < 0x100; j++) removed[j] = false;
-
+	bool removed[0x100] = { };		// // //
 	for (int j = 0; j < 0x207; j++) {
 		if (removed[rom[j + i]]) continue;
 		sizeOfErasedData += clearRATS(SNESToPC(rom[j + i] * 0x10000 + 0x8000));
