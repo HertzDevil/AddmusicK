@@ -288,9 +288,24 @@ void Music::init() {
 }
 
 void Music::compile() {
+	static const auto CMDS = [&] {		// // //
+		AMKd::Utility::Trie<void (Music::*)()> cmd;
+
+		cmd.Insert("p", &Music::parseVibratoCommand);
+
+		return cmd;
+	}();
+
 	init();
 
 	while (hasNextToken()) {		// // //
+		if (auto token = mml_.ExtractToken(CMDS)) {		// // //
+			if (hexLeft != 0)
+				error("Unknown hex command.");
+			(this->*(*token))();
+			continue;
+		}
+
 		char ch = ::tolower((*mml_.Trim("."))[0]);		// // //
 
 		if (hexLeft != 0 && ch != '$')
@@ -314,7 +329,7 @@ void Music::compile() {
 			case '[': parseLoopCommand();			break;
 			case ']': parseLoopEndCommand();		break;
 			case '*': parseStarLoopCommand();		break;
-			case 'p': parseVibratoCommand();		break;
+//			case 'p': parseVibratoCommand();		break;
 			case '{': parseTripletOpenDirective();	break;
 			case '}': parseTripletCloseDirective();	break;
 			case '>': parseRaiseOctaveDirective();	break;
@@ -1081,25 +1096,6 @@ void Music::parseHexCommand() {
 
 		hexLeft = hexLengths[currentHex - AMKd::Binary::CmdType::Inst] - 1;
 		append(currentHex);
-
-		/*
-		while (hexLeft > 0) {
-			int param;
-			if (!getHexByte(param))
-				error("Incomplete hex command.");
-
-			if (peek() != '$') {
-				if (songTargetProgram == TargetType::AM4 && currentHex == AMKd::Binary::CmdType::Subloop) {		// // //
-					// tremolo off
-					tracks[channel].data.pop_back();
-					append(AMKd::Binary::CmdType::Tremolo, 0x00, 0x00, 0x00);
-					hexLeft = 0;
-				}
-				else
-					error("Incomplete hex command.");
-			}
-		}
-		*/
 	}
 	else {
 		--hexLeft;
