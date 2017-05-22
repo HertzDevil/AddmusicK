@@ -35,7 +35,7 @@ extern Music musics[256];
 //extern Sample samples[256];
 extern std::vector<Sample> samples;
 extern SoundEffect soundEffects[SFX_BANKS][256];		// // //
-extern std::vector<BankDefine *> bankDefines;
+extern std::vector<BankDefine> bankDefines;		// // //
 
 extern std::map<fs::path, int> sampleToIndex;
 

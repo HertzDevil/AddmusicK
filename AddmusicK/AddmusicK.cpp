@@ -536,9 +536,9 @@ void loadSampleList() {
 		}
 		else if (gettingGroupName == true) {
 			if (isspace(str[i])) {
-				BankDefine *sg = new BankDefine;
-				sg->name = groupName;
-				bankDefines.push_back(sg);
+				BankDefine sg;		// // //
+				sg.name = groupName;
+				bankDefines.push_back(std::move(sg));
 				i++;
 				gettingGroupName = false;
 				continue;
@@ -553,8 +553,8 @@ void loadSampleList() {
 			if (tempName.length() > 0) {
 				if (str[i] == '\"') {
 					tempName.erase(tempName.begin(), tempName.begin() + 1);
-					bankDefines[bankDefines.size() - 1]->samples.push_back(new std::string(tempName));
-					bankDefines[bankDefines.size() - 1]->importants.push_back(false);
+					bankDefines.back().samples.push_back(std::move(tempName));		// // //
+					bankDefines.back().importants.push_back(false);
 					tempName.clear();
 					i++;
 					continue;
@@ -582,10 +582,11 @@ void loadSampleList() {
 					continue;
 				}
 				else if (str[i] == '!') {
-					if (bankDefines[bankDefines.size() - 1]->importants.size() == 0)
+					auto &def = bankDefines.back();		// // //
+					if (def.importants.empty())
 						fatalError("Error parsing Addmusic_sample groups.txt: Importance specifier ('!') must come\n"
 								   "after asample declaration, not before it.");		// // //
-					bankDefines[bankDefines.size() - 1]->importants[bankDefines[bankDefines.size() - 1]->importants.size() - 1] = true;
+					def.importants.back() = true;
 					i++;
 				}
 				else
@@ -1102,9 +1103,9 @@ void fixMusicPointers() {
 
 	int defaultIndex = -1, optimizedIndex = -1;
 	for (unsigned int i = 0; i < bankDefines.size(); i++) {
-		if (bankDefines[i]->name == "default")
+		if (bankDefines[i].name == "default")
 			defaultIndex = i;
-		if (bankDefines[i]->name == "optimized")
+		if (bankDefines[i].name == "optimized")
 			optimizedIndex = i;
 	}
 
@@ -1550,10 +1551,8 @@ void tryToCleanAM4Data() {
 
 		std::cout << "Attempting to erase data from Addmusic 4.05:\n";
 		std::string ROMstr = ROMName.string();		// // //
-		char **am405argv = new char*[2];
-		am405argv[1] = const_cast<char *>(ROMstr.c_str());
+		char *am405argv[] = {"", const_cast<char *>(ROMstr.c_str())};
 		removeAM405Data(2, am405argv);
-		delete[] am405argv;
 
 		rom = openFile(ROMName);		// // // Reopen the file.
 		if (rom[0x255] == 0x5C) {

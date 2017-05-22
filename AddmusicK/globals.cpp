@@ -16,7 +16,7 @@ SoundEffect soundEffects[SFX_BANKS][256];		// // //
 //SoundEffect (&soundEffectsDF9)[256] = soundEffects[0];
 //SoundEffect (&soundEffectsDFC)[256] = soundEffects[1];
 //std::vector<SampleGroup> sampleGroups;
-std::vector<BankDefine *> bankDefines;
+std::vector<BankDefine> bankDefines;		// // //
 std::map<fs::path, int> sampleToIndex;		// // //
 
 bool convert = true;
@@ -395,12 +395,12 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 
 void addSampleGroup(const fs::path &groupName, Music *music) {
 	for (const auto &bank : bankDefines) {		// // //
-		if (groupName == bank->name) {		// // //
-			for (size_t j = 0, n = bank->samples.size(); j < n; ++j) {
+		if (groupName == bank.name) {		// // //
+			for (size_t j = 0, n = bank.samples.size(); j < n; ++j) {
 				std::string temp;
 				//temp += "samples/";
-				temp += *(bank->samples[j]);
-				addSample(temp, music, bank->importants[j]);
+				temp += bank.samples[j];		// // //
+				addSample(temp, music, bank.importants[j]);
 			}
 			return;
 		}

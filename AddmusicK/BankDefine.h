@@ -3,6 +3,6 @@
 struct BankDefine
 {
 	std::string name;
-	std::vector<const std::string *> samples;
+	std::vector<std::string> samples;		// // //
 	std::vector<bool> importants;
 };
