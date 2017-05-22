@@ -127,9 +127,9 @@ static bool usingSMWVTable;
 template <typename... Args>
 void Music::append(Args&&... value) {
 #if 0
-	(tracks[channel].data.push_back(static_cast<uint8_t>(value)), ...);
+	(tracks[::channel].data.push_back(static_cast<uint8_t>(value)), ...);
 #else
-	SWALLOW(tracks[channel].data.push_back(static_cast<uint8_t>(value)));
+	SWALLOW(tracks[::channel].data.push_back(static_cast<uint8_t>(value)));
 #endif
 }
 
@@ -144,27 +144,16 @@ bool Music::trimDirective(std::string_view str) {
 }
 
 // // //
-void Music::skipChars(size_t count) {
-	mml_.SetReadCount(mml_.GetReadCount() + count);
-}
-
-// // //
 void Music::skipSpaces() {
 	mml_.SkipSpaces();
 }
 
 Music::Music() {
 	knowsLength = false;
-	playOnce = false;
-	hasIntro = false;
 	totalSize = 0;
 	spaceForPointersAndInstrs = 0;
 	exists = false;
 	echoBufferSize = 0;
-	noteParamaterByteCount = 0;
-
-	//if (validateHex)		// Allow space for the buffer reservation header.
-	//	data[0].resize(3);
 }
 
 void Music::init() {
@@ -182,7 +171,6 @@ void Music::init() {
 
 	channelDefined = false;
 	tempoRatio = 1;
-	nextHexIsArpeggioNoteLength = false;
 
 	// // //
 	//remoteDefinitionArg = 0;
@@ -201,7 +189,6 @@ void Music::init() {
 	hTranspose = 0;
 	usingHTranspose = false;
 	// // //
-	channel = 0;
 	octave = 4;
 	prevNoteLength = -1;
 	defaultNoteLength = 8;
@@ -277,44 +264,45 @@ void Music::init() {
 	
 	// // // We can't just insert this at the end due to looping complications and such.
 	if (validateHex && index > highestGlobalSong && stat.firstChannel != CHANNELS) {
-		auto &data = tracks[stat.firstChannel].data;
-		if (targetAMKVersion > 1) {
-			std::vector<uint8_t> header {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, 0x01};
-			data.insert(data.cbegin(), header.cbegin(), header.cend());
-		}
-		std::vector<uint8_t> header {AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::EchoBuffer, static_cast<uint8_t>(echoBufferSize)};
-		data.insert(data.cbegin(), header.cbegin(), header.cend());
+		channel = stat.firstChannel;
+		if (targetAMKVersion > 1)
+			doVolumeTable(true);
+		append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::EchoBuffer, echoBufferSize);
 	}
+
+	channel = 0;
 }
 
 void Music::compile() {
-	static const auto CMDS = [&] {		// // //
+	static const auto CMDS = [] {		// // //
 		AMKd::Utility::Trie<void (Music::*)()> cmd;
 
 		cmd.Insert("p", &Music::parseVibratoCommand);
+		cmd.Insert("tuning", &Music::parseTransposeDirective);
+		cmd.Insert("t", &Music::parseTempoCommand);
 
 		return cmd;
 	}();
 
 	init();
 
-	while (hasNextToken()) {		// // //
-		if (auto token = mml_.ExtractToken(CMDS)) {		// // //
-			if (hexLeft != 0)
+	try {
+		while (hasNextToken()) {		// // //
+			if (auto token = mml_.ExtractToken(CMDS)) {		// // //
+				if (hexLeft != 0)
+					error("Unknown hex command.");
+				(this->*(*token))();
+				continue;
+			}
+
+			char ch = ::tolower((*mml_.Trim("."))[0]);		// // //
+
+			if (hexLeft != 0 && ch != '$')
 				error("Unknown hex command.");
-			(this->*(*token))();
-			continue;
-		}
 
-		char ch = ::tolower((*mml_.Trim("."))[0]);		// // //
-
-		if (hexLeft != 0 && ch != '$')
-			error("Unknown hex command.");
-
-		try {
 			switch (ch) {
 			case '?': parseQMarkDirective();		break;
-	//		case '!': parseExMarkDirective();		break;
+//			case '!': parseExMarkDirective();		break;
 			case '#': parseChannelDirective();		break;
 			case 'l': parseLDirective();			break;
 			case 'w': parseGlobalVolumeCommand();	break;
@@ -322,14 +310,12 @@ void Music::compile() {
 			case 'q': parseQuantizationCommand();	break;
 			case 'y': parsePanCommand();			break;
 			case '/': parseIntroDirective();		break;
-			case 't': parseT();						break;
 			case 'o': parseOctaveDirective();		break;
 			case '@': parseInstrumentCommand();		break;
 			case '(': parseOpenParenCommand();		break;
 			case '[': parseLoopCommand();			break;
 			case ']': parseLoopEndCommand();		break;
 			case '*': parseStarLoopCommand();		break;
-//			case 'p': parseVibratoCommand();		break;
 			case '{': parseTripletOpenDirective();	break;
 			case '}': parseTripletCloseDirective();	break;
 			case '>': parseRaiseOctaveDirective();	break;
@@ -347,12 +333,12 @@ void Music::compile() {
 				throw AMKd::Utility::SyntaxException {"Unexpected character \"" + std::string(1, ch) + "\" found."};
 			}
 		}
-		catch (AMKd::Utility::SyntaxException &e) {
-			fatalError(e.what());
-		}
-		catch (AMKd::Utility::MMLException &e) {
-			error(e.what());
-		}
+	}
+	catch (AMKd::Utility::SyntaxException &e) {
+		fatalError(e.what());
+	}
+	catch (AMKd::Utility::MMLException &e) {
+		error(e.what());
 	}
 
 	pointersFirstPass();
@@ -364,6 +350,14 @@ size_t Music::getDataSize() const {
 	for (int i = 0; i < CHANNELS; ++i)
 		x += tracks[i].data.size();
 	return x;
+}
+
+// // //
+void Music::FlushSongData(std::vector<uint8_t> &buf) const {
+	buf.reserve(buf.size() + getDataSize() + tracks[CHANNELS].data.size() + allPointersAndInstrs.size());
+	buf.insert(buf.end(), allPointersAndInstrs.cbegin(), allPointersAndInstrs.cend());
+	for (const auto &x : tracks)
+		buf.insert(buf.cend(), x.data.cbegin(), x.data.cend());
 }
 
 void Music::parseComment() {
@@ -437,7 +431,7 @@ void Music::parseChannelDirective() {
 }
 
 void Music::parseLDirective() {
-	using namespace AMKd::MML::Lexer;
+	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Int>(mml_))
 		defaultNoteLength = requires(param.get<0>(), 1u, 192u, DIR_ILLEGAL("note length (\"l\")"));		// // //
 	else
@@ -445,19 +439,17 @@ void Music::parseLDirective() {
 }
 
 void Music::parseGlobalVolumeCommand() {
-	using namespace AMKd::MML::Lexer;
+	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Int>(mml_))
-		append(AMKd::Binary::CmdType::VolGlobal, requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("global volume", "w")));		// // //
-	else
-		error(CMD_ERROR("global volume", "w"));		// // //
+		return doGlobalVolume(requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("global volume", "w")));		// // //
+	error(CMD_ERROR("global volume", "w"));		// // //
 }
 
 void Music::parseVolumeCommand() {
-	using namespace AMKd::MML::Lexer;
+	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Int>(mml_))
-		append(AMKd::Binary::CmdType::Vol, requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("volume", "v")));		// // //
-	else
-		error(CMD_ERROR("volume", "v"));		// // //
+		return doVolume(requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("volume", "v")));
+	error(CMD_ERROR("volume", "v"));		// // //
 }
 
 void Music::parseQuantizationCommand() {
@@ -516,13 +508,6 @@ void Music::parseIntroDirective() {
 	introLength = static_cast<unsigned>(tracks[channel].channelLength);		// // //
 }
 
-void Music::parseT() {
-	if (trimDirective("uning\\["))		// // //
-		parseTransposeDirective();
-	else
-		parseTempoCommand();
-}
-
 void Music::parseTempoCommand() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Int>(mml_))
@@ -532,7 +517,7 @@ void Music::parseTempoCommand() {
 
 void Music::parseTransposeDirective() {
 	using namespace AMKd::MML::Lexer;		// // //
-	if (auto param = GetParameters<Int, Sep<']'>, Sep<'='>, SInt>(mml_)) {
+	if (auto param = GetParameters<Sep<'['>, Int, Sep<']'>, Sep<'='>, SInt>(mml_)) {
 		unsigned inst; int trsp;
 		std::tie(inst, trsp) = *param;
 		while (true) {
@@ -608,10 +593,8 @@ void Music::parseOpenParenCommand() {
 			error("The specified sample was not included in this song.");
 		sampID = std::distance(mySamples.cbegin(), it);
 	}
-	else {
-		parseLabelLoopCommand();
-		return;
-	}
+	else
+		return parseLabelLoopCommand();
 
 	if (auto ext = GetParameters<Comma, Byte, Sep<')'>>(mml_))
 		return doSampleLoad(sampID, ext.get<0>());
@@ -674,14 +657,12 @@ void Music::parseLabelLoopCommand() {
 				error("Error parsing remote code definition.");
 			if (skipSpaces(), !trimChar(')'))		// // //
 				error("Error parsing remote code definition.");
+			if (trimChar('['))		// // //
+				error("Error parsing remote code definition; the definition was missing.");
 
-			if (peek() == '[') {
-				loopLabel = i;
-				// // //
-				inRemoteDefinition = true;
-				return;
-			}
-			error("Error parsing remote code definition; the definition was missing.");
+			loopLabel = i;		// // //
+			inRemoteDefinition = true;
+			return parseLoopCommand();
 		}
 	}
 	if (inNormalLoop)		// // //
@@ -990,6 +971,10 @@ void Music::parseHexCommand() {
 			if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
 				return apply_this(&Music::doVibrato, this, *param);
 			error("Unknown hex command.");
+		case AMKd::Binary::CmdType::VolGlobal:
+			if (auto param = GetParameters<Byte>(mml_))
+				return apply_this(&Music::doGlobalVolume, this, *param);
+			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Tempo:
 			if (auto param = GetParameters<Byte>(mml_))
 				return apply_this(&Music::doTempo, this, *param);
@@ -1005,11 +990,8 @@ void Music::parseHexCommand() {
 					auto param = GetParameters<Byte>(mml_);
 					return doSampleLoad(i - 0x80, param.get<0>());
 				}
-				if (auto remain = GetParameters<Byte, Byte>(mml_)) {
-					unsigned rate, depth;
-					std::tie(rate, depth) = *remain;
-					return doTremolo(first.get<0>(), rate, depth);
-				}
+				if (auto remain = GetParameters<Byte, Byte>(mml_))
+					return apply_this(&Music::doTremolo, this, std::tuple_cat(*first, *remain));
 			}
 			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Subloop:
@@ -1019,6 +1001,10 @@ void Music::parseHexCommand() {
 				int repeats = param.get<0>();
 				return repeats ? doSubloopExit(repeats + 1) : doSubloopEnter();
 			}
+			error("Unknown hex command.");
+		case AMKd::Binary::CmdType::Vol:
+			if (auto param = GetParameters<Byte>(mml_))
+				return apply_this(&Music::doVolume, this, *param);
 			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Envelope:
 			if (songTargetProgram == TargetType::AM4) {
@@ -1031,18 +1017,24 @@ void Music::parseHexCommand() {
 				return apply_this(&Music::doSampleLoad, this, *param);
 			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Arpeggio:
-		{
-			int j;
-			if (!getHexByte(j))		// // //
-				error("Error parsing hex command.");
-			if (j >= 0x80)
-				hexLeft = 2;
-			else
-				hexLeft = j + 1;
-			nextHexIsArpeggioNoteLength = true;
-			append(currentHex, j);
-		}
-			return;
+			if (auto param = GetParameters<Byte, Byte>(mml_)) {
+				unsigned count, len;
+				std::tie(count, len) = *param;
+				append(AMKd::Binary::CmdType::Arpeggio, count, divideByTempoRatio(len, false));
+				if (count >= 0x80) {
+					if (count != 0x80 && count != 0x81)
+						error("Illegal value for arpeggio command.");
+					count = 2;
+				}
+				for (unsigned i = 0; i < count; ++i) {
+					auto note = GetParameters<Byte>(mml_);
+					if (!note)
+						error("Error parsing arpeggio command.");
+					append(note.get<0>());
+				}
+				return;
+			}
+			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Callback:
 			if (targetAMKVersion > 1)
 				error("$FC has been replaced with remote code in #amk 2 and above.");		// // //
@@ -1083,10 +1075,10 @@ void Music::parseHexCommand() {
 		default:
 			if (currentHex < AMKd::Binary::CmdType::Inst && manualNoteWarning) {
 				if (targetAMKVersion == 0) {
-					printWarning("Warning: A hex command was found that will act as a note instead of a special\n"
-								 "effect. If this is a song you're using from someone else, you can most likely\n"
-								 "ignore this message, though it may indicate that a necessary #amm or #am4 is\n"
-								 "missing.", name, mml_.GetLineNumber());		// // //
+					warn("Warning: A hex command was found that will act as a note instead of a special\n"
+						 "effect. If this is a song you're using from someone else, you can most likely\n"
+						 "ignore this message, though it may indicate that a necessary #amm or #am4 is\n"
+						 "missing.");		// // //
 					manualNoteWarning = false;
 					return;
 				}
@@ -1228,12 +1220,6 @@ void Music::parseHexCommand() {
 					tracks[channelToCheck].usingFA = false;
 				}
 				return;
-			}
-			break;
-		case AMKd::Binary::CmdType::Arpeggio:
-			if (nextHexIsArpeggioNoteLength) {
-				i = divideByTempoRatio(i, false);
-				nextHexIsArpeggioNoteLength = false;
 			}
 			break;
 		case AMKd::Binary::CmdType::Callback:
@@ -1406,7 +1392,7 @@ void Music::parseNote(int ch) {		// // //
 			append(tracks[channel].q);
 			tracks[channel].updateQ = false;
 			tracks[CHANNELS].updateQ = false;
-			noteParamaterByteCount++;
+			// // //
 		}
 		append(i); j -= divideByTempoRatio(0x60, true);
 
@@ -1431,7 +1417,7 @@ void Music::parseNote(int ch) {		// // //
 			append(tracks[channel].q);
 			tracks[channel].updateQ = false;
 			tracks[CHANNELS].updateQ = false;		// // //
-			noteParamaterByteCount++;
+			// // //
 		}
 		append(i);
 	}
@@ -1469,13 +1455,13 @@ void Music::parseOptionDirective() {
 
 	if (trimDirective("smwvtable"))		// // //
 		if (!usingSMWVTable) {
-			append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, 0x00);		// // //
+			doVolumeTable(false);
 			usingSMWVTable = true;
 		}
 		else
 			warn("This song is already using the SMW V Table. This command is just wasting three bytes...");		// // //
 	else if (trimDirective("nspcvtable")) {		// // //
-		append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, 0x01);		// // //
+		doVolumeTable(true);
 		usingSMWVTable = false;
 		warn("This song uses the N-SPC V by default. This command is just wasting two bytes...");		// // //
 	}
@@ -1890,9 +1876,7 @@ void Music::pointersFirstPass() {
 		tracks[i].phrasePointers[1] += tracks[i].phrasePointers[0];
 		binpos += tracks[i].data.size();
 	}
-
-	playOnce = doesntLoop;
-
+	// // //
 	spaceForPointersAndInstrs = 20;
 
 	if (hasIntro)
@@ -2296,6 +2280,96 @@ void Music::doSubloopEnter() {
 	append(AMKd::Binary::CmdType::Subloop, 0x00);		// // //
 }
 
+void Music::handleNormalLoopRemoteCall(int loopCount) {
+	if (loopLabel == 0)
+		addNoteLength(normalLoopLength * loopCount);
+	else
+		addNoteLength(loopLengths[loopLabel] * loopCount);
+}
+
+
+void Music::addNoteLength(double ticks) {
+	if (extraLoopIsNormal)
+		normalLoopLength += ticks;
+	else if (extraLoopIsSuper)
+		superLoopLength += ticks;
+	else if (baseLoopIsNormal)
+		normalLoopLength += ticks;
+	else if (baseLoopIsSuper)
+		superLoopLength += ticks;
+	else
+		tracks[channel].channelLength += ticks;		// // //
+}
+
+int Music::divideByTempoRatio(int value, bool fractionIsError) {
+	int temp = value / tempoRatio;
+/*
+	if (temp * tempoRatio != value)
+		if (fractionIsError)
+			printError("Using the tempo ratio on this value would result in a fractional value.", false, name, line);
+		else
+			warn("The tempo ratio resulted in a fractional value.");
+*/
+	return temp;
+}
+
+int Music::multiplyByTempoRatio(int value) {
+	int temp = value * tempoRatio;
+	if (temp > 0xFF) {		// // //		
+		warn("Using the tempo ratio on this value would cause it to overflow.");
+		temp = 0xFF;
+	}
+	return temp;
+}
+
+// // //
+const std::string &Music::getFileName() const {
+	return name;
+}
+
+
+
+// // //
+void Music::doVolume(int vol) {
+	append(AMKd::Binary::CmdType::Vol, vol);
+}
+
+void Music::doGlobalVolume(int vol) {
+	append(AMKd::Binary::CmdType::VolGlobal, vol);
+}
+
+void Music::doVibrato(int delay, int rate, int depth) {
+	append(AMKd::Binary::CmdType::Vibrato,
+		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);		// // //
+}
+
+void Music::doTremolo(int delay, int rate, int depth) {
+	append(AMKd::Binary::CmdType::Tremolo,
+		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);		// // //
+}
+
+void Music::doTremoloOff() {
+	append(AMKd::Binary::CmdType::Tremolo, 0x00, 0x00, 0x00);
+}
+
+void Music::doTempo(int speed) {
+	tempo = requires(divideByTempoRatio(speed, false), 0x01, 0xFF, "Tempo has been zeroed out by #halvetempo");		// // //
+	tempoDefined = true;
+	append(AMKd::Binary::CmdType::Tempo, tempo);		// // //
+
+	if (inNormalLoop || inE6Loop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
+		guessLength = false;
+	else
+		tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
+}
+
+void Music::doSampleLoad(int index, int mult) {
+	if (optimizeSampleUsage)
+		usedSamples[index] = true;
+	append(AMKd::Binary::CmdType::SampleLoad, index, mult);		// // //
+}
+
+
 void Music::handleNormalLoopExit(int loopCount) {
 	if (extraLoopIsNormal) {				// We're leaving a normal loop that's nested in a super loop.
 		extraLoopIsNormal = false;
@@ -2331,89 +2405,6 @@ void Music::doSubloopExit(int loopCount) {
 	append(AMKd::Binary::CmdType::Subloop, loopCount - 1);		// // //
 }
 
-void Music::handleNormalLoopRemoteCall(int loopCount) {
-	if (loopLabel == 0)
-		addNoteLength(normalLoopLength * loopCount);
-	else
-		addNoteLength(loopLengths[loopLabel] * loopCount);
-}
-
-
-void Music::addNoteLength(double ticks) {
-	if (extraLoopIsNormal)
-		normalLoopLength += ticks;
-	else if (extraLoopIsSuper)
-		superLoopLength += ticks;
-	else if (baseLoopIsNormal)
-		normalLoopLength += ticks;
-	else if (baseLoopIsSuper)
-		superLoopLength += ticks;
-	else
-		tracks[channel].channelLength += ticks;		// // //
-}
-
-int Music::divideByTempoRatio(int value, bool fractionIsError) {
-	int temp = value / tempoRatio;
-/*
-	if (temp * tempoRatio != value)
-		if (fractionIsError)
-			printError("Using the tempo ratio on this value would result in a fractional value.", false, name, line);
-		else
-			printWarning("The tempo ratio resulted in a fractional value.", name, line);
-*/
-	return temp;
-}
-
-int Music::multiplyByTempoRatio(int value) {
-	int temp = value * tempoRatio;
-	if (temp >= 256)
-		[&] { error("Using the tempo ratio on this value would cause it to overflow."); }();
-
-	return temp;
-}
-
-// // //
-const std::string &Music::getFileName() const {
-	return name;
-}
-
-
-
-// // //
-void Music::doVibrato(int delay, int rate, int depth) {
-	append(AMKd::Binary::CmdType::Vibrato,
-		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);		// // //
-}
-
-void Music::doTremolo(int delay, int rate, int depth) {
-	append(AMKd::Binary::CmdType::Tremolo,
-		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);		// // //
-}
-
-void Music::doTremoloOff() {
-	append(AMKd::Binary::CmdType::Tremolo, 0x00, 0x00, 0x00);
-}
-
-void Music::doTempo(int speed) {
-	tempo = requires(divideByTempoRatio(speed, false), 0x01, 0xFF, "Tempo has been zeroed out by #halvetempo");		// // //
-	tempoDefined = true;
-	append(AMKd::Binary::CmdType::Tempo, tempo);		// // //
-
-	if (inNormalLoop || inE6Loop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
-		guessLength = false;
-	else
-		tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
-}
-
-void Music::doSampleLoad(int index, int mult) {
-	if (optimizeSampleUsage)
-		usedSamples[index] = true;
-	append(AMKd::Binary::CmdType::SampleLoad, index, mult);		// // //
-}
-
-
-
-// // //
-void Track::FlushData(std::vector<uint8_t> &buf) const {
-	buf.insert(buf.cend(), data.cbegin(), data.cend());
+void Music::doVolumeTable(bool louder) {
+	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, louder ? 0x01 : 0x00);
 }

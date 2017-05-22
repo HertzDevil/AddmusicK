@@ -15,12 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="class_int.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="class_string.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="AddMusic.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -29,13 +23,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="class_string.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="AddMusic.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="class_int.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

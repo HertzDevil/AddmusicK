@@ -142,14 +142,15 @@ int execute(const std::string &command, bool prepend) {
 		tempstr.insert(0, "./");
 #endif
 	}
-	return system(tempstr.c_str());
+	return std::system(tempstr.c_str());
 }
 
 int scanInt(const std::string &str, const std::string &value) {		// Scans an integer value that comes after the specified string within another string.  Must be in $XXXX format (or $XXXXXX, etc.).
-	int i, ret;
-	if ((i = str.find(value)) == -1)
-		fatalError(std::string("Error: Could not find \"") + value + "\"");		// // //
+	int i = str.find(value);		// // //
+	if (i == std::string::npos)
+		fatalError("Error: Could not find \"" + value + "\"");		// // //
 
+	int ret;
 	std::sscanf(str.c_str() + i + value.length(), "$%X", &ret);	// Woo C functions in C++ code!
 	return ret;
 }

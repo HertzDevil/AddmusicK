@@ -84,6 +84,8 @@ int main(int argc, char* argv[]) {
 		for (int i = 1; i < argc; i++)
 			arguments.push_back(argv[i]);
 
+	std::ofstream redirectOut, redirectErr;		// // //
+
 	for (const auto &arg : arguments) {		// // //
 		waitAtEnd = false;			// If the user entered a command line argument, chances are they don't need the "Press Any Key To Continue . . ." prompt.
 		if (arg == "-c")
@@ -116,8 +118,10 @@ int main(int argc, char* argv[]) {
 			forceNoContinuePrompt = true;
 		else if (arg == "-streamredirect") {
 			redirectStandardStreams = true;
-			std::freopen("AddmusicK_stdout", "w+", stdout);
-			std::freopen("AddmusicK_stderr", "w+", stderr);
+			redirectOut.open("AddmusicK_stdout", std::ios::out | std::ios::trunc);		// // //
+			redirectErr.open("AddmusicK_stderr", std::ios::out | std::ios::trunc);
+			std::cout.rdbuf(redirectOut.rdbuf());
+			std::cerr.rdbuf(redirectErr.rdbuf());
 		}
 		else if (arg == "-norom") {
 			if (!ROMName.empty())		// // //
@@ -1047,10 +1051,7 @@ void fixMusicPointers() {
 			final.push_back(songDataARAMPos >> 8);
 		}
 
-		// // //
-		final.insert(final.end(), musics[i].allPointersAndInstrs.cbegin(), musics[i].allPointersAndInstrs.cend());
-		for (const auto &x : musics[i].tracks)
-			x.FlushData(final);		// // //
+		musics[i].FlushSongData(final);		// // //
 
 		if (musics[i].minSize > 0 && i <= highestGlobalSong)
 			while (final.size() < musics[i].minSize)
@@ -1208,37 +1209,152 @@ void generateSPCs() {
 	std::vector<uint8_t> programData = openFile("asm/SNES/bin/main.bin");		// // //
 	programData.erase(programData.begin(), programData.begin() + 4);	// Erase the upload data.
 
-	unsigned int localPos;
+	unsigned int localPos = programData.size() + programPos;
 
 	//for (i = 0; i < programPos; i++) base[i] = 0;
 
 	//for (i = 0; i < programSize; i++)
 	//	base[i + programPos] = programData[i];
 
-	localPos = programData.size() + programPos;
+	enum : size_t
+	{
+		PC = 0x25,
+		TITLE = 0x2E,
+		GAME = 0x4E,
+		DUMPER = 0x6E,
+		COMMENT = 0x7E,
+		DATE = 0x9E,
+		LENGTH = 0xA9,
+		FADEOUT = 0xAC,
+		AUTHOR = 0xB1,
+		RAM = 0x100,
+		DSP_ADDR = RAM + 0x10000,
+		SPC_SIZE = DSP_ADDR + 0x100,
+	};
 
-	std::vector<uint8_t> SPC;		// // //
 	std::vector<uint8_t> SPCBase = openFile("asm/SNES/SPCBase.bin");
 	std::vector<uint8_t> DSPBase = openFile("asm/SNES/SPCDSPBase.bin");
-	SPC.resize(0x10200);
+	SPCBase.resize(SPC_SIZE);
 
 	int SPCsGenerated = 0;
 
-	bool forceAll = false;
+	enum spc_mode_t {MUSIC, SFX1, SFX2};		// // //
 
-	time_t recentMod = getLastModifiedTime();		// // // If any main program modifications were made, we need to update all SPCs.
+	const auto makeSPCfn = [&] (int i, const spc_mode_t mode, bool yoshi) {		// // //
+		std::vector<uint8_t> SPC = SPCBase;		// // //
 
-	int maxMode = 0;	// 0 = dump music, 1 = dump SFX1, 2 = dump SFX2
-	if (sfxDump == true) maxMode = 2;
+		if (mode == MUSIC) {		// // //
+			std::copy_n(musics[i].title.cbegin(), std::min(32u, musics[i].title.size()), SPC.begin() + TITLE);
+			std::copy_n(musics[i].game.cbegin(), std::min(32u, musics[i].game.size()), SPC.begin() + GAME);
+			std::copy_n(musics[i].comment.cbegin(), std::min(32u, musics[i].comment.size()), SPC.begin() + COMMENT);
+			std::copy_n(musics[i].author.cbegin(), std::min(32u, musics[i].author.size()), SPC.begin() + AUTHOR);
+		}
 
-	for (int mode = 0; mode <= maxMode; mode++) {
+		std::copy_n(programData.cbegin(), programSize, SPC.begin() + RAM + programPos);
+
+		int backupIndex = i;
+		if (mode == MUSIC)		// // //
+			std::copy(musics[i].finalData.cbegin(), musics[i].finalData.cend(), SPC.begin() + RAM + localPos);		// // //
+		else
+			i = highestGlobalSong + 1;		// While dumping SFX, pretend that the current song is the lowest local song
+
+		int tablePos = localPos + musics[i].finalData.size();
+		if ((tablePos & 0xFF) != 0)
+			tablePos = (tablePos & 0xFF00) + 0x100;
+
+		int samplePos = tablePos + musics[i].mySamples.size() * 4;
+		auto srcTable = SPC.begin() + RAM + tablePos;
+
+		for (const auto &id : musics[i].mySamples) {		// // //
+			const auto &samp = samples[id];
+			unsigned short loopPoint = samp.loopPoint;
+			unsigned short newLoopPoint = loopPoint + samplePos;
+
+			*srcTable++ = static_cast<uint8_t>(samplePos & 0xFF);
+			*srcTable++ = static_cast<uint8_t>(samplePos >> 8);
+			*srcTable++ = static_cast<uint8_t>(newLoopPoint & 0xFF);
+			*srcTable++ = static_cast<uint8_t>(newLoopPoint >> 8);
+
+			std::copy(samp.data.cbegin(), samp.data.cend(), SPC.begin() + RAM + samplePos);
+			samplePos += samp.data.size();
+		}
+
+		std::copy(DSPBase.cbegin(), DSPBase.cend(), SPC.begin() + DSP_ADDR);		// // //
+
+		SPC[DSP_ADDR + 0x5D] = tablePos >> 8; // sample directory
+
+		SPC[RAM + 0x5F] = 0x20;
+
+		SPC[LENGTH    ] = (musics[i].seconds / 100 % 10) + '0';		// Why on Earth is the value stored as plain text...?
+		SPC[LENGTH + 1] = (musics[i].seconds / 10 % 10) + '0';
+		SPC[LENGTH + 2] = (musics[i].seconds / 1 % 10) + '0';
+
+		SPC[FADEOUT    ] = '1';
+		SPC[FADEOUT + 1] = '0';
+		SPC[FADEOUT + 2] = '0';
+		SPC[FADEOUT + 3] = '0';
+		SPC[FADEOUT + 4] = '0';
+
+		SPC[PC    ] = static_cast<uint8_t>(programUploadPos & 0xFF);	// // // Set the PC to the main loop.
+		SPC[PC + 1] = static_cast<uint8_t>(programUploadPos >> 8);	// The values of the registers (besides stack which is in the file) don't matter.  They're 0 in the base file.
+
+		i = backupIndex;
+
+		switch (mode) {		// // //
+		case MUSIC: SPC[RAM + 0xF6] = highestGlobalSong + 1; break;	// Tell the SPC to play this song.
+		case SFX1:  SPC[RAM + 0xF4] = i; break;						// Tell the SPC to play this SFX
+		case SFX2:  SPC[RAM + 0xF7] = i; break;						// Tell the SPC to play this SFX
+		}
+		if (yoshi)		// // //
+			SPC[RAM + 0xF5] = 2;
+
+		std::stringstream timeField;		// // //
+		std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		timeField << std::put_time(std::localtime(&t), "%m/%d/%Y");
+		auto timeStr = timeField.str();
+		std::copy_n(timeStr.cbegin(), std::min(10u, timeStr.size()), SPC.begin() + DATE);
+
+		auto fname = fs::path {mode == SFX1 ? soundEffects[0][i].name :
+			mode == SFX2 ? soundEffects[1][i].name : musics[i].getFileName()}.stem();		// // //
+		switch (mode) {
+		case SFX1: fname = "1DF9" / fname; break;
+		case SFX2: fname = "1DFC" / fname; break;
+		}
+
+		fname = "SPCs" / fname;
+		if (yoshi)		// // //
+			fname.replace_filename(fname.filename().string() + " (Yoshi)");
+		fname.replace_extension(".spc");
+
+		if (verbose)
+			std::cout << "Wrote \"" << fname << "\" to file." << std::endl;
+
+		writeFile(fname, SPC);
+		++SPCsGenerated;		// // //
+	};
+
+//	std::time_t recentMod = getLastModifiedTime();		// // // If any main program modifications were made, we need to update all SPCs.
+
+	for (spc_mode_t mode : {MUSIC, SFX1, SFX2}) {
+		if (!sfxDump && mode != MUSIC)		// // //
+			break;
+
 		for (int i = 0; i < 256; i++) {		// // //
-			if (mode == 0 && musics[i].exists == false) continue;
-			if (mode == 1 && soundEffects[0][i].exists == false) continue;
-			if (mode == 2 && soundEffects[1][i].exists == false) continue;
-
-			if (mode == 0 && i <= highestGlobalSong) continue;		// Cannot generate SPCs for global songs as required samples, SRCN table, etc. cannot be determined.
-
+			switch (mode) {
+			case MUSIC:
+				// Cannot generate SPCs for global songs as required samples, SRCN table, etc. cannot be determined.
+				if (!musics[i].exists || i <= highestGlobalSong)
+					continue;
+				break;
+			case SFX1:
+				if (!soundEffects[0][i].exists)
+					continue;
+				break;
+			case SFX2:
+				if (!soundEffects[1][i].exists)
+					continue;
+				break;
+			}
 			//time_t spcTimeStamp = getTimeStamp((File)fname);
 
 			/*if (!forceSPCGeneration)
@@ -1248,125 +1364,9 @@ void generateSPCs() {
 				if (recentMod < spcTimeStamp)
 				continue;*/
 
-			SPCsGenerated++;
-			int y = 2;					// Used to generate 2 SPCs for tracks with Yoshi drums.
-			if (mode != 0) y = 1;
-			while (y > 0) {
-				if (mode == 0 && musics[i].hasYoshiDrums == false && y == 2) {
-					y--;
-					continue;
-				}
-				SPC = SPCBase;		// // //
-				SPC.resize(0x10200);
-
-				if (mode == 0) {		// // //
-					std::copy_n(musics[i].title.cbegin(), std::min(32u, musics[i].title.size()), SPC.begin() + 0x2E);
-					std::copy_n(musics[i].game.cbegin(), std::min(32u, musics[i].game.size()), SPC.begin() + 0x4E);
-					std::copy_n(musics[i].comment.cbegin(), std::min(32u, musics[i].comment.size()), SPC.begin() + 0x7E);
-					std::copy_n(musics[i].author.cbegin(), std::min(32u, musics[i].author.size()), SPC.begin() + 0xB1);
-				}
-
-				std::copy_n(programData.cbegin(), programSize, SPC.begin() + 0x100 + programPos);
-
-				int backupIndex = i;
-				if (mode != 0)
-					i = highestGlobalSong + 1;		// While dumping SFX, pretend that the current song is the lowest local song
-
-				if (mode == 0) {
-					for (unsigned int j = 0; j < musics[i].finalData.size(); j++)
-						SPC[localPos + 0x100 + j] = musics[i].finalData[j];
-				}
-
-				int tablePos = localPos + musics[i].finalData.size();
-
-				if ((tablePos & 0xFF) != 0)
-					tablePos = (tablePos & 0xFF00) + 0x100;
-
-				int samplePos = tablePos + musics[i].mySamples.size() * 4;
-
-				for (unsigned int j = 0; j < musics[i].mySamples.size(); j++) {
-					SPC[tablePos + j * 4 + 0x100] = samplePos & 0xFF;
-					SPC[tablePos + j * 4 + 0x101] = samplePos >> 8;
-					unsigned short loopPoint = samples[musics[i].mySamples[j]].loopPoint;
-					unsigned short newLoopPoint = loopPoint + samplePos;
-					SPC[tablePos + j * 4 + 0x102] = newLoopPoint & 0xFF;
-					SPC[tablePos + j * 4 + 0x103] = newLoopPoint >> 8;
-
-					for (unsigned int k = 0; k < samples[musics[i].mySamples[j]].data.size(); k++)
-						SPC[samplePos + 0x100 + k] = samples[musics[i].mySamples[j]].data[k];
-
-					samplePos += samples[musics[i].mySamples[j]].data.size();
-				}
-
-				std::copy(DSPBase.cbegin(), DSPBase.cend(), SPC.begin() + 0x10100);		// // //
-
-				SPC[0x1015D] = tablePos >> 8;
-
-				SPC[0x15F] = 0x20;
-
-				if (y == 2) SPC[0x01f5] = 2;
-
-				SPC[0xA9] = (musics[i].seconds / 100 % 10) + '0';		// Why on Earth is the value stored as plain text...?
-				SPC[0xAA] = (musics[i].seconds / 10 % 10) + '0';
-				SPC[0xAB] = (musics[i].seconds / 1 % 10) + '0';
-
-				SPC[0xAC] = '1';
-				SPC[0xAD] = '0';
-				SPC[0xAE] = '0';
-				SPC[0xAF] = '0';
-				SPC[0xB0] = '0';
-
-				SPC[0x25] = static_cast<uint8_t>(programUploadPos & 0xFF);	// // // Set the PC to the main loop.
-				SPC[0x26] = static_cast<uint8_t>(programUploadPos >> 8);	// The values of the registers (besides stack which is in the file) don't matter.  They're 0 in the base file.
-
-				i = backupIndex;
-
-				if (mode == 0)
-					SPC[0x1F6] = highestGlobalSong + 1;	// Tell the SPC to play this song.
-				else if (mode == 1)
-					SPC[0x1F4] = i;				// Tell the SPC to play this SFX
-				else if (mode == 2)
-					SPC[0x1F7] = i;				// Tell the SPC to play this SFX
-
-				char buffer[11];
-				time_t t = time(NULL);
-				strftime(buffer, 11, "%m/%d/%Y", localtime(&t));
-				strncpy((char *)SPC.data() + 0x9E, buffer, 10);
-
-				std::string pathlessSongName;
-				if (mode == 0)
-					pathlessSongName = musics[i].getFileName();		// // //
-				else if (mode == 1)
-					pathlessSongName = soundEffects[0][i].name;
-				else if (mode == 2)
-					pathlessSongName = soundEffects[1][i].name;
-
-				int extPos = pathlessSongName.find_last_of('.');
-				if (extPos != -1)
-					pathlessSongName = pathlessSongName.substr(0, extPos);
-
-				if (pathlessSongName.find('/') != -1)
-					pathlessSongName = pathlessSongName.substr(pathlessSongName.find_last_of('/') + 1);
-				else if (pathlessSongName.find('\\') != -1)
-					pathlessSongName = pathlessSongName.substr(pathlessSongName.find_last_of('\\') + 1);
-
-				if (mode == 0) musics[i].pathlessSongName = pathlessSongName;
-				if (mode == 1) pathlessSongName.insert(0, "1DF9/");
-				if (mode == 2) pathlessSongName.insert(0, "1DFC/");
-
-				std::string fname = "SPCs/" + pathlessSongName;
-
-				if (y == 2)
-					fname += " (Yoshi)";
-
-				fname += ".spc";
-
-				if (verbose)
-					std::cout << "Wrote \"" << fname << "\" to file." << std::endl;
-
-				writeFile(fname, SPC);
-				y--;
-			}
+			if (mode == MUSIC && musics[i].hasYoshiDrums)
+				makeSPCfn(i, mode, true);
+			makeSPCfn(i, mode, false);
 		}
 	}
 
@@ -1608,14 +1608,13 @@ void tryToCleanAM4Data() {
 			fatalError("Addmusic 4.05 ROMs can only be cleaned if they have a header. This does not\n"
 					   "apply to any other aspect of the program.");		// // //
 
-		char **am405argv;
-		std::string ROMstr = ROMName.string();		// // //
-		am405argv = (char **)malloc(sizeof(char **) * 2);
-		am405argv[1] = (char *)malloc(ROMstr.size() + 1);
-		strcpy(am405argv[1], ROMstr.c_str());
-		am405argv[1][ROMstr.size()] = 0;
 		std::cout << "Attempting to erase data from Addmusic 4.05:" << std::endl;
+		std::string ROMstr = ROMName.string();		// // //
+		char **am405argv = new char*[2];
+		am405argv[1] = const_cast<char *>(ROMstr.c_str());
 		removeAM405Data(2, am405argv);
+		delete[] am405argv;
+
 		rom = openFile(ROMName);		// // // Reopen the file.
 		if (rom[0x255] == 0x5C) {
 			int moreASMData = ((rom[0x255 + 3] << 16) | (rom[0x255 + 2] << 8) | (rom[0x255 + 1])) - 8;

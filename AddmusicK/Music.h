@@ -27,7 +27,6 @@ class Track
 {
 public:
 	friend class Music;
-	void FlushData(std::vector<uint8_t> &buf) const;
 
 private:
 	std::vector<uint8_t> data;		// // //
@@ -54,82 +53,74 @@ private:
 
 class Music
 {
-
-
-public:
 	double introSeconds;
 	double mainSeconds;
-
-	int noteParamaterByteCount;
 
 	int tempoRatio;
 	int divideByTempoRatio(int, bool fractionIsError);		// Divides a value by tempoRatio.  Errors out if it can't be done without a decimal (if the parameter is set).
 	int multiplyByTempoRatio(int);					// Multiplies a value by tempoRatio.  Errors out if it goes higher than 255.
-	bool nextHexIsArpeggioNoteLength;	
 
+public:		// // //
 	std::string name;
+public:
 	const std::string &getFileName() const;
-	std::string pathlessSongName;
-	bool playOnce;
+
+private:		// // //
 	bool hasIntro;
 	std::map<int, uint16_t> loopPointers;		// // //
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
 	AMKd::MML::SourceFile mml_;		// // //
-	size_t totalSize;		// // //
-	int spaceForPointersAndInstrs;
-	std::vector<uint8_t> allPointersAndInstrs;		// // //
-	std::vector<uint8_t> instrumentData;
-	std::vector<uint8_t> finalData;
 
-	SpaceInfo spaceInfo;
-
+//public:		// // //
 	Track tracks[CHANNELS + 1];		// // //
-	
+
 	unsigned int introLength;
 	unsigned int mainLength;
 
-	unsigned int seconds;
-
-	bool hasYoshiDrums;
-
 	bool knowsLength;
 
-	int index;
+public:		// // //
+	size_t getDataSize() const;		// // //
+	void FlushSongData(std::vector<uint8_t> &buf) const;		// // //
+	void adjustLoopPointers();		// // //
 
-	//byte mySamples[255];
+	SpaceInfo spaceInfo;
+	std::vector<uint8_t> instrumentData;
+	std::vector<uint8_t> finalData;
+	std::vector<uint8_t> allPointersAndInstrs;		// // //
 	std::vector<unsigned short> mySamples;
-	//int mySampleCount;
+	size_t totalSize;		// // //
+	size_t minSize;		// // //
+	int posInARAM;
+	int spaceForPointersAndInstrs;
 	int echoBufferSize;
+	bool exists;
+	bool hasYoshiDrums;
 
-	std::string statStr;
-
+	int index;
 	std::string title;
 	std::string author;
 	std::string game;
 	std::string comment;
+	unsigned int seconds;
+
+private:
+	std::string statStr;
 
 	bool usedSamples[256];		// Holds a record of which samples have been used for this song.
-
-	size_t minSize;		// // //
-
-	bool exists;
-
-	int posInARAM;
-
-	void compile();
-
-	size_t getDataSize() const;		// // //
-	void adjustLoopPointers();		// // //
 
 	// // //
 	bool inRemoteDefinition;
 	//int remoteDefinitionArg;
 
+public:		// // //
 	Music();
+	void compile();
 
-	void init();
 private:
+	void init();
 	void pointersFirstPass();
+
 	void parseComment();
 	void parseQMarkDirective();
 	void parseExMarkDirective();
@@ -140,7 +131,7 @@ private:
 	void parseQuantizationCommand();
 	void parsePanCommand();
 	void parseIntroDirective();
-	void parseT();
+	// // //
 	void parseTempoCommand();
 	void parseTransposeDirective();
 	void parseOctaveDirective();
@@ -184,6 +175,8 @@ private:
 	void parseSPCInfo();
 
 	// // // action methods, these will become objects later
+	void doVolume(int vol);
+	void doGlobalVolume(int vol);
 	void doVibrato(int delay, int rate, int depth);
 	void doTremolo(int delay, int rate, int depth);
 	void doTremoloOff();
@@ -191,12 +184,12 @@ private:
 	void doSampleLoad(int index, int mult);
 	void doSubloopEnter();		// // // Call any time a definition of a super loop is entered.
 	void doSubloopExit(int loopCount);		// // // Call any time a definition of a super loop is exited.
+	void doVolumeTable(bool louder);
 
 	template <typename... Args>		// // //
 	void append(Args&&... value);
 	bool trimChar(char c);		// // //
 	bool trimDirective(std::string_view str);		// // //
-	void skipChars(size_t count);		// // //
 	void skipSpaces();		// // //
 
 	bool hasNextToken();		// // //

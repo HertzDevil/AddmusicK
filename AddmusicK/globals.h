@@ -1,23 +1,5 @@
 #pragma once		// // //
 
-#ifdef _WIN32
-	#define _CRT_SECURE_NO_WARNINGS
-#endif
-
-//#if defined(linux) && !defined(stricmp)
-//#error Please use -Dstrnicmp=strncasecmp on Unix-like systems.
-//#endif
-
-
-
-// Grab yer ducktape, folks!
-#ifdef _WIN32
-#define strnicmp _strnicmp
-#else
-#define stricmp strcasecmp
-#define strnicmp strncasecmp
-#endif
-
 // // //
 const int AMKVERSION = 1;
 const int AMKMINOR = 0;
