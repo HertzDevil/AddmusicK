@@ -66,6 +66,9 @@
     <ClInclude Include="Utility\fs.h">
       <Filter>Header Files\Utility</Filter>
     </ClInclude>
+    <ClInclude Include="Music\SongBase.h">
+      <Filter>Header Files\Music</Filter>
+    </ClInclude>
     <ClInclude Include="D:\C++\lodepng\lodepng.h">
       <Filter>Header Files</Filter>
     </ClInclude>

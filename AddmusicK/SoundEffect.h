@@ -3,28 +3,28 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include "Music/SongBase.h"		// // //
 
-class SoundEffect
+class SoundEffect : public AMKd::Music::SongBase		// // //
 {
-	int getHex();
-	int getInt();
-	int getPitch(int i, int octave);
-	int getNoteLength(int i);
 public:
 	std::string &getEffectiveName();		// Returns name or pointName.
+	void compile();
+
 	int bank;
-	int index;
-	std::string name;
 	std::vector<uint8_t> data;		// // //
+	std::vector<uint8_t> code;		// // //
 	std::string text;
 	bool add0 = true;		// // //
 	std::string pointName;
 	int pointsTo = 0;		// // //
-	bool exists = false;		// // //
 
-	int posInARAM;
+private:		// // //
+	int getHex();
+	int getInt();
+	int getPitch(int i, int octave);
+	int getNoteLength(int i);
 
-	void compile();
 	void parseASM();
 	void compileASM();
 	void parseJSR();
@@ -38,7 +38,6 @@ public:
 	std::vector<std::string> defineStrings;
 
 	std::vector<std::string> asmStrings;
-	std::vector<uint8_t> code;		// // //
 	std::vector<std::string> asmNames;
 	std::vector<std::string> jmpNames;
 	std::vector<int> jmpPoses;

@@ -152,7 +152,6 @@ Music::Music() {
 	knowsLength = false;
 	totalSize = 0;
 	spaceForPointersAndInstrs = 0;
-	exists = false;
 	echoBufferSize = 0;
 }
 
@@ -1995,7 +1994,7 @@ void Music::pointersFirstPass() {
 		spaceUsedBySamples += 4 + samples[x].data.size();	// The 4 accounts for the space used by the SRCN table.
 
 	if (verbose)
-		std::cout << name << " total size: 0x" << hex4 << totalSize << " bytes" << std::dec << std::endl;
+		std::cout << name << " total size: 0x" << hex4 << totalSize << std::dec << " bytes\n";
 	else
 		printChannelDataNonVerbose(totalSize);
 

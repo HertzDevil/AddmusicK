@@ -152,6 +152,7 @@
     <ClInclude Include="MML\Lexer.h" />
     <ClInclude Include="MML\SourceFile.h" />
     <ClInclude Include="Music.h" />
+    <ClInclude Include="Music\SongBase.h" />
     <ClInclude Include="Sample.h" />
     <ClInclude Include="SampleGroup.h" />
     <ClInclude Include="SoundEffect.h" />

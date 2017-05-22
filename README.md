@@ -11,7 +11,8 @@ Assume that only AddmusicK will be modified and the 4 other projects in the solu
 - [x] Replace `boost::filesystem` with `std::experimental::filesystem`
 - [ ] Remove VS-exclusive bloat
 - [ ] Decompose pretty much everything in `Music.cpp`
-- [ ] Bring in the `Chunk` classes I wrote a while ago (originally for 0CC-FT)
+- [ ] `AMKd::MML::Action` and `AMKd::Music::Command` classes
+- [ ] Bring in the `Chunk` classes I wrote a while ago (originally for 0CC-FT) (maybe)
 - [ ] Makefiles (maybe)
 
 #### Compiler stuffs
@@ -29,12 +30,13 @@ Assume that only AddmusicK will be modified and the 4 other projects in the solu
 - [ ] Track multiplexing (e.g. `#0123`)
 - [ ] N-SPC block support
 - [ ] Globally defined patterns
+- [ ] `#include` directive, this allows for example core instruments to be defined solely using MML
 
 #### Things that should die (and might irreversibly break some MMLs)
 
 - Hex validation, there is no reason to once all commands have names
 - Whitespace requirements, missing post-conditions, case-insensitivity etc.
-- If this really gets used by people in the future, drop support for everything below `#amk 2`
+- Drop support for everything below `#amk 2` (it is year `[CURRENT YEAR]` and nobody should be even slightly concerned about removing music data inserted with the original AddMusic)
 
 #### Things that have actually been added
 
@@ -44,3 +46,4 @@ Assume that only AddmusicK will be modified and the 4 other projects in the solu
 
 - `|` command used for bypassing hex validation, it is now a no-op (since there is no guarantee bytes already placed with `$` will be inserted verbatim)
 - Replacement macros are still allowed but each result must form complete tokens (tokens cannot cross macro boundaries)
+- Hex commands will become exactly identical to plain-text equivalents

@@ -12,9 +12,9 @@ std::vector<uint8_t> rom;		// // //
 Music musics[256];
 //Sample samples[256];
 std::vector<Sample> samples;
-SoundEffect soundEffectsDF9[256];
-SoundEffect soundEffectsDFC[256];
-SoundEffect *soundEffects[2] = {soundEffectsDF9, soundEffectsDFC};
+SoundEffect soundEffects[SFX_BANKS][256];		// // //
+//SoundEffect (&soundEffectsDF9)[256] = soundEffects[0];
+//SoundEffect (&soundEffectsDFC)[256] = soundEffects[1];
 //std::vector<SampleGroup> sampleGroups;
 std::vector<BankDefine *> bankDefines;
 std::map<fs::path, int> sampleToIndex;		// // //
@@ -74,7 +74,7 @@ std::string openTextFile(const fs::path &fileName) {		// // //
 time_t getTimeStamp(const fs::path &file) {
 	// // // TODO: <chrono>
 	if (!fs::exists(file)) {
-		//std::cerr << "Could not determine timestamp of \"" << file << "\"." << std::endl;
+		//std::cerr << "Could not determine timestamp of \"" << file << "\".\n";
 		return 0;
 	}
 	return fs::last_write_time(file).time_since_epoch().count();
@@ -359,7 +359,7 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 			if ((sample.size() - 2) % 9 != 0) {
 				std::stringstream errstream;
 
-				errstream << "The sample \"" + name + "\" was of an invalid length (the filesize - 2 should be a multiple of 9).  Did you forget the loop header?" << std::endl;
+				errstream << "The sample \"" + name + "\" was of an invalid length (the filesize - 2 should be a multiple of 9).  Did you forget the loop header?\n";
 				fatalError(errstream.str());		// // //
 			}
 

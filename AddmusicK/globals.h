@@ -9,6 +9,8 @@ const int PARSER_VERSION = 2;			// Used to keep track of incompatible changes to
 
 const int DATA_VERSION = 0;				// Used to keep track of incompatible changes to any and all compiled data, either to the SNES or to the PC
 
+const int SFX_BANKS = 2;		// // //
+
 // // //
 class SoundEffect;
 
@@ -32,7 +34,7 @@ extern std::vector<uint8_t> rom;		// // //
 extern Music musics[256];
 //extern Sample samples[256];
 extern std::vector<Sample> samples;
-extern SoundEffect *soundEffects[2];	// soundEffects[2][256];
+extern SoundEffect soundEffects[SFX_BANKS][256];		// // //
 extern std::vector<BankDefine *> bankDefines;
 
 extern std::map<fs::path, int> sampleToIndex;

@@ -2,7 +2,7 @@
 
 #include <optional>
 #include <string_view>
-#include <map>
+#include <unordered_map>
 #include <memory>
 
 namespace AMKd::Utility {
@@ -18,7 +18,7 @@ private:
 	struct Node
 	{
 		std::optional<value_type> val_;
-		std::map<key_type, Node> child_;
+		std::unordered_map<key_type, Node> child_;
 	};
 
 public:

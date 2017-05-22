@@ -5,6 +5,7 @@
 #include <map>
 #include <cstdint>		// // //
 #include "MML/SourceFile.h"		// // //
+#include "Music/SongBase.h"		// // //
 
 const size_t CHANNELS = 8;		// // //
 
@@ -51,7 +52,7 @@ private:
 	bool isDefiningLabelLoop = false;		// // //
 };
 
-class Music
+class Music : public AMKd::Music::SongBase		// // //
 {
 	double introSeconds;
 	double mainSeconds;
@@ -60,10 +61,8 @@ class Music
 	int divideByTempoRatio(int, bool fractionIsError);		// Divides a value by tempoRatio.  Errors out if it can't be done without a decimal (if the parameter is set).
 	int multiplyByTempoRatio(int);					// Multiplies a value by tempoRatio.  Errors out if it goes higher than 255.
 
-public:		// // //
-	std::string name;
 public:
-	const std::string &getFileName() const;
+	const std::string &getFileName() const;		// // //
 
 private:		// // //
 	bool hasIntro;
@@ -91,13 +90,10 @@ public:		// // //
 	std::vector<unsigned short> mySamples;
 	size_t totalSize;		// // //
 	size_t minSize;		// // //
-	int posInARAM;
 	int spaceForPointersAndInstrs;
 	int echoBufferSize;
-	bool exists;
 	bool hasYoshiDrums;
 
-	int index;
 	std::string title;
 	std::string author;
 	std::string game;

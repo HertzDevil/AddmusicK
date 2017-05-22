@@ -55,11 +55,11 @@ int main(int argc, char* argv[]) {
 	std::cout.imbue(loc);
 	std::cerr.imbue(loc);
 */
-	std::clock_t startTime = clock();
+	auto startTime = std::chrono::steady_clock::now();		// // //
 
-	std::cout << "AddmusicK version " << AMKVERSION << "." << AMKMINOR << "." << AMKREVISION << " by Kipernal" << std::endl;
-	std::cout << "Parser version " << PARSER_VERSION << std::endl << std::endl;
-	std::cout << "Protip: Be sure to read the readme! If there's an error or something doesn't\nseem right, it may have your answer!\n\n" << std::endl;
+	std::cout << "AddmusicK version " << AMKVERSION << "." << AMKMINOR << "." << AMKREVISION << " by Kipernal\n";
+	std::cout << "Parser version " << PARSER_VERSION << "\n\n";
+	std::cout << "Protip: Be sure to read the readme! If there's an error or something doesn't\nseem right, it may have your answer!\n\n\n";
 
 	std::vector<std::string> arguments;
 
@@ -243,16 +243,17 @@ int main(int argc, char* argv[]) {
 #endif
 	}
 
-	std::cout << "\nSuccess!\n" << std::endl;
+	auto elapsed = std::chrono::duration<double> {std::chrono::steady_clock::now() - startTime}.count();		// // //
 
-	std::clock_t endTime = clock();
-	if (((endTime - startTime) / (float)CLOCKS_PER_SEC) - 1 < 0.02)
-		std::cout << "Completed in 1 second." << std::endl;
+	std::cout << "\nSuccess!\n\n";
+	if (elapsed - 1 < 0.02)
+		std::cout << "Completed in 1 second.\n";
 	else
-		std::cout << "Completed in " << std::dec << std::setprecision(2) << std::fixed << (endTime - startTime) / (float)CLOCKS_PER_SEC << " seconds." << std::endl;
+		std::cout << "Completed in " << std::dec << std::setprecision(2) << std::fixed << elapsed << " seconds.\n";
 
 	if (waitAtEnd)
 		quit(0);
+	return 0;
 }
 
 void displayNewUserMessage() {
@@ -323,7 +324,7 @@ void cleanROM() {
 			std::stringstream s;
 			s << "Error: The identifier for this ROM, \"" << romprogramname << "\", could not be identified. It should\n"
 				 "be \"@AMK\". This either means that some other program has modified this area of\n"
-				 "your ROM, or your ROM is corrupted. Continue? (Y or N)" << std::endl;
+				 "your ROM, or your ROM is corrupted. Continue? (Y or N)\n";
 			std::cout << s.str();
 
 			int c = '\0';
@@ -337,9 +338,9 @@ void cleanROM() {
 		int romversion = *(unsigned char *)(rom.data() + SNESToPC(0x0E8004));
 
 		if (romversion > DATA_VERSION) {
-			std::cout << "WARNING: This ROM was modified using a newer version of AddmusicK." << std::endl;
-			std::cout << "You can continue, but it is HIGHLY recommended that you upgrade AMK first." << std::endl;
-			std::cout << "Continue anyway? (Y or N)" << std::endl;
+			std::cout << "WARNING: This ROM was modified using a newer version of AddmusicK.\n";
+			std::cout << "You can continue, but it is HIGHLY recommended that you upgrade AMK first.\n";
+			std::cout << "Continue anyway? (Y or N)\n";
 
 			int c = '\0';
 			while (c != 'y' && c != 'Y' && c != 'n' && c != 'N')
@@ -386,7 +387,7 @@ void assembleSPCDriver() {
 
 	programPos = scanInt(openTextFile("asm/main.asm"), "base ");		// // //
 	if (verbose)
-		std::cout << "Compiling main SPC program, pass 1." << std::endl;
+		std::cout << "Compiling main SPC program, pass 1.\n";
 
 	//execute("asar asm/main.asm asm/main.bin 2> temp.log > temp.txt");
 
@@ -679,38 +680,15 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 				i++;
 			}
 			else if (str[i] == '\n' || str[i] == '\r') {
-				if (in1DF9) {
-					if (!isPointer)
-						soundEffects[0][index].name = tempName;
-					else
-						soundEffects[0][index].pointName = tempName;
+				fs::path bankStr = in1DF9 ? "1DF9" : "1DFC";		// // //
+				int bankIndex = in1DF9 ? 0 : 1;
+				auto &samp = soundEffects[bankIndex][index];
 
-					soundEffects[0][index].exists = true;
-
-					if (doNotAdd0)
-						soundEffects[0][index].add0 = false;
-					else
-						soundEffects[0][index].add0 = true;
-
-					if (!isPointer)
-						soundEffects[0][index].text = openTextFile(fs::path("1DF9") / tempName);		// // //
-				}
-				else {
-					if (!isPointer)
-						soundEffects[1][index].name = tempName;
-					else
-						soundEffects[1][index].pointName = tempName;
-
-					soundEffects[1][index].exists = true;
-
-					if (doNotAdd0)
-						soundEffects[1][index].add0 = false;
-					else
-						soundEffects[1][index].add0 = true;
-
-					if (!isPointer)
-						soundEffects[1][index].text = openTextFile(fs::path("1DFC") / tempName);		// // //
-				}
+				(isPointer ? samp.pointName : samp.name) = tempName;		// // //
+				soundEffects[bankIndex][index].exists = true;
+				soundEffects[bankIndex][index].add0 = !doNotAdd0;
+				if (!isPointer)
+					soundEffects[bankIndex][index].text = openTextFile(bankStr / tempName);
 
 				index = -1;
 				i++;
@@ -755,63 +733,43 @@ void compileSFX() {
 }
 
 void compileGlobalData() {
-	int DF9DataTotal = 0;
-	int DFCDataTotal = 0;
-	int DF9Count = 0;
-	int DFCCount = 0;
+	int dataTotal[SFX_BANKS] = { };		// // //
+	int sfxCount[SFX_BANKS] = { };
+	std::vector<uint16_t> sfxPointers[SFX_BANKS];
 
-	std::ostringstream oss;
+	const auto getSFXSpace = [&] (int bank) {		// // //
+		return sfxCount[bank] * 2 + dataTotal[bank];
+	};
 
-	std::vector<unsigned short> DF9Pointers, DFCPointers;
-
-	for (int i = 255; i >= 0; i--) {
-		if (soundEffects[0][i].exists) {
-			DF9Count = i;
-			break;
+	for (int bank = 0; bank < SFX_BANKS; ++bank)
+		for (int i = 255; i >= 0; i--) {
+			if (soundEffects[bank][i].exists) {
+				sfxCount[bank] = i;
+				break;
+			}
 		}
-	}
 
-	for (int i = 255; i >= 0; i--) {
-		if (soundEffects[1][i].exists) {
-			DFCCount = i;
-			break;
+	std::vector<uint8_t> allSFXData;		// // //
+
+	for (int bank = 0; bank < SFX_BANKS; ++bank) {		// // //
+		for (int i = 0; i <= sfxCount[bank]; ++i) {
+			auto &sfx = soundEffects[bank][i];		// // //
+			if (sfx.exists && !sfx.pointsTo) {
+				sfx.posInARAM = getSFXSpace(0) + getSFXSpace(1) + programSize + programPos;
+				sfx.compile();
+				sfxPointers[bank].push_back(sfx.posInARAM);
+				dataTotal[bank] += sfx.data.size() + sfx.code.size();
+			}
+			else if (!sfx.exists)
+				sfxPointers[bank].push_back(0xFFFF);
+			else if (i > sfx.pointsTo)
+				sfxPointers[bank].push_back(sfxPointers[bank][sfx.pointsTo]);
+			else
+				fatalError("Error: A sound effect that is a pointer to another sound effect must come after\n"
+						   "the sound effect that it points to.");
+			allSFXData.insert(allSFXData.cend(), sfx.data.cbegin(), sfx.data.cend());		// // //
+			allSFXData.insert(allSFXData.cend(), sfx.code.cbegin(), sfx.code.cend());
 		}
-	}
-
-	for (int i = 0; i <= DF9Count; i++) {
-		if (soundEffects[0][i].exists && soundEffects[0][i].pointsTo == 0) {
-			soundEffects[0][i].posInARAM = DFCCount * 2 + DF9Count * 2 + programPos + programSize + DF9DataTotal;
-			soundEffects[0][i].compile();
-			DF9Pointers.push_back(DF9DataTotal + (DF9Count + DFCCount) * 2 + programSize + programPos);
-			DF9DataTotal += soundEffects[0][i].data.size() + soundEffects[0][i].code.size();
-		}
-		else if (soundEffects[0][i].exists == false)
-			DF9Pointers.push_back(0xFFFF);
-		else if (i > soundEffects[0][i].pointsTo)
-			DF9Pointers.push_back(DF9Pointers[soundEffects[0][i].pointsTo]);
-		else
-			fatalError("Error: A sound effect that is a pointer to another sound effect must come after\n"
-					   "the sound effect that it points to.");
-	}
-
-	if (errorCount > 0)
-		fatalError("There were errors when compiling the sound effects.  Compilation aborted.  Your\n"
-				   "ROM has not been modified.");
-
-	for (int i = 0; i <= DFCCount; i++) {
-		if (soundEffects[1][i].exists && soundEffects[1][i].pointsTo == 0) {
-			soundEffects[1][i].posInARAM = DFCCount * 2 + DF9Count * 2 + programPos + programSize + DF9DataTotal + DFCDataTotal;
-			soundEffects[1][i].compile();
-			DFCPointers.push_back(DFCDataTotal + DF9DataTotal + (DF9Count + DFCCount) * 2 + programSize + programPos);
-			DFCDataTotal += soundEffects[1][i].data.size() + soundEffects[1][i].code.size();
-		}
-		else if (!soundEffects[1][i].exists)
-			DFCPointers.push_back(0xFFFF);
-		else if (i > soundEffects[1][i].pointsTo)
-			DFCPointers.push_back(DFCPointers[soundEffects[1][i].pointsTo]);
-		else
-			fatalError("Error: A sound effect that is a pointer to another sound effect must come after\n"
-					   "the sound effect that it points to.");
 	}
 
 	if (errorCount > 0)
@@ -819,35 +777,17 @@ void compileGlobalData() {
 				   "ROM has not been modified.");
 
 	if (verbose) {
-		std::cout << "Total space used by 1DF9 sound effects: 0x" << hex4 << (DF9DataTotal + DF9Count * 2) << std::dec << std::endl;
-		std::cout << "Total space used by 1DFC sound effects: 0x" << hex4 << (DFCDataTotal + DFCCount * 2) << std::dec << std::endl;
+		std::cout << "Total space used by 1DF9 sound effects: 0x" << hex4 << getSFXSpace(0) << '\n';
+		std::cout << "Total space used by 1DFC sound effects: 0x" << hex4 << getSFXSpace(1) << '\n';
 	}
 
-	std::cout << "Total space used by all sound effects: 0x" << hex4 << (DF9DataTotal + DF9Count * 2 + DFCDataTotal + DFCCount * 2) << std::dec << std::endl;
+	std::cout << "Total space used by all sound effects: 0x" << hex4 << (getSFXSpace(0) + getSFXSpace(1)) << std::dec << '\n';
 
-	DF9Pointers.erase(DF9Pointers.begin(), DF9Pointers.begin() + 1);
-	DFCPointers.erase(DFCPointers.begin(), DFCPointers.begin() + 1);
+	for (auto &x : sfxPointers)		// // //
+		x.erase(x.begin(), x.begin() + 1);
 
-	writeFile("asm/SFX1DF9Table.bin", DF9Pointers);
-	writeFile("asm/SFX1DFCTable.bin", DFCPointers);
-
-
-	std::vector<uint8_t> allSFXData;		// // //
-
-	for (int i = 0; i <= DF9Count; i++) {
-		for (unsigned int j = 0; j < soundEffects[0][i].data.size(); j++)
-			allSFXData.push_back(soundEffects[0][i].data[j]);
-		for (unsigned int j = 0; j < soundEffects[0][i].code.size(); j++)
-			allSFXData.push_back(soundEffects[0][i].code[j]);
-	}
-
-	for (int i = 0; i <= DFCCount; i++) {
-		for (unsigned int j = 0; j < soundEffects[1][i].data.size(); j++)
-			allSFXData.push_back(soundEffects[1][i].data[j]);
-		for (unsigned int j = 0; j < soundEffects[1][i].code.size(); j++)
-			allSFXData.push_back(soundEffects[1][i].code[j]);
-	}
-
+	writeFile("asm/SFX1DF9Table.bin", sfxPointers[0]);
+	writeFile("asm/SFX1DFCTable.bin", sfxPointers[1]);
 	writeFile("asm/SFXData.bin", allSFXData);
 
 	std::string str = openTextFile("asm/main.asm");		// // //
@@ -868,7 +808,7 @@ void compileGlobalData() {
 	fs::remove("asm/main.bin");		// // //
 
 	if (verbose)
-		std::cout << "Compiling main SPC program, pass 2." << std::endl;
+		std::cout << "Compiling main SPC program, pass 2.\n";
 
 	//execute("asar asm/tempmain.asm asm/main.bin 2> temp.log > temp.txt");
 	//if (fileExists("temp.log")) 
@@ -877,12 +817,12 @@ void compileGlobalData() {
 
 	programSize = static_cast<unsigned>(fs::file_size("asm/main.bin"));		// // //
 
-	std::cout << "Total size of main program + all sound effects: 0x" << hex4 << programSize << std::dec << std::endl;
+	std::cout << "Total size of main program + all sound effects: 0x" << hex4 << programSize << std::dec << '\n';
 }
 
 void compileMusic() {
 	if (verbose)
-		std::cout << "Compiling music..." << std::endl;
+		std::cout << "Compiling music...\n";
 
 	int totalSamplecount = 0;
 	int totalSize = 0;
@@ -949,7 +889,7 @@ void compileMusic() {
 	s = songSampleList.str();
 	std::stringstream tempstream;
 
-	tempstream << "org $" << hex6 << PCToSNES(findFreeSpace(songSampleListSize, bankStart, rom)) << "\n\n" << std::endl;
+	tempstream << "org $" << hex6 << PCToSNES(findFreeSpace(songSampleListSize, bankStart, rom)) << "\n\n\n";
 
 	s.insert(0, tempstream.str());
 
@@ -958,7 +898,7 @@ void compileMusic() {
 
 void fixMusicPointers() {
 	if (verbose)
-		std::cout << "Fixing song pointers..." << std::endl;
+		std::cout << "Fixing song pointers...\n";
 
 	int pointersPos = programSize + 0x400;
 	std::stringstream globalPointers;
@@ -1134,7 +1074,7 @@ void fixMusicPointers() {
 		writeTextFile("asm/tempmain.asm", patch);
 
 		if (verbose)
-			std::cout << "Compiling main SPC program, final pass." << std::endl;
+			std::cout << "Compiling main SPC program, final pass.\n";
 
 		//removeFile("asm/SNES/bin/main.bin");
 
@@ -1158,7 +1098,7 @@ void fixMusicPointers() {
 	writeFile("asm/SNES/bin/main.bin", temp2);
 
 	if (verbose)
-		std::cout << "Total space in ARAM left for local songs: 0x" << hex4 << (0x10000 - programSize - 0x400) << " bytes." << std::dec << std::endl;
+		std::cout << "Total space in ARAM left for local songs: 0x" << hex4 << (0x10000 - programSize - 0x400) << " bytes." << std::dec << '\n';
 
 	int defaultIndex = -1, optimizedIndex = -1;
 	for (unsigned int i = 0; i < bankDefines.size(); i++) {
@@ -1181,7 +1121,7 @@ void fixMusicPointers() {
 			groupSize += samples[j].data.size() + 4;
 		}
 
-		std::cout << "Total space in ARAM for local songs using #default: 0x" << hex4 << (0x10000 - programSize - 0x400 - groupSize) << " bytes." << std::dec << std::endl;
+		std::cout << "Total space in ARAM for local songs using #default: 0x" << hex4 << (0x10000 - programSize - 0x400 - groupSize) << " bytes." << std::dec << '\n';
 	}
 end1:
 
@@ -1195,7 +1135,7 @@ end1:
 			groupSize += samples[j].data.size() + 4;
 		}
 
-		std::cout << "Total space in ARAM for local songs using #optimized: 0x" << hex4 << (0x10000 - programSize - 0x400 - groupSize) << " bytes." << std::dec << std::endl;
+		std::cout << "Total space in ARAM for local songs using #optimized: 0x" << hex4 << (0x10000 - programSize - 0x400 - groupSize) << " bytes." << std::dec << '\n';
 	}
 end2:;
 	*/
@@ -1327,7 +1267,7 @@ void generateSPCs() {
 		fname.replace_extension(".spc");
 
 		if (verbose)
-			std::cout << "Wrote \"" << fname << "\" to file." << std::endl;
+			std::cout << "Wrote \"" << fname << "\" to file.\n";
 
 		writeFile(fname, SPC);
 		++SPCsGenerated;		// // //
@@ -1372,15 +1312,15 @@ void generateSPCs() {
 
 	if (verbose) {
 		if (SPCsGenerated == 1)
-			std::cout << "Generated 1 SPC file." << std::endl;
+			std::cout << "Generated 1 SPC file.\n";
 		else if (SPCsGenerated > 0)
-			std::cout << "Generated " << SPCsGenerated << " SPC files." << std::endl;
+			std::cout << "Generated " << SPCsGenerated << " SPC files.\n";
 	}
 }
 
 void assembleSNESDriver2() {
 	if (verbose)
-		std::cout << "\nGenerating SNES driver...\n" << std::endl;
+		std::cout << "\nGenerating SNES driver...\n\n";
 
 	std::string patch = openTextFile("asm/SNES/patch.asm");		// // //
 
@@ -1391,7 +1331,7 @@ void assembleSNESDriver2() {
 	//execute("asar asm/SNES/temppatch.asm 2> temp.log");
 	//if (fileExists("temp.log"))
 	//{
-	//	std::cout << "asar reported an error assembling patch.asm. Refer to temp.log for details." << std::endl;
+	//	std::cout << "asar reported an error assembling patch.asm. Refer to temp.log for details.\n";
 	//	quit(1);
 	//}
 
@@ -1416,7 +1356,7 @@ void assembleSNESDriver2() {
 	std::stringstream sampleIncbins; sampleIncbins << "\n\n";
 
 	if (verbose)
-		std::cout << "Writing music files..." << std::endl;
+		std::cout << "Writing music files...\n";
 
 	for (int i = 0; i < songCount; i++) {
 		if (musics[i].exists == true && i > highestGlobalSong) {
@@ -1429,7 +1369,7 @@ void assembleSNESDriver2() {
 
 			freeSpace = PCToSNES(freeSpace);
 			musicPtrStr << "music" << hex2 << i << "+8";
-			musicIncbins << "org $" << hex6 << freeSpace << "\nmusic" << hex2 << i << ": incbin \"bin/music" << hex2 << i << ".bin\"" << std::endl;
+			musicIncbins << "org $" << hex6 << freeSpace << "\nmusic" << hex2 << i << ": incbin \"bin/music" << hex2 << i << ".bin\"\n";
 		}
 		else {
 			musicPtrStr << "$" << hex6 << 0;
@@ -1442,7 +1382,7 @@ void assembleSNESDriver2() {
 	}
 
 	if (verbose)
-		std::cout << "Writing sample files..." << std::endl;
+		std::cout << "Writing sample files...\n";
 
 	for (size_t i = 0, n = samples.size(); i < n; ++i) {		// // //
 		if (samples[i].exists) {
@@ -1466,7 +1406,7 @@ void assembleSNESDriver2() {
 
 			freeSpace = PCToSNES(freeSpace);
 			samplePtrStr << "brr" << hex2 << i << "+8";
-			sampleIncbins << "org $" << hex6 << freeSpace << "\nbrr" << hex2 << i << ": incbin \"bin/brr" << hex2 << i << ".bin\"" << std::endl;
+			sampleIncbins << "org $" << hex6 << freeSpace << "\nbrr" << hex2 << i << ": incbin \"bin/brr" << hex2 << i << ".bin\"\n";
 
 		}
 		else
@@ -1512,7 +1452,7 @@ void assembleSNESDriver2() {
 	writeTextFile("asm/SNES/temppatch.asm", patch);
 
 	if (verbose)
-		std::cout << "Final compilation..." << std::endl;
+		std::cout << "Final compilation...\n";
 
 	if (!doNotPatch) {
 
@@ -1579,7 +1519,7 @@ void tryToCleanSampleToolData() {
 	if (it == rom.cend())
 		return;
 
-	std::cout << "Sample Tool detected.  Erasing data..." << std::endl;
+	std::cout << "Sample Tool detected.  Erasing data...\n";
 
 	unsigned int i = std::distance(rom.cbegin(), it);
 	int hackPos = i - 8;
@@ -1608,7 +1548,7 @@ void tryToCleanAM4Data() {
 			fatalError("Addmusic 4.05 ROMs can only be cleaned if they have a header. This does not\n"
 					   "apply to any other aspect of the program.");		// // //
 
-		std::cout << "Attempting to erase data from Addmusic 4.05:" << std::endl;
+		std::cout << "Attempting to erase data from Addmusic 4.05:\n";
 		std::string ROMstr = ROMName.string();		// // //
 		char **am405argv = new char*[2];
 		am405argv[1] = const_cast<char *>(ROMstr.c_str());
@@ -1636,7 +1576,7 @@ void tryToCleanAMMData() {
 					   "AddmusicM's INIT.asm as well as xkasAnti and a clean ROM (named clean.smc) in\n"
 					   "the same folder as this program. Then attempt to run this program once more.");
 
-		std::cout << "AddmusicM detected.  Attempting to remove..." << std::endl;
+		std::cout << "AddmusicM detected.  Attempting to remove...\n";
 		execute("perl addmusicMRemover.pl " + ROMName.string());		// // //
 		execute("xkasAnti clean.smc " + ROMName.string() + " INIT.asm");
 	}
@@ -1660,7 +1600,7 @@ void checkMainTimeStamps()			// Disabled for now, as this only works if the ROM 
 	mostRecentMainModification = std::max(mostRecentMainModification, getTimeStamp("Addmusic_list.txt"));
 
 	if (recompileMain = (mostRecentMainModification > getTimeStamp("asm/SNES/bin/main.bin")))
-		std::cout << "Changes have been made to the global program.  Recompiling...\n" << std::endl;
+		std::cout << "Changes have been made to the global program.  Recompiling...\n\n";
 */
 }
 
