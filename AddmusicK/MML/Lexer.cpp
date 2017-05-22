@@ -43,6 +43,11 @@ LEXER_FUNC_START(Lexer::Ident)
 		return *x;
 LEXER_FUNC_END()
 
+LEXER_FUNC_START(Lexer::String)
+	if (auto x = file.Trim("\\S+"))
+		return *x;
+LEXER_FUNC_END()
+
 LEXER_FUNC_START(Lexer::QString)
 	const std::regex ESC1 {R"(\\\\)"};
 	const std::regex ESC2 {R"(\\")"};

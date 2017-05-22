@@ -11,7 +11,7 @@
 #include <thread>
 #include "asardll.h"		// // //
 #include "SoundEffect.h"		// // //
-
+#include "MML/Lexer.h"		// // //
 
 bool waitAtEnd = true;
 fs::path ROMName;		// // //
@@ -406,82 +406,48 @@ void assembleSPCDriver() {
 }
 
 void loadMusicList() {
-	std::string musicFile = openTextFile("Addmusic_list.txt");		// // //
-	if (musicFile.empty() || musicFile.back() != '\n')
-		musicFile.push_back('\n');
-
-	unsigned int i = 0;
+	const std::string SONG_LIST {"Addmusic_list.txt"};
+	AMKd::MML::SourceFile list {openTextFile(SONG_LIST)};		// // //
+	using namespace AMKd::MML::Lexer;
 
 	bool inGlobals = false;
 	bool inLocals = false;
-	bool gettingName = false;
-	int index = -1;
 	int shallowSongCount = 0;
+
 	highestGlobalSong = -1;		// // //
 
-	std::string tempName;
-
-	while (i < musicFile.length()) {
-		if (isspace(musicFile[i]) && !gettingName) {
-			i++;
-			continue;
-		}
-
-		if (strncmp(musicFile.c_str() + i, "Globals:", 8) == 0) {
+	while (list.HasNextToken()) {		// // //
+		if (list.Trim("Globals:")) {
 			inGlobals = true;
 			inLocals = false;
-			i += 8;
-			continue;
 		}
-
-		if (strncmp(musicFile.c_str() + i, "Locals:", 7) == 0) {
+		else if (list.Trim("Locals:")) {
 			inGlobals = false;
 			inLocals = true;
-			i += 7;
-			continue;
-		}
-
-		if (!inGlobals && !inLocals)
-			fatalError("Error: Could not find \"Globals:\" label in list.txt");		// // //
-
-		if (index < 0) {
-			if ('0' <= musicFile[i] && musicFile[i] <= '9') index = musicFile[i++] - '0';
-			else if ('A' <= musicFile[i] && musicFile[i] <= 'F') index = musicFile[i++] - 'A' + 10;
-			else if ('a' <= musicFile[i] && musicFile[i] <= 'f') index = musicFile[i++] - 'a' + 10;
-			else fatalError("Invalid number in list.txt.");
-
-			index <<= 4;
-
-			if ('0' <= musicFile[i] && musicFile[i] <= '9') index |= musicFile[i++] - '0';
-			else if ('A' <= musicFile[i] && musicFile[i] <= 'F') index |= musicFile[i++] - 'A' + 10;
-			else if ('a' <= musicFile[i] && musicFile[i] <= 'f') index |= musicFile[i++] - 'a' + 10;
-			else if (isspace(musicFile[i])) index >>= 4;
-			else fatalError("Invalid number in list.txt.");
-
-			if (!isspace(musicFile[i]))
-				fatalError("Invalid number in list.txt.");
-			if (inGlobals)
-				highestGlobalSong = std::max(highestGlobalSong, index);
-			if (inLocals)
-				if (index <= highestGlobalSong)
-					fatalError("Error: Local song numbers must be lower than the largest global song number.");		// // //
 		}
 		else {
-			if (musicFile[i] == '\n' || musicFile[i] == '\r') {
-				musics[index].name = tempName;
-//				if (inLocals && !justSPCsPlease)
-//					musics[index].text = openTextFile(fs::path("music") / tempName);		// // //
-				musics[index].exists = true;
-				index = -1;
-				i++;
-				shallowSongCount++;
-				gettingName = false;
-				tempName.clear();
-				continue;
+			if (!inGlobals && !inLocals)
+				fatalError("Error: Could not find \"Globals:\" or \"Locals:\" label.",
+						   SONG_LIST, list.GetLineNumber());		// // //
 
-			}
-			gettingName = true;
-			tempName += musicFile[i++];
+			auto param = GetParameters<HexInt>(list);
+			if (!param || param.get<0>() > 0xFFu || !list.SkipSpaces())
+				fatalError("Invalid song index.", SONG_LIST, list.GetLineNumber());
+			int index = param.get<0>();
+			if (inGlobals)
+				highestGlobalSong = std::max(highestGlobalSong, index);
+			else if (inLocals && index <= highestGlobalSong)
+				fatalError("Error: Local song numbers must be lower than the largest global song number.",
+						   SONG_LIST, list.GetLineNumber());		// // //
+
+			auto name = list.Trim("[^\\r\\n]+");
+			if (!name)
+				fatalError("Error: Could not read file name.", SONG_LIST, list.GetLineNumber());
+			musics[index].name = *name;
+			musics[index].exists = true;
+//			if (inLocals && !justSPCsPlease)
+//				musics[index].text = openTextFile(fs::path("music") / tempName);		// // //
+			++shallowSongCount;
 		}
 	}
 
@@ -497,213 +463,76 @@ void loadMusicList() {
 }
 
 void loadSampleList() {
-	std::string str = openTextFile("Addmusic_sample groups.txt");		// // //
+	const std::string SAMPGROUP_NAME {"Addmusic_sample groups.txt"};
+	AMKd::MML::SourceFile list {openTextFile(SAMPGROUP_NAME)};		// // //
+	using namespace AMKd::MML::Lexer;
 
-	std::string groupName;
-	std::string tempName;
+	while (list.HasNextToken()) {		// // //
+		auto nameParam = GetParameters<Sep<'#'>, String, Sep<'{'>>(list);
+		if (!nameParam)
+			fatalError("Error: Could not find sample group name.", SAMPGROUP_NAME, list.GetLineNumber());
+		BankDefine sg;		// // //
+		sg.name = nameParam.get<0>();
 
-	unsigned int i = 0;
-	bool gettingGroupName = false;
-	bool gettingSampleName = false;
-
-	while (i < str.length()) {
-		if (gettingGroupName == false && gettingSampleName == false) {
-			if (groupName.length() == 0) {
-				if (isspace(str[i])) {
-					i++;
-					continue;
-				}
-				else if (str[i] == '#') {
-					i++;
-					gettingGroupName = true;
-					groupName.clear();
-					continue;
-				}
-			}
-			else {
-				if (isspace(str[i])) {
-					i++;
-					continue;
-				}
-				else if (str[i] == '{') {
-					i++;
-					gettingSampleName = true;
-					continue;
-				}
-				else
-					fatalError("Error parsing sample groups.txt.  Expected opening curly brace.");		// // //
-			}
+		while (auto item = GetParameters<Sep<'\"'>, QString, Opt<Sep<'!'>>>(list)) {
+			sg.samples.push_back(item.get<0>());
+			sg.importants.push_back(item.get<1>().has_value());
 		}
-		else if (gettingGroupName == true) {
-			if (isspace(str[i])) {
-				BankDefine sg;		// // //
-				sg.name = groupName;
-				bankDefines.push_back(std::move(sg));
-				i++;
-				gettingGroupName = false;
-				continue;
-			}
-			else {
-				groupName += str[i];
-				i++;
-				continue;
-			}
-		}
-		else if (gettingSampleName) {
-			if (tempName.length() > 0) {
-				if (str[i] == '\"') {
-					tempName.erase(tempName.begin(), tempName.begin() + 1);
-					bankDefines.back().samples.push_back(std::move(tempName));		// // //
-					bankDefines.back().importants.push_back(false);
-					tempName.clear();
-					i++;
-					continue;
-				}
-				else {
-					tempName += str[i];
-					i++;
-				}
-			}
-			else {
-				if (isspace(str[i])) {
-					i++;
-					continue;
-				}
-				else if (str[i] == '\"') {
-					i++;
-					tempName += ' ';
-					continue;
-				}
-				else if (str[i] == '}') {
-					gettingSampleName = false;
-					gettingGroupName = false;
-					groupName.clear();
-					i++;
-					continue;
-				}
-				else if (str[i] == '!') {
-					auto &def = bankDefines.back();		// // //
-					if (def.importants.empty())
-						fatalError("Error parsing Addmusic_sample groups.txt: Importance specifier ('!') must come\n"
-								   "after asample declaration, not before it.");		// // //
-					def.importants.back() = true;
-					i++;
-				}
-				else
-					fatalError("Error parsing sample groups.txt.  Expected opening quote.");
+
+		if (!GetParameters<Sep<'}'>>(list))
+			fatalError("Error: Unexpected character in sample group definition.", SAMPGROUP_NAME, list.GetLineNumber());
+		bankDefines.push_back(std::move(sg));
+	}
+
+/*
+	for (const auto &def : bankDefines) {
+		for (const auto &samp : def.samples) {
+			if (!std::any_of(samples.cbegin(), samples.cend(), [&] (const Sample &s) { return s.name == samp; })) {
+				//loadSample(samp, &samples[samples.size()]);
+				samples[samples.size()].exists = true;
 			}
 		}
 	}
-
-//	for (i = 0; (unsigned)i < bankDefines.size(); i++)
-//	{
-//		for (unsigned int j = 0; j < bankDefines[i]->samples.size(); j++)
-//		{
-//			for (int k = 0; k < samples.size(); k++)
-//			{
-//				if (samples[k].name == bankDefines[i]->samples[j]->c_str()) goto sampleExists;
-//				//if (strcmp(samples[k].name, bankDefines[i]->samples[j]->c_str()) == 0) goto sampleExists;
-//			}
-//
-//			loadSample(bankDefines[i]->samples[j]->c_str(), &samples[samples.size()]);
-//			samples[samples.size()].exists = true;
-//sampleExists:;
-//		}
-//	}
+*/
 }
 
 void loadSFXList() {		// Very similar to loadMusicList, but with a few differences.
-	std::string str = openTextFile("Addmusic_sound effects.txt");		// // //
+	const std::string SFX_LIST {"Addmusic_sound effects.txt"};
+	AMKd::MML::SourceFile list {openTextFile(SFX_LIST)};		// // //
+	using namespace AMKd::MML::Lexer;
 
-	if (str[str.length() - 1] != '\n')
-		str += '\n';
-
-	unsigned int i = 0;
-
-	bool in1DF9 = false;
-	bool in1DFC = false;
-	bool gettingName = false;
-	int index = -1;
-	bool isPointer = false;
-	bool doNotAdd0 = false;
-
-	std::string tempName;
-
+	int bank = -1;		// // //
 	int SFXCount = 0;
+	const fs::path BANK_FOLDER[SFX_BANKS] = {"1DF9", "1DFC"};
 
-	while (i < str.length()) {
-		if (isspace(str[i]) && !gettingName) {
-			i++;
-			continue;
-		}
-
-		if (strncmp(str.c_str() + i, "SFX1DF9:", 8) == 0) {
-			in1DF9 = true;
-			in1DFC = false;
-			i += 8;
-			continue;
-		}
-
-		if (strncmp(str.c_str() + i, "SFX1DFC:", 8) == 0) {
-			in1DF9 = false;
-			in1DFC = true;
-			i += 8;
-			continue;
-		}
-
-		if (!in1DF9 && !in1DFC)
-			fatalError("Error: Could not find \"SFX1DF9:\" label in sound effects.txt");		// // //
-
-		if (index < 0) {
-			if ('0' <= str[i] && str[i] <= '9') index = str[i++] - '0';
-			else if ('A' <= str[i] && str[i] <= 'F') index = str[i++] - 'A' + 10;
-			else if ('a' <= str[i] && str[i] <= 'f') index = str[i++] - 'a' + 10;
-			else fatalError("Invalid number in sound effects.txt.");
-
-			index <<= 4;
-
-			if ('0' <= str[i] && str[i] <= '9') index |= str[i++] - '0';
-			else if ('A' <= str[i] && str[i] <= 'F') index |= str[i++] - 'A' + 10;
-			else if ('a' <= str[i] && str[i] <= 'f') index |= str[i++] - 'a' + 10;
-			else if (isspace(str[i])) index >>= 4;
-			else fatalError("Invalid number in sound effects.txt.");
-
-			if (!isspace(str[i]))
-				fatalError("Invalid number in sound effects.txt.");
-		}
+	while (list.HasNextToken()) {		// // //
+		if (list.Trim("SFX1DF9:"))
+			bank = 0;
+		else if (list.Trim("SFX1DFC:"))
+			bank = 1;
 		else {
-			if (str[i] == '*' && tempName.length() == 0) {
-				isPointer = true;
-				i++;
-			}
-			else if (str[i] == '?' && tempName.length() == 0) {
-				doNotAdd0 = true;
-				i++;
-			}
-			else if (str[i] == '\n' || str[i] == '\r') {
-				fs::path bankStr = in1DF9 ? "1DF9" : "1DFC";		// // //
-				int bankIndex = in1DF9 ? 0 : 1;
-				auto &samp = soundEffects[bankIndex][index];
+			if (bank == -1)
+				fatalError("Error: Could not find \"SFX1DF9:\" or \"SFX1DFC:\" label.",
+						   SFX_LIST, list.GetLineNumber());		// // //
 
-				(isPointer ? samp.pointName : samp.name) = tempName;		// // //
-				soundEffects[bankIndex][index].exists = true;
-				soundEffects[bankIndex][index].add0 = !doNotAdd0;
-				if (!isPointer)
-					soundEffects[bankIndex][index].text = openTextFile(bankStr / tempName);
+			auto param = GetParameters<HexInt>(list);
+			if (!param || param.get<0>() > 0xFFu || !list.SkipSpaces())
+				fatalError("Invalid sound effect index.", SFX_LIST, list.GetLineNumber());
+			int index = param.get<0>();
 
-				index = -1;
-				i++;
-				SFXCount++;
-				gettingName = false;
-				tempName.clear();
-				isPointer = false;
-				doNotAdd0 = false;
-				continue;
-			}
-			else {
-				gettingName = true;
-				tempName += str[i++];
-			}
+			auto name = list.Trim("[^\\r\\n]+");
+			if (!name)
+				fatalError("Error: Could not read file name.", SFX_LIST, list.GetLineNumber());
+			bool isPointer = (list.SkipSpaces(), list.Trim('*').has_value());
+			bool add0 = !isPointer && (list.SkipSpaces(), !list.Trim('?'));
+
+			auto &samp = soundEffects[bank][index];
+			(isPointer ? samp.pointName : samp.name) = *name;		// // //
+			samp.exists = true;
+			samp.add0 = add0;
+			if (!isPointer)
+				samp.text = openTextFile(BANK_FOLDER[bank] / *name);
+			++SFXCount;
 		}
 	}
 
@@ -1276,26 +1105,9 @@ void generateSPCs() {
 
 //	std::time_t recentMod = getLastModifiedTime();		// // // If any main program modifications were made, we need to update all SPCs.
 
-	for (spc_mode_t mode : {MUSIC, SFX1, SFX2}) {
-		if (!sfxDump && mode != MUSIC)		// // //
-			break;
-
-		for (int i = 0; i < 256; i++) {		// // //
-			switch (mode) {
-			case MUSIC:
-				// Cannot generate SPCs for global songs as required samples, SRCN table, etc. cannot be determined.
-				if (!musics[i].exists || i <= highestGlobalSong)
-					continue;
-				break;
-			case SFX1:
-				if (!soundEffects[0][i].exists)
-					continue;
-				break;
-			case SFX2:
-				if (!soundEffects[1][i].exists)
-					continue;
-				break;
-			}
+	// Cannot generate SPCs for global songs as required samples, SRCN table, etc. cannot be determined.
+	for (int i = highestGlobalSong + 1; i < 256; ++i)		// // //
+		if (musics[i].exists) {
 			//time_t spcTimeStamp = getTimeStamp((File)fname);
 
 			/*if (!forceSPCGeneration)
@@ -1304,12 +1116,18 @@ void generateSPCs() {
 				if (getTimeStamp((File)"./samples") < spcTimeStamp)
 				if (recentMod < spcTimeStamp)
 				continue;*/
-
-			if (mode == MUSIC && musics[i].hasYoshiDrums)
-				makeSPCfn(i, mode, true);
-			makeSPCfn(i, mode, false);
+			if (musics[i].hasYoshiDrums)
+				makeSPCfn(i, MUSIC, true);
+			makeSPCfn(i, MUSIC, false);
 		}
-	}
+
+	if (sfxDump)
+		for (int i = 0; i < 256; i++) {		// // //
+			if (soundEffects[0][i].exists)
+				makeSPCfn(i, SFX1, false);
+			if (soundEffects[1][i].exists)
+				makeSPCfn(i, SFX2, false);
+		}
 
 	if (verbose) {
 		if (SPCsGenerated == 1)

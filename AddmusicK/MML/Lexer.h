@@ -170,6 +170,7 @@ LEXER_DECL(HexInt, unsigned);
 LEXER_DECL(SInt, int);
 LEXER_DECL(Byte, unsigned);
 LEXER_DECL(Ident, std::string);
+LEXER_DECL(String, std::string);
 LEXER_DECL(QString, std::string);
 LEXER_DECL(Time, unsigned);
 
@@ -178,9 +179,7 @@ struct Opt
 {
 	using arg_type = std::optional<typename T::arg_type>;
 	std::optional<arg_type> operator()(SourceFile &file) {
-		if (auto v = T()(file))
-			return *v;
-		return std::nullopt;
+		return std::optional<arg_type>(arg_type {T()(file)});
 	}
 };
 

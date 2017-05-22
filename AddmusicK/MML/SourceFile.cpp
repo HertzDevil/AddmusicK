@@ -84,10 +84,12 @@ int SourceFile::Peek() const {
 	return sv_.front();
 }
 
-void SourceFile::SkipSpaces() {
+bool SourceFile::SkipSpaces() {
+	bool ret = false;
 	do {
-		Trim(R"(\s*)");
+		ret = ret || !Trim(R"(\s*)")->empty();
 	} while (sv_.empty() && PopMacro());
+	return ret;
 }
 
 void SourceFile::Clear() {
@@ -172,5 +174,5 @@ void SourceFile::SetInitReadCount(std::size_t count) {
 }
 
 SourceFile::operator bool() const {
-	return !sv_.empty();
+	return !IsEmpty();
 }

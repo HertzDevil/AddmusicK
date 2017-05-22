@@ -37,7 +37,7 @@ public:
 	std::optional<std::string> Trim(std::string_view re, bool ignoreCase = false);
 	std::optional<std::string> Trim(char re);
 	int Peek() const;		// // //
-	void SkipSpaces();
+	bool SkipSpaces(); // true if at least one character is skipped
 
 	void Clear();
 	bool IsEmpty() const;
