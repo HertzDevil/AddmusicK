@@ -11,11 +11,13 @@
 #include <thread>
 #include "asardll.h"		// // //
 #include "SoundEffect.h"		// // //
+#include "Music.h"		// // //
 #include "MML/Lexer.h"		// // //
 
 bool waitAtEnd = true;
 fs::path ROMName;		// // //
 
+Music musics[256];		// // //
 std::vector<uint8_t> romHeader;		// // //
 
 void cleanROM();
@@ -36,6 +38,7 @@ void generateSPCs();
 void assembleSNESDriver2();
 void generateMSC();
 void cleanUpTempFiles();
+//std::time_t getLastModifiedTime();		// // //
 
 void generatePNGs();
 
@@ -520,11 +523,11 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 				fatalError("Invalid sound effect index.", SFX_LIST, list.GetLineNumber());
 			int index = param.get<0>();
 
-			auto name = list.Trim("[^\\r\\n]+");
+			bool isPointer = list.Trim('*').has_value();
+			bool add0 = !isPointer && !list.Trim('?');
+			auto name = (list.SkipSpaces(), list.Trim("[^\\r\\n]+"));
 			if (!name)
 				fatalError("Error: Could not read file name.", SFX_LIST, list.GetLineNumber());
-			bool isPointer = (list.SkipSpaces(), list.Trim('*').has_value());
-			bool add0 = !isPointer && (list.SkipSpaces(), !list.Trim('?'));
 
 			auto &samp = soundEffects[bank][index];
 			(isPointer ? samp.pointName : samp.name) = *name;		// // //
@@ -1080,6 +1083,7 @@ void generateSPCs() {
 
 		std::stringstream timeField;		// // //
 		std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+#pragma warning ( suppress : 4996 )
 		timeField << std::put_time(std::localtime(&t), "%m/%d/%Y");
 		auto timeStr = timeField.str();
 		std::copy_n(timeStr.cbegin(), std::min(10u, timeStr.size()), SPC.begin() + DATE);
@@ -1420,6 +1424,32 @@ void checkMainTimeStamps()			// Disabled for now, as this only works if the ROM 
 		std::cout << "Changes have been made to the global program.  Recompiling...\n\n";
 */
 }
+
+// // //
+/*
+std::time_t getLastModifiedTime() {
+	std::time_t recentMod = 0;			// If any main program modifications were made, we need to update all SPCs.
+	for (int i = 1; i <= highestGlobalSong; i++)
+		recentMod = std::max(recentMod, getTimeStamp(fs::path("music") / musics[i].getFileName()));		// // //
+
+	recentMod = std::max(recentMod, getTimeStamp("asm/main.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/commands.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/InstrumentData.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("asm/CommandTable.asm"));
+	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sound effects.txt"));
+	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sample groups.txt"));
+	recentMod = std::max(recentMod, getTimeStamp("AddmusicK.exe"));
+
+	for (int i = 1; i < 256; i++) {		// // //
+		if (soundEffects[0][i].exists)
+			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DF9") / soundEffects[0][i].getEffectiveName()));
+		if (soundEffects[1][i].exists)
+			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DFC") / soundEffects[1][i].getEffectiveName()));
+	}
+
+	return recentMod;
+}
+*/
 
 void generatePNGs()
 {

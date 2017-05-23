@@ -5,12 +5,11 @@
 #include <stack>
 #include "asardll.h"		// // //
 #include "SoundEffect.h"		// // //
+#include "Music.h"		// // //
 
 //ROM rom;
 std::vector<uint8_t> rom;		// // //
 
-Music musics[256];
-//Sample samples[256];
 std::vector<Sample> samples;
 SoundEffect soundEffects[SFX_BANKS][256];		// // //
 //SoundEffect (&soundEffectsDF9)[256] = soundEffects[0];
@@ -78,30 +77,6 @@ time_t getTimeStamp(const fs::path &file) {
 		return 0;
 	}
 	return fs::last_write_time(file).time_since_epoch().count();
-}
-
-// // //
-time_t getLastModifiedTime() {
-	time_t recentMod = 0;			// If any main program modifications were made, we need to update all SPCs.
-	for (int i = 1; i <= highestGlobalSong; i++)
-		recentMod = std::max(recentMod, getTimeStamp(fs::path("music") / musics[i].getFileName()));		// // //
-
-	recentMod = std::max(recentMod, getTimeStamp("asm/main.asm"));
-	recentMod = std::max(recentMod, getTimeStamp("asm/commands.asm"));
-	recentMod = std::max(recentMod, getTimeStamp("asm/InstrumentData.asm"));
-	recentMod = std::max(recentMod, getTimeStamp("asm/CommandTable.asm"));
-	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sound effects.txt"));
-	recentMod = std::max(recentMod, getTimeStamp("Addmusic_sample groups.txt"));
-	recentMod = std::max(recentMod, getTimeStamp("AddmusicK.exe"));
-
-	for (int i = 1; i < 256; i++) {		// // //
-		if (soundEffects[0][i].exists)
-			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DF9") / soundEffects[0][i].getEffectiveName()));
-		if (soundEffects[1][i].exists)
-			recentMod = std::max(recentMod, getTimeStamp(fs::path("1DFC") / soundEffects[1][i].getEffectiveName()));
-	}
-
-	return recentMod;
 }
 
 // // //
@@ -519,6 +494,7 @@ int strToInt(const std::string &str) {
 PreprocessStatus preprocess(const std::string &str, const std::string &filename) {
 	// Handles #ifdefs.  Maybe more later?
 	PreprocessStatus stat;
+	stat.firstChannel = CHANNELS;
 
 	unsigned int i = 0;
 	int level = 0, line = 1;

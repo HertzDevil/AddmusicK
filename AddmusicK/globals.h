@@ -12,10 +12,10 @@ const int DATA_VERSION = 0;				// Used to keep track of incompatible changes to 
 const int SFX_BANKS = 2;		// // //
 
 // // //
+class Music;
 class SoundEffect;
 
 //#include "ROM.h"
-#include "Music.h"
 #include "Sample.h"
 #include "BankDefine.h"
 #include <string>
@@ -31,8 +31,6 @@ class SoundEffect;
 //extern ROM rom;
 extern std::vector<uint8_t> rom;		// // //
 
-extern Music musics[256];
-//extern Sample samples[256];
 extern std::vector<Sample> samples;
 extern SoundEffect soundEffects[SFX_BANKS][256];		// // //
 extern std::vector<BankDefine> bankDefines;		// // //
@@ -146,11 +144,10 @@ struct PreprocessStatus
 	std::string result;
 	std::string title;
 	int version = 0;
-	int firstChannel = CHANNELS;
+	int firstChannel;
 };
 PreprocessStatus preprocess(const std::string &str, const std::string &filename);		// // //
 
 int strToInt(const std::string &str);
 
 time_t getTimeStamp(const fs::path &file);
-time_t getLastModifiedTime();		// // //

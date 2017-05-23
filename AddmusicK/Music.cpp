@@ -9,7 +9,6 @@
 #include <locale>		// // //
 
 #include "globals.h"		// // //
-#include "Utility/Trie.h"		// // //
 #include "Utility/Exception.h"		// // //
 #include "Binary/Defines.h"		// // //
 #include "MML/Lexer.h"		// // //
@@ -226,8 +225,8 @@ void Music::init() {
 		title = name.substr(p);
 
 	//std::string backup = text;
-	
-	const auto stat = preprocess(openTextFile((std::string)"music/" + name), name);		// // //
+
+	const auto stat = preprocess(openTextFile(fs::path {"music"} / name), name);		// // //
 	mml_ = AMKd::MML::SourceFile {stat.result};
 	if (!stat.title.empty())
 		title = stat.title;
