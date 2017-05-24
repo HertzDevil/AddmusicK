@@ -380,13 +380,24 @@ void cleanROM() {
 	writeFile("asm/SNES/temp.sfc", rom);
 }
 
+// // // moved
+int scanInt(const std::string &str, const std::string &value) {		// Scans an integer value that comes after the specified string within another string.  Must be in $XXXX format (or $XXXXXX, etc.).
+	int i = str.find(value);		// // //
+	if (i == std::string::npos)
+		fatalError("Error: Could not find \"" + value + "\"");		// // //
+
+	int ret;
+	std::sscanf(str.c_str() + i + value.length(), "$%X", &ret);	// Woo C functions in C++ code!
+	return ret;
+}
+
 void assembleSNESDriver() {
 	programUploadPos = scanInt(openTextFile("asm/SNES/patch.asm"), "!DefARAMRet = ");		// // //
 }
 
 void assembleSPCDriver() {
-	fs::remove("temp.log");		// // //
-	fs::remove("asm/main.bin");
+	removeFile("temp.log");		// // //
+	removeFile("asm/main.bin");
 
 	programPos = scanInt(openTextFile("asm/main.asm"), "base ");		// // //
 	if (verbose)
@@ -403,7 +414,7 @@ void assembleSPCDriver() {
 	reuploadPos = scanInt(temptxt, "ReuploadPos: ");
 	SRCNTableCodePos = scanInt(temptxt, "SRCNTableCodePos: ");
 
-	fs::remove("temp.log");
+	removeFile("temp.log");
 
 	programSize = static_cast<unsigned>(fs::file_size("asm/main.bin"));		// // //
 }
@@ -1398,7 +1409,7 @@ void tryToCleanAMMData() {
 					   "the same folder as this program. Then attempt to run this program once more.");
 
 		std::cout << "AddmusicM detected.  Attempting to remove...\n";
-		execute("perl addmusicMRemover.pl " + ROMName.string());		// // //
+		execute("perl addmusicMRemover.pl " + ROMName.string(), false);		// // //
 		execute("xkasAnti clean.smc " + ROMName.string() + " INIT.asm");
 	}
 }

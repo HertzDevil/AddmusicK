@@ -6,6 +6,11 @@
 
 namespace AMKd::MML {
 
+enum class Target		// // //
+{
+	Unknown, AMK, AM4, AMM,
+};
+
 class SourceFile;
 
 class Preprocessor
@@ -15,6 +20,7 @@ public:
 
 	std::string result;
 	std::string title;
+	Target target;		// // //
 	int version;
 	int firstChannel;
 
@@ -28,6 +34,7 @@ private:
 	void doElseIf(bool enable);		// // //
 	void doElse();		// // //
 
+	void doTarget(Target t);		// // //
 	void doVersion(int ver);		// // //
 
 	bool parsePredicate(SourceFile &row);		// // //

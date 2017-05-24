@@ -25,7 +25,7 @@ namespace {
 } // namespace
 
 Preprocessor::Preprocessor(const std::string &str, const std::string &filename) :
-	version(0), firstChannel(CHANNELS)
+	target(Target::Unknown), version(0), firstChannel(CHANNELS)
 {
 	// Handles #ifdefs.  Maybe more later?
 	SourceFile text {str};
@@ -99,11 +99,11 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 							fatalError(!msg.empty() ? msg : "(empty #error directive)", filename, text.GetLineNumber());
 						}
 						else if (*ident == "amm")
-							doDirective(&Preprocessor::doVersion, -2);
+							doDirective(&Preprocessor::doTarget, Target::AMM);
 						else if (*ident == "am4")
-							doDirective(&Preprocessor::doVersion, -1);
+							doDirective(&Preprocessor::doTarget, Target::AM4);
 						else if (*ident == "amk") {
-							auto param = GetParameters<Opt<Sep<'='>>, Int>(row);
+							auto param = GetParameters<Opt<Sep<'='>>, SInt>(row);
 							param ? doDirective(&Preprocessor::doVersion, param.get<1>()) :
 								throw AMKd::Utility::SyntaxException {MISSING("#amk")};
 						}
@@ -190,9 +190,14 @@ void Preprocessor::doElse() {
 	doIf(!prev);
 }
 
+void Preprocessor::doTarget(Target t) {
+	target = t;
+	version = 0;
+}
+
 void Preprocessor::doVersion(int ver) {
-	if (ver < 0 || version >= 0)
-		version = ver;
+	target = Target::AMK;
+	version = ver;
 }
 
 bool Preprocessor::parsePredicate(SourceFile &row) {

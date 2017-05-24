@@ -58,10 +58,8 @@ static bool doesntLoop;
 static bool triplet;
 static bool inPitchSlide;
 
-// // //
-static enum class TargetType {
-	AMK, AM4, AMM, Unknown = AMK,
-} songTargetProgram;
+using AMKd::MML::Target;		// // //
+static Target songTargetProgram = Target::Unknown;
 static int targetAMKVersion;
 
 static int loopLabel = 0;
@@ -184,7 +182,6 @@ void Music::init() {
 	inE6Loop = false;
 	seconds = 0;
 
-	songTargetProgram = TargetType::AMK;		// // //
 	hTranspose = 0;
 	usingHTranspose = false;
 	// // //
@@ -196,9 +193,6 @@ void Music::init() {
 	// // //
 
 	inDefineBlock = false;
-
-	for (auto &t : tracks)		// // //
-		t.ignoreTuning = (songTargetProgram == TargetType::AM4); // AM4 fix for tuning[] related stuff.
 
 	hasIntro = false;
 	doesntLoop = false;
@@ -229,34 +223,34 @@ void Music::init() {
 
 	const auto stat = AMKd::MML::Preprocessor {openTextFile(fs::path {"music"} / name), name};		// // //
 	mml_ = AMKd::MML::SourceFile {stat.result};
+	songTargetProgram = stat.target;		// // //
+	targetAMKVersion = stat.version;
 	if (!stat.title.empty())
 		title = stat.title;
 
-	if (stat.version == -1) {
-		songTargetProgram = TargetType::AM4;		// // //
+	switch (stat.target) {		// // //
+	case Target::AMM:
 		//songVersionIdentified = true;
-		targetAMKVersion = 0;
-	}
-
-	else if (stat.version == -2) {
-		songTargetProgram = TargetType::AMM;		// // //
+		break;
+	case Target::AM4:
 		//songVersionIdentified = true;
+		for (auto &t : tracks)		// // //
+			t.ignoreTuning = true; // AM4 fix for tuning[] related stuff.
+		break;
+	case Target::AMK:
+		/*
 		targetAMKVersion = 0;
-	}
-	else if (stat.version == 0)
-		error("Song did not specify target program with #amk, #am4, or #amm.");
-	else {						// Just assume it's AMK for now.
-		targetAMKVersion = stat.version;
-
+		if (backup.find('\r') != -1)
+			backup = backup.insert(backup.length(), "\r\n\r\n#amk=1\r\n");		// Automatically assume that this is a song written for AMK.
+		else
+			backup = backup.insert(backup.length(), "\n\n#amk=1\n");
+		writeTextFile(fs::path {"music"} / name, backup);
+		*/
 		if (targetAMKVersion > PARSER_VERSION)
 			error("This song was made for a newer version of AddmusicK.  You must update to use\nthis song.");
-
-		/*			targetAMKVersion = 0;
-		if (backup.find('\r') != -1)
-		backup = backup.insert(backup.length(), "\r\n\r\n#amk=1\r\n");		// Automatically assume that this is a song written for AMK.
-		else
-		backup = backup.insert(backup.length(), "\n\n#amk=1\n");
-		writeTextFile((std::string)"music/" + name, backup);*/
+		break;
+	default:
+		error("Song did not specify target program with #amk, #am4, or #amm.");
 	}
 
 	usingSMWVTable = (targetAMKVersion < 2);		// // //
@@ -360,7 +354,7 @@ void Music::FlushSongData(std::vector<uint8_t> &buf) const {
 }
 
 void Music::parseComment() {
-	if (songTargetProgram == TargetType::AMM)		// // //
+	if (songTargetProgram == Target::AMM)		// // //
 		mml_.Trim(".*?\\n");
 	else
 		error("Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2.");		// // //
@@ -559,7 +553,7 @@ void Music::parseInstrumentCommand() {
 				else
 					error("This custom instrument has not been defined yet.");		// // //
 
-			if (songTargetProgram == TargetType::AM4)		// // //
+			if (songTargetProgram == Target::AM4)		// // //
 				tracks[channel].ignoreTuning = false;
 
 			append(AMKd::Binary::CmdType::Inst, i);		// // //
@@ -731,7 +725,7 @@ void Music::parseLoopCommand() {
 	inNormalLoop = true;		// // //
 	prevNoteLength = -1;
 	tracks[CHANNELS].instrument = tracks[prevChannel].instrument;		// // //
-	if (songTargetProgram == TargetType::AM4)
+	if (songTargetProgram == Target::AM4)
 		tracks[CHANNELS].ignoreTuning = tracks[prevChannel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
 
 	if (loopLabel > 0 && loopPointers.find(loopLabel) != loopPointers.cend())		// // //
@@ -895,7 +889,7 @@ void Music::parseHFDHex() {
 				else
 					append(AMKd::Binary::CmdType::DSP, reg, val);		// // //
 			else
-				songTargetProgram = TargetType::AM4;		// // // The HFD header bytes indicate this as being an AM4 song, so it gets AM4 treatment.
+				songTargetProgram = Target::AM4;		// // // The HFD header bytes indicate this as being an AM4 song, so it gets AM4 treatment.
 		} break;
 		case 0x81:
 			if (!getHexByte(i))		// // //
@@ -983,7 +977,7 @@ void Music::parseHexCommand() {
 			break;
 		case AMKd::Binary::CmdType::Tremolo:
 			if (auto first = GetParameters<Byte>(mml_)) {		// // //
-				if (songTargetProgram == TargetType::AM4 && first.get<0>() >= 0x80) {
+				if (songTargetProgram == Target::AM4 && first.get<0>() >= 0x80) {
 					if (mySamples.empty() && (i & 0x7F) > 0x13)
 						error("This song uses custom samples, but has not yet defined its samples with the #samples command.");		// // //
 					auto param = GetParameters<Byte>(mml_);
@@ -994,7 +988,7 @@ void Music::parseHexCommand() {
 			}
 			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Subloop:
-			if (songTargetProgram == TargetType::AM4)		// // // N-SPC tremolo off
+			if (songTargetProgram == Target::AM4)		// // // N-SPC tremolo off
 				return doTremoloOff();		// // //
 			if (auto param = GetParameters<Byte>(mml_)) {
 				int repeats = param.get<0>();
@@ -1006,7 +1000,7 @@ void Music::parseHexCommand() {
 				return apply_this(&Music::doVolume, this, *param);
 			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Envelope:
-			if (songTargetProgram == TargetType::AM4) {
+			if (songTargetProgram == Target::AM4) {
 				parseHFDHex();
 				return;
 			}
@@ -1092,7 +1086,7 @@ void Music::parseHexCommand() {
 		--hexLeft;
 		switch (currentHex) {
 		case AMKd::Binary::CmdType::Inst:
-			if (songTargetProgram == TargetType::AM4) {		// // // If this was the instrument command
+			if (songTargetProgram == Target::AM4) {		// // // If this was the instrument command
 				if (i >= 0x13)					// And it was >= 0x13
 					i = i - 0x13 + 30;		// Then change it to a custom instrument.
 				if (optimizeSampleUsage)
@@ -1135,7 +1129,7 @@ void Music::parseHexCommand() {
 				i = divideByTempoRatio(i, false);
 			break;
 		case AMKd::Binary::CmdType::TrspGlobal:
-			if (hexLeft == 0 && songTargetProgram == TargetType::AM4) {	// // // AM4 seems to do something strange with $E4?
+			if (hexLeft == 0 && songTargetProgram == Target::AM4) {	// // // AM4 seems to do something strange with $E4?
 				++i;
 				i &= 0xFF;
 			}
@@ -1162,7 +1156,7 @@ void Music::parseHexCommand() {
 			// Print error for AM4 songs that attempt to use an invalid FIR filter. They both
 			// A) won't sound like their originals and
 			// B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
-			else if (hexLeft == 0 && songTargetProgram == TargetType::AM4) {		// // //
+			else if (hexLeft == 0 && songTargetProgram == Target::AM4) {		// // //
 				if (i > 1) {
 					std::stringstream ss;		// // //
 					ss << '$' << hex2 << i;
@@ -1307,7 +1301,7 @@ void Music::parseNote(int ch) {		// // //
 		error("Remote definitions cannot contain note data!");
 
 	// // //
-	if (songTargetProgram == TargetType::AMK && channelDefined == false && inRemoteDefinition == false)
+	if (songTargetProgram == Target::AMK && channelDefined == false && inRemoteDefinition == false)
 		error("Note data must be inside a channel!");
 
 	int i;		// // //
@@ -1520,7 +1514,7 @@ void Music::parseSpecialDirective() {
 void Music::parseReplacementDirective() {
 	std::string s = getEscapedString();		// // //
 	int i = s.find('=');
-	if (i == -1)
+	if (i == std::string::npos)
 		fatalError("Error parsing replacement directive; could not find '='");		// // //
 
 	std::string findStr = s.substr(0, i);
@@ -1534,10 +1528,6 @@ void Music::parseReplacementDirective() {
 
 	while (!replStr.empty() && isspace(replStr.front()))
 		replStr.erase(0, 1);
-
-//	auto it = replacements.find(findStr);
-//	if (it != replacements.end())
-//		replacements.erase(it);
 
 	mml_.AddMacro(findStr, replStr);		// // //
 }
@@ -1788,7 +1778,7 @@ int Music::getNoteLength() {
 	while (trimChar('.')) {		// // //
 		frac /= 2;
 		len += frac;
-		if (++times == 2 && songTargetProgram == TargetType::AM4)
+		if (++times == 2 && songTargetProgram == Target::AM4)
 			break;	// // // AM4 only allows two dots for whatever reason.
 	}
 

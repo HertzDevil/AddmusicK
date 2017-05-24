@@ -118,16 +118,6 @@ int execute(const std::string &command, bool prepend) {
 	return std::system(tempstr.c_str());
 }
 
-int scanInt(const std::string &str, const std::string &value) {		// Scans an integer value that comes after the specified string within another string.  Must be in $XXXX format (or $XXXXXX, etc.).
-	int i = str.find(value);		// // //
-	if (i == std::string::npos)
-		fatalError("Error: Could not find \"" + value + "\"");		// // //
-
-	int ret;
-	std::sscanf(str.c_str() + i + value.length(), "$%X", &ret);	// Woo C functions in C++ code!
-	return ret;
-}
-
 // // //
 
 void removeFile(const fs::path &fileName) {

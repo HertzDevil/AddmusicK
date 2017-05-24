@@ -3,7 +3,7 @@
 // // //
 const int AMKVERSION = 1;
 const int AMKMINOR = 0;
-const int AMKREVISION = 3;
+const int AMKREVISION = 5;		// // //
 
 const int PARSER_VERSION = 2;			// Used to keep track of incompatible changes to the parser
 
@@ -72,9 +72,6 @@ extern bool useAsarDLL;
 bool asarCompileToBIN(const fs::path &patchName, const fs::path &binOutput, bool dieOnError = true);
 bool asarPatchToROM(const fs::path &patchName, const fs::path &romName, bool dieOnError = true);
 
-std::vector<uint8_t> openFile(const fs::path &fileName);		// // //
-std::string openTextFile(const fs::path &fileName);		// // //
-
 // // //
 class hex_formatter
 {
@@ -93,6 +90,7 @@ constexpr auto hex2 = hex_formatter(2);
 constexpr auto hex4 = hex_formatter(4);
 constexpr auto hex6 = hex_formatter(6);
 
+std::vector<uint8_t> openFile(const fs::path &fileName);		// // //
 template <typename T>
 void writeFile(const fs::path &fileName, const std::vector<T> &vector) {		// // //
 	std::ofstream ofs;
@@ -101,20 +99,19 @@ void writeFile(const fs::path &fileName, const std::vector<T> &vector) {		// // 
 	ofs.close();
 }
 
+std::string openTextFile(const fs::path &fileName);		// // //
 void writeTextFile(const fs::path &fileName, const std::string &string);
+
+void removeFile(const fs::path &fileName);
+
 int execute(const std::string &command, bool prepentDotSlash = true);
 
 void printError(const std::string &error, const std::string &fileName = "", int line = -1);		// // //
 void printWarning(const std::string &error, const std::string &fileName = "", int line = -1);
-
 [[noreturn]] void fatalError(const std::string &error, const std::string &fileName = "", int line = -1);		// // //
 [[noreturn]] void quit(int code);		// // //
 
-int scanInt(const std::string &str, const std::string &value);
-
 // // //
-
-void removeFile(const fs::path &fileName);
 
 //int getSampleIndex(const std::string &name);
 
