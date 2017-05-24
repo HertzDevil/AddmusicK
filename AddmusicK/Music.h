@@ -162,12 +162,6 @@ private:
 	void parsePath();
 	void compileASM();
 
-	void parseDefine();
-	void parseIfdef();
-	void parseIfndef();
-	void parseEndif();
-	void parseUndef();
-
 	void parseSPCInfo();
 
 	// // // action methods, these will become objects later

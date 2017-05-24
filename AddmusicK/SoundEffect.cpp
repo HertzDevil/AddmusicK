@@ -1,5 +1,6 @@
 #include "SoundEffect.h"
 #include "globals.h"		// // //
+#include "MML/Preprocessor.h"		// // //
 #include <sstream>
 #include <iomanip>
 
@@ -8,13 +9,6 @@ static int line;
 static bool triplet;
 static int defaultNoteValue;
 static bool inDefineBlock;
-
-#define skipSpaces() \
-	while (isspace(text[pos])) { \
-		if (text[pos] == '\n') \
-			++line; \
-		++pos; \
-	}
 
 #define error2(str) do { \
 		printError(str, name, line); \
@@ -103,14 +97,22 @@ int SoundEffect::getNoteLength(int i) {
 	return i;
 }
 
+// // //
+void SoundEffect::skipSpaces() {
+	while (isspace(text[pos])) {
+		if (text[pos] == '\n')
+			++line;
+		++pos;
+	}
+}
+
 void SoundEffect::compile() {
 #define error(str) if (false); else { \
 		printError(str, name, line); \
 		continue; \
 	}
 
-	text += "                   ";
-	const auto stat = preprocess(text, name);		// // //
+	const auto stat = AMKd::MML::Preprocessor {text, name};		// // //
 	text = stat.result;
 	pos = 0;
 	line = 0;
@@ -144,19 +146,9 @@ void SoundEffect::compile() {
 				parseASM();
 			else if (text.substr(pos + 1, 3) == "jsr")
 				parseJSR();
-			else if (text.substr(pos + 1, 6) == "define")
-				parseDefine();
-			else if (text.substr(pos + 1, 5) == "undef")
-				parseUndef();
-			else if (text.substr(pos + 1, 5) == "ifdef")
-				parseIfdef();
-			else if (text.substr(pos + 1, 6) == "ifndef")
-				parseIfndef();
-			else if (text.substr(pos + 1, 5) == "endif")
-				parseEndif();
-			else {
+			else {		// // //
 				pos++;
-				error("Channel declarations are not allowed in sound effects.");
+				error("Unknown option type for '#' directive.");
 			}
 			continue;
 		case '!':
@@ -488,92 +480,4 @@ void SoundEffect::parseJSR() {
 	append(0x00);
 }
 
-void SoundEffect::parseDefine() {
-	pos += 7;
-	skipSpaces();		// // //
-	std::string defineName;
-	while (!isspace(text[pos]) && pos < text.length()) {
-		defineName += text[pos++];
-	}
-
-	for (unsigned int z = 0; z < defineStrings.size(); z++)
-		if (defineStrings[z] == defineName)
-			error2("A string cannot be defined more than once.");
-
-	defineStrings.push_back(defineName);
-}
-
-void SoundEffect::parseUndef() {
-	pos += 6;
-	skipSpaces();		// // //
-	std::string defineName;
-	while (!isspace(text[pos]) && pos < text.length()) {
-		defineName += text[pos++];
-	}
-	unsigned int z = -1;
-	for (z = 0; z < defineStrings.size(); z++)
-		if (defineStrings[z] == defineName) {		// // //
-			defineStrings[z].clear();
-			return;
-		}
-
-	error2("The specified string was never defined.");
-}
-
-void SoundEffect::parseIfdef() {
-	pos += 6;
-	inDefineBlock = true;
-	skipSpaces();		// // //
-	std::string defineName;
-	while (!isspace(text[pos]) && pos < text.length()) {
-		defineName += text[pos++];
-	}
-
-	unsigned int z = -1;
-
-	int temp;
-
-	for (unsigned int z = 0; z < defineStrings.size(); z++)
-		if (defineStrings[z] == defineName)
-			goto found;
-
-	temp = text.find("#endif", pos);
-
-	if (temp == -1)
-		error2("#ifdef was missing a matching #endif.");
-
-	pos = temp;
-found:
-	return;
-}
-
-void SoundEffect::parseIfndef() {
-	pos += 7;
-	inDefineBlock = true;
-	skipSpaces();		// // //
-	std::string defineName;
-	while (!isspace(text[pos]) && pos < text.length()) {
-		defineName += text[pos++];
-	}
-
-	unsigned int z = -1;
-
-	for (unsigned int z = 0; z < defineStrings.size(); z++)
-		if (defineStrings[z] == defineName) {		// // //
-			int temp = text.find("#endif", pos);
-
-			if (temp == -1)
-				error2("#ifdef was missing a matching #endif.");
-
-			pos = temp;
-			return;
-		}
-}
-
-void SoundEffect::parseEndif() {
-	pos += 6;
-	if (inDefineBlock == false)
-		error2("#endif was found without a matching #ifdef or #ifndef");		// // //
-	else
-		inDefineBlock = false;
-}
+// // //

@@ -139,15 +139,5 @@ int getSample(const fs::path &name, Music *music);
 fs::path getSamplePath(const fs::path &name, const std::string &musicName);		// // //
 
 // // //
-struct PreprocessStatus
-{
-	std::string result;
-	std::string title;
-	int version = 0;
-	int firstChannel;
-};
-PreprocessStatus preprocess(const std::string &str, const std::string &filename);		// // //
-
-int strToInt(const std::string &str);
 
 time_t getTimeStamp(const fs::path &file);

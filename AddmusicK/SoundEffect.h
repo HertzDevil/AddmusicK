@@ -25,17 +25,11 @@ private:		// // //
 	int getPitch(int i, int octave);
 	int getNoteLength(int i);
 
+	void skipSpaces();		// // //
+
 	void parseASM();
 	void compileASM();
 	void parseJSR();
-
-	void parseDefine();
-	void parseIfdef();
-	void parseIfndef();
-	void parseEndif();
-	void parseUndef();
-	
-	std::vector<std::string> defineStrings;
 
 	std::vector<std::string> asmStrings;
 	std::vector<std::string> asmNames;

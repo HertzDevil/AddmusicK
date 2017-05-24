@@ -19,6 +19,7 @@ using namespace AMKd::MML;
 
 SourceFile::SourceFile() : sv_(mml_), prev_(sv_)
 {
+	Trim("\xEF\xBB\xBF"); // utf-8 bom
 }
 
 SourceFile::SourceFile(std::string_view data) :

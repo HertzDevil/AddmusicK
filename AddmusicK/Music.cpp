@@ -12,6 +12,7 @@
 #include "Utility/Exception.h"		// // //
 #include "Binary/Defines.h"		// // //
 #include "MML/Lexer.h"		// // //
+#include "MML/Preprocessor.h"		// // //
 #include <functional>
 
 //#include "Preprocessor.h"
@@ -226,7 +227,7 @@ void Music::init() {
 
 	//std::string backup = text;
 
-	const auto stat = preprocess(openTextFile(fs::path {"music"} / name), name);		// // //
+	const auto stat = AMKd::MML::Preprocessor {openTextFile(fs::path {"music"} / name), name};		// // //
 	mml_ = AMKd::MML::SourceFile {stat.result};
 	if (!stat.title.empty())
 		title = stat.title;
@@ -1491,16 +1492,6 @@ void Music::parseSpecialDirective() {
 		parseSampleDefinitions();
 	else if (trimDirective("pad"))		// // //
 		parsePadDefinition();
-	else if (trimDirective("define"))		// // //
-		parseDefine();
-	else if (trimDirective("undef"))		// // //
-		parseUndef();
-	else if (trimDirective("ifdef"))		// // //
-		parseIfdef();
-	else if (trimDirective("ifndef"))		// // //
-		parseIfndef();
-	else if (trimDirective("endif"))		// // //
-		parseEndif();
 	else if (trimDirective("spc"))		// // //
 		parseSPCInfo();
 	else if (trimDirective("louder")) {		// // //
@@ -1512,12 +1503,6 @@ void Music::parseSpecialDirective() {
 		append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::TempoImmunity);		// // //
 	else if (trimDirective("path"))		// // //
 		parsePath();
-	else if (trimDirective("am4"))		// // //
-		;
-	else if (trimDirective("amm"))		// // //
-		;
-	else if (trimDirective("amk="))		// // //
-		getInt();
 	else if (trimDirective("halvetempo")) {		// // //
 		if (channelDefined)
 			error("#halvetempo must be used before any and all channels.");		// // //
@@ -1528,6 +1513,8 @@ void Music::parseSpecialDirective() {
 	}
 	else if (trimDirective("option"))		// // //
 		parseOptionDirective();
+	else
+		error("Unknown option type for '#' directive.");		// // //
 }
 
 void Music::parseReplacementDirective() {
@@ -2078,104 +2065,7 @@ void Music::adjustLoopPointers() {
 	}
 }
 
-void Music::parseDefine() {
-	error("A #define was found after the preprocessing stage.");
-	//skipSpaces();
-	//std::string defineName;
-	//while (!isspace(peek()) && pos < text.length())
-	//{
-	//	defineName += text[pos++];
-	//}
-
-	//for (unsigned int z = 0; z < defineStrings.size(); z++)
-	//	if (defineStrings[z] == defineName)
-	//		error("A string cannot be defined more than once.");
-
-	//defineStrings.push_back(defineName);
-}
-
-void Music::parseUndef() {
-	error("An #undef was found after the preprocessing stage.");
-	//	skipSpaces();
-	//	std::string defineName;
-	//	while (!isspace(peek()) && pos < text.length())
-	//	{
-	//		defineName += text[pos++];
-	//	}
-	//	unsigned int z = -1;
-	//	for (z = 0; z < defineStrings.size(); z++)
-	//		if (defineStrings[z] == defineName)
-	//			goto found;
-	//	
-	//	error("The specified string was never defined.");
-	//
-	//found:
-	//
-	//	defineStrings[z].clear();
-}
-
-void Music::parseIfdef() {
-	error("An #ifdef was found after the preprocessing stage.");
-	//	inDefineBlock = true;
-	//	skipSpaces();
-	//	std::string defineName;
-	//	while (!isspace(peek()) && pos < text.length())
-	//	{
-	//		defineName += text[pos++];
-	//	}
-	//
-	//	unsigned int z = -1;
-	//
-	//	int temp;
-	//
-	//	for (unsigned int z = 0; z < defineStrings.size(); z++)
-	//		if (defineStrings[z] == defineName)
-	//			goto found;
-	//
-	//	temp = text.find("#endif", pos);
-	//
-	//	if (temp == -1)
-	//		error("#ifdef was missing a matching #endif.");
-	//
-	//	pos = temp;
-	//found:
-	//	return;
-}
-
-void Music::parseIfndef() {
-	error("An #ifndef was found after the preprocessing stage.");
-	//	inDefineBlock = true;
-	//	skipSpaces();
-	//	std::string defineName;
-	//	while (!isspace(peek()) && pos < text.length())
-	//	{
-	//		defineName += text[pos++];
-	//	}
-	//
-	//	unsigned int z = -1;
-	//
-	//	for (unsigned int z = 0; z < defineStrings.size(); z++)
-	//		if (defineStrings[z] == defineName)
-	//			goto found;
-	//
-	//	return;
-	//
-	//found:
-	//	int temp = text.find("#endif", pos);
-	//
-	//	if (temp == -1)
-	//		error("#ifdef was missing a matching #endif.");
-	//
-	//	pos = temp;
-}
-
-void Music::parseEndif() {
-	error("An #endif was found after the preprocessing stage.");
-	//if (inDefineBlock == false)
-	//	error("#endif was found without a matching #ifdef or #ifndef")
-	//else
-	//	inDefineBlock = false;
-}
+// // //
 
 void Music::parseSPCInfo() {
 	if (skipSpaces(), !trimChar('{'))

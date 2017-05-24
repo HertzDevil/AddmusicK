@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\Music">
+      <UniqueIdentifier>{aa77e426-db94-4a81-8bcc-7523a2791c59}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Header Files\MML">
       <UniqueIdentifier>{8ad6734a-d88e-4804-8dd7-7cbcca0fae0c}</UniqueIdentifier>
     </Filter>
@@ -69,6 +72,9 @@
     <ClInclude Include="Music\SongBase.h">
       <Filter>Header Files\Music</Filter>
     </ClInclude>
+    <ClInclude Include="MML\Preprocessor.h">
+      <Filter>Header Files\MML</Filter>
+    </ClInclude>
     <ClInclude Include="D:\C++\lodepng\lodepng.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -93,6 +99,9 @@
       <Filter>Source Files\MML</Filter>
     </ClCompile>
     <ClCompile Include="MML\SourceFile.cpp">
+      <Filter>Source Files\MML</Filter>
+    </ClCompile>
+    <ClCompile Include="MML\Preprocessor.cpp">
       <Filter>Source Files\MML</Filter>
     </ClCompile>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp">

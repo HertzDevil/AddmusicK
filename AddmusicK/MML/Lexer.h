@@ -161,7 +161,7 @@ GetParameters(SourceFile &file) {
 #define LEXER_FUNC_START(T) \
 	typename std::optional<typename T::arg_type> T::operator()(SourceFile &file) {
 
-#define LEXER_FUNC_END(...) \
+#define LEXER_FUNC_END() \
 		return std::nullopt; \
 	}
 
