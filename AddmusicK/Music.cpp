@@ -79,7 +79,6 @@ static int transposeMap[256];
 //static bool htranspose[256];
 static int hTranspose;
 static bool usingHTranspose;
-static int currentHex = 0;
 
 //static int tempLoopLength;		// How long the current [ ] loop is.
 //static int e6LoopLength;		// How long the current $E6 loop is.
@@ -197,7 +196,6 @@ void Music::init() {
 	inPitchSlide = false;
 
 	loopLabel = 0;
-	currentHex = 0;
 	// // //
 
 	for (int z = 0; z < 256; z++) {
@@ -885,7 +883,6 @@ void Music::parseHFDHex() {
 			error("Error while parsing HFD hex command.");
 	}
 
-	currentHex = AMKd::Binary::CmdType::Envelope;
 	append(AMKd::Binary::CmdType::Envelope, i);		// // //
 }
 
@@ -922,10 +919,8 @@ void Music::parseHexCommand() {
 		return;
 	}
 
-	currentHex = i;
-
 	using namespace AMKd::MML::Lexer;		// // //
-	switch (currentHex) {		// // //
+	switch (int currentHex = i) {		// // //
 	case AMKd::Binary::CmdType::Inst:
 		append(currentHex);
 		getval();
