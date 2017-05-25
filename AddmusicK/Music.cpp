@@ -79,7 +79,6 @@ static int transposeMap[256];
 //static bool htranspose[256];
 static int hTranspose;
 static bool usingHTranspose;
-static int hexLeft = 0;
 static int currentHex = 0;
 
 //static int tempLoopLength;		// How long the current [ ] loop is.
@@ -199,7 +198,7 @@ void Music::init() {
 
 	loopLabel = 0;
 	currentHex = 0;
-	hexLeft = 0;
+	// // //
 
 	for (int z = 0; z < 256; z++) {
 		transposeMap[z] = 0;
@@ -289,16 +288,11 @@ void Music::compile() {
 	try {
 		while (hasNextToken()) {		// // //
 			if (auto token = mml_.ExtractToken(CMDS)) {		// // //
-				if (hexLeft != 0)
-					error("Unknown hex command.");
 				(this->*(*token))();
 				continue;
 			}
 
 			char ch = ::tolower((*mml_.Trim("."))[0]);		// // //
-
-			if (hexLeft != 0 && ch != '$')
-				error("Unknown hex command.");
 
 			switch (ch) {
 			case '?': parseQMarkDirective();		break;
@@ -861,14 +855,12 @@ void Music::parseHFDHex() {
 					append(AMKd::Binary::CmdType::Noise, val);
 				else
 					append(AMKd::Binary::CmdType::DSP, reg, val);		// // //
-				hexLeft = 0;
 				return;
 			}
 			break;
 		case 0x81:
 			if (auto param = GetParameters<Byte, Byte>(mml_)) {		// // //
 				append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Transpose, param.get<0>());		// // //
-				hexLeft = 0;
 				return;
 			}
 			break;
@@ -885,7 +877,6 @@ void Music::parseHFDHex() {
 					// append(AMKd::Binary::CmdType::ARAM, i, addr >> 8, addr & 0xFF);		// // //
 					++addr;
 				}
-				hexLeft = 0;
 				return;
 			}
 			break;
@@ -895,8 +886,6 @@ void Music::parseHFDHex() {
 	}
 
 	currentHex = AMKd::Binary::CmdType::Envelope;
-//	hexLeft = hexLengths[currentHex - AMKd::Binary::CmdType::Inst] - 1 - 1;
-	hexLeft = 1;
 	append(AMKd::Binary::CmdType::Envelope, i);		// // //
 }
 
@@ -920,349 +909,458 @@ void Music::parseHexCommand() {
 		error("Error parsing hex command.");
 	int i = *hex;
 
+	const auto getval = [&] {		// // // TODO: remove
+		using namespace AMKd::MML::Lexer;
+		auto param = GetParameters<Byte>(mml_);
+		if (!param)
+			error("Error parsing hex command.");
+		i = param.get<0>();
+	};
+
 	if (!validateHex) {
 		append(i);
 		return;
 	}
 
-	if (hexLeft == 0) {
-		currentHex = i;
+	currentHex = i;
 
-		using namespace AMKd::MML::Lexer;		// // //
-		switch (currentHex) {		// // //
-		case AMKd::Binary::CmdType::Vibrato:
-			if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
-				return apply_this(&Music::doVibrato, this, *param);
-			error("Unknown hex command.");
-		case AMKd::Binary::CmdType::VolGlobal:
-			if (auto param = GetParameters<Byte>(mml_))
-				return apply_this(&Music::doGlobalVolume, this, *param);
-			error("Unknown hex command.");
-		case AMKd::Binary::CmdType::Tempo:
-			if (auto param = GetParameters<Byte>(mml_))
-				return apply_this(&Music::doTempo, this, *param);
-			error("Unknown hex command.");
-		case AMKd::Binary::CmdType::TempoFade:
-			guessLength = false; // NOPE.  Nope nope nope nope nope nope nope nope nope nope.
-			break;
-		case AMKd::Binary::CmdType::Tremolo:
-			if (auto first = GetParameters<Byte>(mml_)) {		// // //
-				if (songTargetProgram == Target::AM4 && first.get<0>() >= 0x80) {
-					if (mySamples.empty() && (i & 0x7F) > 0x13)
-						error("This song uses custom samples, but has not yet defined its samples with the #samples command.");		// // //
-					auto param = GetParameters<Byte>(mml_);
-					return doSampleLoad(i - 0x80, param.get<0>());
-				}
-				if (auto remain = GetParameters<Byte, Byte>(mml_))
-					return apply_this(&Music::doTremolo, this, std::tuple_cat(*first, *remain));
-			}
-			error("Unknown hex command.");
-		case AMKd::Binary::CmdType::Subloop:
-			if (songTargetProgram == Target::AM4)		// // // N-SPC tremolo off
-				return doTremoloOff();		// // //
-			if (auto param = GetParameters<Byte>(mml_)) {
-				int repeats = param.get<0>();
-				return repeats ? doSubloopExit(repeats + 1) : doSubloopEnter();
-			}
-			error("Unknown hex command.");
-		case AMKd::Binary::CmdType::Vol:
-			if (auto param = GetParameters<Byte>(mml_))
-				return apply_this(&Music::doVolume, this, *param);
-			error("Unknown hex command.");
-		case AMKd::Binary::CmdType::Envelope:
-			if (songTargetProgram == Target::AM4)
-				return parseHFDHex();
-			if (auto param = GetParameters<Byte, Byte>(mml_))
-				return apply_this(&Music::doEnvelope, this, *param);
-			error("Unknown hex command.");
-		case AMKd::Binary::CmdType::SampleLoad:
-			if (auto param = GetParameters<Byte, Byte>(mml_))
-				return apply_this(&Music::doSampleLoad, this, *param);
-			error("Unknown hex command.");
-		case AMKd::Binary::CmdType::Arpeggio:
-			if (auto param = GetParameters<Byte, Byte>(mml_)) {
-				unsigned count, len;
-				std::tie(count, len) = *param;
-				append(AMKd::Binary::CmdType::Arpeggio, count, divideByTempoRatio(len, false));
-				if (count >= 0x80) {
-					if (count != 0x80 && count != 0x81)
-						error("Illegal value for arpeggio command.");
-					count = 2;
-				}
-				for (unsigned i = 0; i < count; ++i) {
-					auto note = GetParameters<Byte>(mml_);
-					if (!note)
-						error("Error parsing arpeggio command.");
-					append(note.get<0>());
-				}
-				return;
-			}
-			error("Unknown hex command.");
-		case AMKd::Binary::CmdType::Callback:
-			if (targetAMKVersion > 1)
-				error("$FC has been replaced with remote code in #amk 2 and above.");		// // //
-			else if (targetAMKVersion == 1) {
-				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-					// Add in a "restore instrument" remote call.
-				int channelToCheck = inNormalLoop ? prevChannel : channel;		// // //
-				tracks[channelToCheck].usingFC = true;		// // //
-
-				// If we're just using the FC command and not the FA command as well,
-				if (!tracks[channelToCheck].usingFA) {
-					// Then add the "restore instrument command"
-					insertRemoteConversion({AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00},
-										   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00});
-
-					// Then add in the first part of a "apply gain before a note ends" call.
-					hexLeft = 2;
-					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain},
-										   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Release});
-
-					// We won't know the gain and delays until later.
-				}
-				else {
-					// Then add in the first part of a "2 3 combination" call.  
-					// Theoretically we could go back and change the previous type to 5.
-					// But that's annoying if the commands are separated, so maybe some other time.
-					// Shh.  Don't tell anyone.
-
-					hexLeft = 2;
-					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain},
-										   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05});
-					//append(lastFAGainValue[channelToCheck]);
-				}
-				return;
-			}
-		case 0xFD: case 0xFE: case 0xFF:
-			error("Unknown hex command.");
-		default:
-			if (currentHex < AMKd::Binary::CmdType::Inst && manualNoteWarning) {
-				if (targetAMKVersion == 0) {
-					warn("Warning: A hex command was found that will act as a note instead of a special\n"
-						 "effect. If this is a song you're using from someone else, you can most likely\n"
-						 "ignore this message, though it may indicate that a necessary #amm or #am4 is\n"
-						 "missing.");		// // //
-					manualNoteWarning = false;
-					return;
-				}
-				error("Unknown hex command.");
-			}
-		}
-
-		hexLeft = hexLengths[currentHex - AMKd::Binary::CmdType::Inst] - 1;
+	using namespace AMKd::MML::Lexer;		// // //
+	switch (currentHex) {		// // //
+	case AMKd::Binary::CmdType::Inst:
 		append(currentHex);
-	}
-	else {
-		--hexLeft;
-		switch (currentHex) {
-		case AMKd::Binary::CmdType::Inst:
-			if (songTargetProgram == Target::AM4) {		// // // If this was the instrument command
-				if (i >= 0x13)					// And it was >= 0x13
-					i = i - 0x13 + 30;		// Then change it to a custom instrument.
-				if (optimizeSampleUsage)
-					usedSamples[instrumentData[(i - 30) * 5]] = true;
-			}
-			break;
-		case AMKd::Binary::CmdType::PanFade:
-			if (hexLeft == 1)
-				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::Portamento:
-			if (hexLeft == 2)
-				i = divideByTempoRatio(i, false);
-			else if (hexLeft == 1) {		// Hack allowing the $DD command to accept a note as a parameter.
-				AMKd::MML::SourceFile checkNote {mml_};		// // //
-				while (true) {
-					checkNote.SkipSpaces();
-					if (checkNote.Trim("[A-Ga-g]")) {
-						if (tracks[channel].updateQ)		// // //
-							error("You cannot use a note as the last parameter of the $DD command if you've also\n"
-								  "used the qXX command just before it.");		// // //
-						hexLeft = 0;
-						nextNoteIsForDD = true;
-						break;
-					}
-					else if (checkNote.Trim('o'))
-						AMKd::MML::Lexer::GetParameters<AMKd::MML::Lexer::Int>(checkNote);
-					else if (!checkNote.Trim('<') && !checkNote.Trim('>'))
-						break;
-				}
-				i = divideByTempoRatio(i, false);
-			}
-			break;
-		case AMKd::Binary::CmdType::VolGlobalFade:
-			if (hexLeft == 1)
-				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::TempoFade:
-			if (hexLeft == 1)
-				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::TrspGlobal:
-			if (hexLeft == 0 && songTargetProgram == Target::AM4) {	// // // AM4 seems to do something strange with $E4?
-				++i;
-				i &= 0xFF;
-			}
-			break;
-		case AMKd::Binary::CmdType::VolFade:
-			if (hexLeft == 1)
-				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::VibratoFade:
-			if (hexLeft == 0)
-				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::BendAway:
-			if (hexLeft == 2 || hexLeft == 1)
-				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::BendTo:
-			if (hexLeft == 2 || hexLeft == 1)
-				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::Echo2:
-			if (hexLeft == 2)
-				echoBufferSize = std::max(echoBufferSize, i);
-			// Print error for AM4 songs that attempt to use an invalid FIR filter. They both
-			// A) won't sound like their originals and
-			// B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
-			else if (hexLeft == 0 && songTargetProgram == Target::AM4) {		// // //
-				if (i > 1) {
-					std::stringstream ss;		// // //
-					ss << '$' << hex2 << i;
-					error(ss.str() + " is not a valid FIR filter for the $F1 command. Must be either $00 or $01.");
-				}
-			}
-			break;
-		case AMKd::Binary::CmdType::EchoFade:
-			if (hexLeft == 2)
-				i = divideByTempoRatio(i, false);
-			break;
-		case AMKd::Binary::CmdType::ExtF4:
-			if (hexLeft == 0)
-				if (i == AMKd::Binary::CmdOptionF4::YoshiCh5 || i == AMKd::Binary::CmdOptionF4::Yoshi)
-					hasYoshiDrums = true;
-			break;
-		case AMKd::Binary::CmdType::ExtFA:
-			if (hexLeft == 1 && targetAMKVersion > 1 && i == 0x05)
-				error("$FA $05 in #amk 2 or above has been replaced with remote code.");		// // //
-			// More code conversion.
-			if (hexLeft == 0 && targetAMKVersion == 1 && tracks[channel].data.back() == 0x05) {
-				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-				tracks[channel].data.pop_back();					// // // Remove the last two bytes
-				tracks[channel].data.pop_back();					// (i.e. the $FA $05)
-
-				int channelToCheck = inNormalLoop ? prevChannel : channel;
-
-				if (i != 0) {
-					// Check if this channel is using FA and FC combined...
-					if (!tracks[channelToCheck].usingFC) {		// // //
-						// Then add in a "restore instrument" remote call.
-						insertRemoteConversion({AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00},
-											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00});
-
-						// Then add the "set gain" remote call.
-						insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
-											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00});
-					}
-					else {
-						// Otherwise, add in a "2 5 combination" command.
-
-						// Then add the "set gain" remote call.
-						insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
-											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05, tracks[channelToCheck].lastFCDelayValue});
-						//append(0x00);
-					}
-
-					// Either way, we're using FA now.
-					tracks[channelToCheck].usingFA = true;
-				}
-				else {
-					insertRemoteConversion({},
-										   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00});
-					tracks[channelToCheck].usingFA = false;
-				}
-				return;
-			}
-			break;
-		case AMKd::Binary::CmdType::Callback:
-			// Do conversion for the old remote gain command.
-			if (hexLeft == 1 && targetAMKVersion == 1) {
-				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-
-				int channelToCheck = inNormalLoop ? prevChannel : channel;		// // //
-
-				if (i == 0) {							// If i is zero, we have to undo a bunch of stuff.
-					if (!tracks[channelToCheck].usingFA) {		// // // But only if this is a "pure" FC command.
-						removeRemoteConversion();
-						removeRemoteConversion();
-
-						tracks[channel].data.pop_back();		// // //
-						tracks[channel].data.pop_back();
-						tracks[channel].data.pop_back();
-						tracks[channel].data.pop_back();
-						tracks[channel].data.pop_back();
-						tracks[channel].data.pop_back();
-						tracks[channel].data.pop_back();
-						tracks[channel].data.pop_back();
-						tracks[channel].data.pop_back();
-
-						insertRemoteConversion({},
-											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00});
-					}
-					else {
-						// If we're using FA and FC, then we need to "restore" the FA data.
-
-						// Same as the other "get rid of stuff", but without the "restore instrument" call.
-						removeRemoteConversion();
-
-						tracks[channel].data.pop_back();		// // //
-						tracks[channel].data.pop_back();
-						tracks[channel].data.pop_back();
-						tracks[channel].data.pop_back();
-
-						// Then add the "set gain" remote call.
-						insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
-											   {AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00});
-					}
-
-					// Either way, FC gets turned off.
-					tracks[channelToCheck].usingFC = false;
-
-					//remoteGainConversion.back().push_back(AMKd::Binary::CmdType::ExtFA);
-					//remoteGainConversion.back().push_back(AMKd::Binary::CmdOptionFA::Gain);
-				}
-				else {
-					i = divideByTempoRatio(i, false);
-					tracks[channelToCheck].lastFCDelayValue = static_cast<uint8_t>(i);		// // //
-					append(i);
-				}
-				return;
-			}
-			else if (hexLeft == 0 && targetAMKVersion == 1) {		// // //
-				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-				// // //
-				std::map<std::vector<uint8_t>, uint16_t> a;
-				if (!tracks[channel].remoteGainInfo.empty()) {
-					auto &conv = tracks[channel].remoteGainInfo.back().second;		// // //
-					if (!conv.empty()) {			// If the size was zero, then it has no data anyway.  Used for the 0 event type.
-	//					int channelToCheck = inNormalLoop ? prevChannel : channel;			// Only saves two bytes, though.
-
-	//					tracks[channelToCheck].lastFCGainValue = static_cast<uint8_t>(i);		// // //
-						conv.push_back(i);
-						conv.push_back(0x00);
-					}
-				}
-				return;
-			}
-			break;
+		getval();
+		if (songTargetProgram == Target::AM4) {		// // // If this was the instrument command
+			if (i >= 0x13)					// And it was >= 0x13
+				i = i - 0x13 + 30;		// Then change it to a custom instrument.
+			if (optimizeSampleUsage)
+				usedSamples[instrumentData[(i - 30) * 5]] = true;
 		}
-
-		if (i == -1)
-			error("Error parsing hex command.");
-		if (i < 0 || i > 255)
-			error("Illegal value for hex command.");
 		append(i);
+		return;
+	case AMKd::Binary::CmdType::Pan:
+		append(currentHex);
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::PanFade:
+		append(currentHex);
+		getval();
+		append(divideByTempoRatio(i, false));
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::Portamento:
+		append(currentHex);
+		getval();
+		append(divideByTempoRatio(i, false));
+		getval();
+		{		// Hack allowing the $DD command to accept a note as a parameter.
+			AMKd::MML::SourceFile checkNote {mml_};		// // //
+			while (true) {
+				checkNote.SkipSpaces();
+				if (checkNote.Trim("[A-Ga-g]")) {
+					if (tracks[channel].updateQ)		// // //
+						error("You cannot use a note as the last parameter of the $DD command if you've also\n"
+								"used the qXX command just before it.");		// // //
+					nextNoteIsForDD = true;
+					break;
+				}
+				else if (checkNote.Trim('o'))
+					AMKd::MML::Lexer::GetParameters<AMKd::MML::Lexer::Int>(checkNote);
+				else if (!checkNote.Trim('<') && !checkNote.Trim('>'))
+					break;
+			}
+			i = divideByTempoRatio(i, false);
+		}
+		append(i);
+		if (!nextNoteIsForDD) {
+			getval();
+			append(i);
+		}
+		return;
+	case AMKd::Binary::CmdType::Vibrato:
+		if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
+			return apply_this(&Music::doVibrato, this, *param);
+		error("Unknown hex command.");
+	case AMKd::Binary::CmdType::VibratoOff:
+		append(currentHex);
+		return;
+	case AMKd::Binary::CmdType::VolGlobal:
+		if (auto param = GetParameters<Byte>(mml_))
+			return apply_this(&Music::doGlobalVolume, this, *param);
+		error("Unknown hex command.");
+	case AMKd::Binary::CmdType::VolGlobalFade:
+		append(currentHex);
+		getval();
+		append(divideByTempoRatio(i, false));
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::Tempo:
+		if (auto param = GetParameters<Byte>(mml_))
+			return apply_this(&Music::doTempo, this, *param);
+		error("Unknown hex command.");
+	case AMKd::Binary::CmdType::TempoFade:
+		guessLength = false; // NOPE.  Nope nope nope nope nope nope nope nope nope nope.
+		append(currentHex);
+		getval();
+		append(divideByTempoRatio(i, false));
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::TrspGlobal:
+		append(currentHex);
+		getval();
+		if (songTargetProgram == Target::AM4)	// // // AM4 seems to do something strange with $E4?
+			++i &= 0xFF;
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::Tremolo:
+		if (auto first = GetParameters<Byte>(mml_)) {		// // //
+			if (songTargetProgram == Target::AM4 && first.get<0>() >= 0x80) {
+				if (mySamples.empty() && (i & 0x7F) > 0x13)
+					error("This song uses custom samples, but has not yet defined its samples with the #samples command.");		// // //
+				auto param = GetParameters<Byte>(mml_);
+				return doSampleLoad(i - 0x80, param.get<0>());
+			}
+			if (auto remain = GetParameters<Byte, Byte>(mml_))
+				return apply_this(&Music::doTremolo, this, std::tuple_cat(*first, *remain));
+		}
+		error("Unknown hex command.");
+	case AMKd::Binary::CmdType::Subloop:
+		if (songTargetProgram == Target::AM4)		// // // N-SPC tremolo off
+			return doTremoloOff();		// // //
+		if (auto param = GetParameters<Byte>(mml_)) {
+			int repeats = param.get<0>();
+			return repeats ? doSubloopExit(repeats + 1) : doSubloopEnter();
+		}
+		error("Unknown hex command.");
+	case AMKd::Binary::CmdType::Vol:
+		if (auto param = GetParameters<Byte>(mml_))
+			return apply_this(&Music::doVolume, this, *param);
+		error("Unknown hex command.");
+	case AMKd::Binary::CmdType::VolFade:
+		append(currentHex);
+		getval();
+		append(divideByTempoRatio(i, false));
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::Loop:
+		append(currentHex);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::VibratoFade:
+		append(currentHex);
+		getval();
+		append(divideByTempoRatio(i, false));
+		return;
+	case AMKd::Binary::CmdType::BendAway:
+	case AMKd::Binary::CmdType::BendTo:
+		append(currentHex);
+		getval();
+		append(divideByTempoRatio(i, false));
+		getval();
+		append(divideByTempoRatio(i, false));
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::Envelope:
+		if (songTargetProgram == Target::AM4) {
+			parseHFDHex();
+			getval();
+			append(i);
+			return;
+		}
+		if (auto param = GetParameters<Byte, Byte>(mml_))
+			return apply_this(&Music::doEnvelope, this, *param);
+		error("Unknown hex command.");
+	case AMKd::Binary::CmdType::Detune:
+		append(currentHex);
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::Echo1:
+		append(currentHex);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::EchoOff:
+		append(currentHex);
+		return;
+	case AMKd::Binary::CmdType::Echo2:
+		append(currentHex);
+		getval();
+		append(i);
+		echoBufferSize = std::max(echoBufferSize, i);
+		getval();
+		append(i);
+		getval();
+		// Print error for AM4 songs that attempt to use an invalid FIR filter. They both
+		// A) won't sound like their originals and
+		// B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
+		if (songTargetProgram == Target::AM4) {		// // //
+			if (i > 1) {
+				std::stringstream ss;		// // //
+				ss << '$' << hex2 << i;
+				error(ss.str() + " is not a valid FIR filter for the $F1 command. Must be either $00 or $01.");
+			}
+		}
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::EchoFade:
+		append(currentHex);
+		getval();
+		append(divideByTempoRatio(i, false));
+		getval();
+		append(i);
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::SampleLoad:
+		if (auto param = GetParameters<Byte, Byte>(mml_))
+			return apply_this(&Music::doSampleLoad, this, *param);
+		error("Unknown hex command.");
+	case AMKd::Binary::CmdType::ExtF4:
+		append(currentHex);
+		getval();
+		append(i);
+		if (i == AMKd::Binary::CmdOptionF4::YoshiCh5 || i == AMKd::Binary::CmdOptionF4::Yoshi)
+			hasYoshiDrums = true;
+		return;
+	case AMKd::Binary::CmdType::FIR:
+		append(currentHex);
+		for (int j = 0; j < 8; ++j) {
+			getval();
+			append(i);
+		}
+		return;
+	case AMKd::Binary::CmdType::DSP:
+		append(currentHex);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::ARAM:
+		append(currentHex);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::Noise:
+		append(currentHex);
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::DataSend:
+		append(currentHex);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::ExtFA:
+		append(currentHex);
+		getval();
+		if (targetAMKVersion > 1 && i == 0x05)
+			error("$FA $05 in #amk 2 or above has been replaced with remote code.");		// // //
+		append(i);
+		getval();
+		// More code conversion.
+		if (targetAMKVersion == 1 && tracks[channel].data.back() == 0x05) {
+			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
+			tracks[channel].data.pop_back();					// // // Remove the last two bytes
+			tracks[channel].data.pop_back();					// (i.e. the $FA $05)
+
+			int channelToCheck = inNormalLoop ? prevChannel : channel;
+
+			if (i != 0) {
+				// Check if this channel is using FA and FC combined...
+				if (!tracks[channelToCheck].usingFC) {		// // //
+					// Then add in a "restore instrument" remote call.
+					insertRemoteConversion({AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00},
+											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00});
+
+					// Then add the "set gain" remote call.
+					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
+											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00});
+				}
+				else {
+					// Otherwise, add in a "2 5 combination" command.
+
+					// Then add the "set gain" remote call.
+					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
+											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05, tracks[channelToCheck].lastFCDelayValue});
+					//append(0x00);
+				}
+
+				// Either way, we're using FA now.
+				tracks[channelToCheck].usingFA = true;
+			}
+			else {
+				insertRemoteConversion({},
+										{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00});
+				tracks[channelToCheck].usingFA = false;
+			}
+			return;
+		}
+		append(i);
+		return;
+	case AMKd::Binary::CmdType::Arpeggio:
+		if (auto param = GetParameters<Byte, Byte>(mml_)) {
+			unsigned count, len;
+			std::tie(count, len) = *param;
+			append(AMKd::Binary::CmdType::Arpeggio, count, divideByTempoRatio(len, false));
+			if (count >= 0x80) {
+				if (count != 0x80 && count != 0x81)
+					error("Illegal value for arpeggio command.");
+				count = 2;
+			}
+			for (unsigned i = 0; i < count; ++i) {
+				auto note = GetParameters<Byte>(mml_);
+				if (!note)
+					error("Error parsing arpeggio command.");
+				append(note.get<0>());
+			}
+			return;
+		}
+		error("Unknown hex command.");
+	case AMKd::Binary::CmdType::Callback:
+		if (targetAMKVersion == 1) {
+			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
+				// Add in a "restore instrument" remote call.
+			int channelToCheck = inNormalLoop ? prevChannel : channel;		// // //
+			tracks[channelToCheck].usingFC = true;		// // //
+
+			// If we're just using the FC command and not the FA command as well,
+			if (!tracks[channelToCheck].usingFA) {
+				// Then add the "restore instrument command"
+				insertRemoteConversion({AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00},
+										{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00});
+
+				// Then add in the first part of a "apply gain before a note ends" call.
+				insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain},
+										{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Release});
+
+				// We won't know the gain and delays until later.
+			}
+			else {
+				// Then add in the first part of a "2 3 combination" call.  
+				// Theoretically we could go back and change the previous type to 5.
+				// But that's annoying if the commands are separated, so maybe some other time.
+				// Shh.  Don't tell anyone.
+
+				insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain},
+										{AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05});
+				//append(lastFAGainValue[channelToCheck]);
+			}
+
+			getval();
+			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
+
+			int channelToCheck = inNormalLoop ? prevChannel : channel;		// // //
+
+			if (i == 0) {							// If i is zero, we have to undo a bunch of stuff.
+				if (!tracks[channelToCheck].usingFA) {		// // // But only if this is a "pure" FC command.
+					removeRemoteConversion();
+					removeRemoteConversion();
+
+					tracks[channel].data.pop_back();		// // //
+					tracks[channel].data.pop_back();
+					tracks[channel].data.pop_back();
+					tracks[channel].data.pop_back();
+					tracks[channel].data.pop_back();
+					tracks[channel].data.pop_back();
+					tracks[channel].data.pop_back();
+					tracks[channel].data.pop_back();
+					tracks[channel].data.pop_back();
+
+					insertRemoteConversion({},
+											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00});
+				}
+				else {
+					// If we're using FA and FC, then we need to "restore" the FA data.
+
+					// Same as the other "get rid of stuff", but without the "restore instrument" call.
+					removeRemoteConversion();
+
+					tracks[channel].data.pop_back();		// // //
+					tracks[channel].data.pop_back();
+					tracks[channel].data.pop_back();
+					tracks[channel].data.pop_back();
+
+					// Then add the "set gain" remote call.
+					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
+											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00});
+				}
+
+				// Either way, FC gets turned off.
+				tracks[channelToCheck].usingFC = false;
+
+				//remoteGainConversion.back().push_back(AMKd::Binary::CmdType::ExtFA);
+				//remoteGainConversion.back().push_back(AMKd::Binary::CmdOptionFA::Gain);
+			}
+			else {
+				i = divideByTempoRatio(i, false);
+				tracks[channelToCheck].lastFCDelayValue = static_cast<uint8_t>(i);		// // //
+				append(i);
+			}
+
+			getval();
+			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
+			// // //
+			if (!tracks[channel].remoteGainInfo.empty()) {
+				auto &conv = tracks[channel].remoteGainInfo.back().second;		// // //
+				if (!conv.empty()) {			// If the size was zero, then it has no data anyway.  Used for the 0 event type.
+//					int channelToCheck = inNormalLoop ? prevChannel : channel;			// Only saves two bytes, though.
+
+//					tracks[channelToCheck].lastFCGainValue = static_cast<uint8_t>(i);		// // //
+					conv.push_back(i);
+					conv.push_back(0x00);
+				}
+			}
+			return;
+		}
+			
+		if (targetAMKVersion > 1)
+			error("$FC has been replaced with remote code in #amk 2 and above.");		// // //
+		append(currentHex);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		getval();
+		append(i);
+		return;
+	case 0xFD: case 0xFE: case 0xFF:
+		error("Unknown hex command.");
+	default:
+		if (currentHex < AMKd::Binary::CmdType::Inst && manualNoteWarning) {
+			if (targetAMKVersion == 0) {
+				warn("Warning: A hex command was found that will act as a note instead of a special\n"
+						"effect. If this is a song you're using from someone else, you can most likely\n"
+						"ignore this message, though it may indicate that a necessary #amm or #am4 is\n"
+						"missing.");		// // //
+				manualNoteWarning = false;
+				return;
+			}
+			error("Unknown hex command.");
+		}
 	}
 }
 
