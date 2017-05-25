@@ -5,13 +5,7 @@
 #include "SoundEffect.h"		// // //
 #include "Music.h"		// // //
 
-//ROM rom;
-std::vector<uint8_t> rom;		// // //
-
 std::vector<Sample> samples;
-SoundEffect soundEffects[SFX_BANKS][256];		// // //
-//SoundEffect (&soundEffectsDF9)[256] = soundEffects[0];
-//SoundEffect (&soundEffectsDFC)[256] = soundEffects[1];
 //std::vector<SampleGroup> sampleGroups;
 std::vector<BankDefine> bankDefines;		// // //
 std::map<fs::path, int> sampleToIndex;		// // //
@@ -217,45 +211,36 @@ int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM) {		//
 	size_t pos = 0;
 	size_t runningSpace = 0;
 	size += 8;
-	int i;
 
-	for (i = start; (unsigned)i < ROM.size(); i++) {
+	size_t i = start;
+	for (const size_t N = ROM.size(); i < N; ) {		// // //
+		if (i % 0x8000 == 0)
+			runningSpace = 0;
+
+		if (i < N - 4 && ROM[i] == 'S' && ROM[i + 1] == 'T' && ROM[i + 2] == 'A' && ROM[i + 3] == 'R') {
+			unsigned short RATSSize = ROM[i + 4] | ROM[i + 5] << 8;
+			unsigned short sizeInv = (ROM[i + 6] | ROM[i + 7] << 8) ^ 0xFFFF;
+			if (RATSSize != sizeInv)
+				++runningSpace;
+			else {
+				i += RATSSize + 8;	// Would be nine if the loop didn't auto increment.
+				runningSpace = 0;
+			}
+		}
+		else if (ROM[i] == 0 || aggressive)
+			++runningSpace;
+		else
+			runningSpace = 0;
+
+		++i;
 		if (runningSpace == size) {
 			pos = i;
 			break;
 		}
-
-		if (i % 0x8000 == 0)
-			runningSpace = 0;
-
-		if ((unsigned)i < ROM.size() - 4 && memcmp(&ROM[i], "STAR", 4) == 0) {
-			unsigned short RATSSize = ROM[i + 4] | ROM[i + 5] << 8;
-			unsigned short sizeInv = (ROM[i + 6] | ROM[i + 7] << 8) ^ 0xFFFF;
-			if (RATSSize != sizeInv) {
-				runningSpace += 1;
-				continue;
-			}
-			i += RATSSize + 8;	// Would be nine if the loop didn't auto increment.
-			runningSpace = 0;
-
-		}
-		else if (ROM[i] == 0 || aggressive) {
-			runningSpace += 1;
-		}
-		else {
-			runningSpace = 0;
-		}
 	}
 
-	if (runningSpace == size)
-		pos = i;
-
-	if (pos == 0) {
-		if (start == 0x080000)
-			return -1;
-		else
-			return findFreeSpace(size, 0x080000, rom);
-	}
+	if (pos == 0)
+		return start == 0x080000 ? -1 : findFreeSpace(size, 0x080000, ROM);		// // //
 
 	pos -= size;
 
@@ -274,35 +259,9 @@ int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM) {		//
 	return pos;
 }
 
-int SNESToPC(int addr)					// Thanks to alcaro.
-{
-	if (addr < 0 || addr > 0xFFFFFF ||		// not 24bit 
-		(addr & 0xFE0000) == 0x7E0000 ||	// wram 
-		(addr & 0x408000) == 0x000000)		// hardware regs 
-		return -1;
-	if (usingSA1 && addr >= 0x808000)
-		addr -= 0x400000;
-	addr = ((addr & 0x7F0000) >> 1 | (addr & 0x7FFF));
-	return addr;
-}
-
-int PCToSNES(int addr) {
-	if (addr < 0 || addr >= 0x400000)
-		return -1;
-
-	addr = ((addr << 1) & 0x7F0000) | (addr & 0x7FFF) | 0x8000;
-
-	if ((addr & 0xF00000) == 0x700000)
-		addr |= 0x800000;
-
-	if (usingSA1 && addr >= 0x400000)
-		addr += 0x400000;
-	return addr;
-}
-
-int clearRATS(int offset) {
-	size_t size = ((rom[offset + 5] << 8) | rom[offset + 4]) + 9;		// // //
-	std::fill(rom.begin() + offset, rom.begin() + offset + size, 0);
+int clearRATS(std::vector<uint8_t> &ROM, int offset) {		// // //
+	size_t size = ((ROM[offset + 5] << 8) | ROM[offset + 4]) + 9;		// // //
+	std::fill(ROM.begin() + offset, ROM.begin() + offset + size, 0);
 	return size;
 }
 
@@ -374,8 +333,6 @@ void addSampleGroup(const fs::path &groupName, Music *music) {
 	fatalError(ss.str());
 }
 
-int bankSampleCount = 0;			// Used to give unique names to sample bank brrs.
-
 void addSampleBank(const fs::path &fileName, Music *music) {
 	std::vector<uint8_t> bankFile = openFile(getSamplePath(fileName, music->name));		// // //
 
@@ -406,6 +363,7 @@ void addSampleBank(const fs::path &fileName, Music *music) {
 		}
 
 		std::stringstream ss;		// // //
+		static int bankSampleCount = 0;		// // // Used to give unique names to sample bank brrs.
 		ss << "__SRCNBANKBRR" << hex4 << bankSampleCount++;
 		tempSample.name = ss.str();
 		addSample(tempSample.data, tempSample.name, music, true, true, tempSample.loopPoint);
@@ -415,133 +373,76 @@ void addSampleBank(const fs::path &fileName, Music *music) {
 int getSample(const fs::path &name, Music *music) {
 	fs::path actualPath = getSamplePath(name, music->name);		// // //
 
-	for (const auto &x : sampleToIndex) {
-		fs::path p2 = x.first;
-		if (fs::equivalent(actualPath, p2))
+	for (const auto &x : sampleToIndex)
+		if (fs::equivalent(actualPath, x.first))
 			return x.second;
-	}
 
 	return -1;
 }
 
 // // //
 fs::path getSamplePath(const fs::path &name, const std::string &musicName) {
-	fs::path absoluteDir = "samples" / name;
-	fs::path relativeDir = (fs::path("music") / musicName).parent_path() / name;
+	for (const auto &path : {
+		(fs::path("music") / musicName).parent_path() / name,
+		"samples" / name,
+	})
+		if (fs::exists(path))
+			return path;
 
-	if (fs::exists(relativeDir))
-		return relativeDir;
-	if (fs::exists(absoluteDir))
-		return absoluteDir;
 	fatalError("Could not find sample " + name.string(), musicName);
-
-//	return fs::exists(relativeDir) ? relativeDir :
-//		fs::exists(absoluteDir) ? absoluteDir :
-//		throw AMKd::Utility::Exception("Could not find sample " + name.string(), true, musicName);
 }
 
 // // //
+template <typename F, typename G>
+static void asarOutput(F f, G g, const fs::path &filename) {
+	int count = 0;
+	const auto *msg = f(&count);
+	if (!count)
+		return;
+	std::string out;
+	for (int i = 0; i < count; ++i) {
+		out += G(msg[i]);
+		out += '\n';
+	}
+	writeTextFile(filename, out);
+}
 
-bool asarCompileToBIN(const fs::path &patchName, const fs::path &binOutputFile, bool dieOnError) {
+// // //
+template <typename F>
+static bool asarDoCompile(const fs::path &patchName, const fs::path &outputName, bool dieOnError, F maker) {
 	removeFile("temp.log");
 	removeFile("temp.txt");
 
 	if (useAsarDLL) {
+		std::vector<uint8_t> binOutput = maker();
 		int binlen = 0;
-		int buflen = 0x10000;		// 0x10000 instead of 0x8000 because a few things related to sound effects are stored at 0x8000 at times.
+		int buflen = binOutput.size();
 
-		uint8_t *binOutput = (uint8_t *)malloc(buflen);		// // //
+		bool suc = asar_patch(patchName.string().c_str(), reinterpret_cast<char *>(binOutput.data()), buflen, &binlen);		// // //
 
-		asar_patch(patchName.string().c_str(), (char *)binOutput, buflen, &binlen);		// // //
-		int count = 0, currentCount = 0;
-		std::string printout;
-
-		asar_getprints(&count);
-
-		while (currentCount != count) {
-			printout += asar_getprints(&count)[currentCount];
-			printout += "\n";
-			currentCount++;
-		}
-		if (count > 0)
-			writeTextFile("temp.txt", printout);
-///////////////////////////////////////////////////////////////////////////////
-		count = 0; currentCount = 0;
-		printout.clear();
-
-		asar_geterrors(&count);
-
-		while (currentCount != count) {
-			printout += asar_geterrors(&count)[currentCount].fullerrdata + (std::string)"\n";
-			currentCount++;
-		}
-		if (count > 0) {
-			writeTextFile("temp.log", printout);
-			free(binOutput);
+		asarOutput(asar_getprints, [] (const char *str) { return str; }, "temp.txt");
+		if (!suc) {
+			asarOutput(asar_geterrors, [] (const errordata &err) { return err.fullerrdata; }, "temp.log");
 			return false;
 		}
 
-		std::vector<uint8_t> v;		// // //
-		v.assign(binOutput, binOutput + binlen);
-		writeFile(binOutputFile, v);
-		free(binOutput);
+		writeFile(outputName, binOutput);
 		return true;
 	}
 	else {
-		remove(binOutputFile);
-		std::string s = "asar " + patchName.string() + " " + binOutputFile.string() + " 2> temp.log > temp.txt";		// // //
-		execute(s);
-		if (dieOnError && fs::exists("temp.log") && fs::file_size("temp.log") != 0)
-			return false;
-		return true;
+		remove(outputName);
+		execute("asar " + patchName.string() + " " + outputName.string() + " 2> temp.log > temp.txt");		// // //
+		return !(dieOnError && fs::exists("temp.log") && fs::file_size("temp.log") > 0);
 	}
 }
 
-bool asarPatchToROM(const fs::path &patchName, const fs::path &romName, bool dieOnError) {
-	removeFile("temp.log");
-	removeFile("temp.txt");
+bool asarCompileToBIN(const fs::path &patchName, const fs::path &outputName, bool dieOnError) {
+	if (!useAsarDLL)
+		remove(outputName);
+	// 0x10000 instead of 0x8000 because a few things related to sound effects are stored at 0x8000 at times.
+	return asarDoCompile(patchName, outputName, dieOnError, [] { return std::vector<uint8_t>(0x10000); });
+}
 
-	if (useAsarDLL) {
-		std::vector<uint8_t> patchrom = openFile(romName);		// // //
-		int binlen = 0;
-		int buflen = patchrom.size();
-
-		asar_patch(patchName.string().c_str(), (char *)patchrom.data(), buflen, &buflen);		// // //
-		int count = 0, currentCount = 0;
-		std::string printout;
-
-		asar_getprints(&count);
-
-		while (currentCount != count) {
-			printout += asar_getprints(&count)[currentCount];
-			printout += "\n";
-			currentCount++;
-		}
-		if (count > 0)
-			writeTextFile("temp.txt", printout);
-///////////////////////////////////////////////////////////////////////////////
-		count = 0; currentCount = 0;
-		printout.clear();
-
-		asar_geterrors(&count);
-
-		while (currentCount != count) {
-			printout += asar_geterrors(&count)[currentCount].fullerrdata + (std::string)"\n";
-			currentCount++;
-		}
-		if (count > 0) {
-			writeTextFile("temp.log", printout);
-			return false;
-		}
-
-		writeFile(romName, patchrom);
-		return true;
-	}
-	else {
-		std::string s = "asar " + patchName.string() + " " + romName.string() + " 2> temp.log > temp.txt";
-		execute(s);
-		if (dieOnError && fs::exists("temp.log") && fs::file_size("temp.log") > 0)		// // //
-			return false;
-		return true;
-	}
+bool asarPatchToROM(const fs::path &patchName, const fs::path &outputName, bool dieOnError) {
+	return asarDoCompile(patchName, outputName, dieOnError, [&] { return openFile(outputName); });
 }

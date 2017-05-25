@@ -28,11 +28,8 @@ class SoundEffect;
 #include "Utility/fs.h"		// // //
 
 
-//extern ROM rom;
-extern std::vector<uint8_t> rom;		// // //
 
 extern std::vector<Sample> samples;
-extern SoundEffect soundEffects[SFX_BANKS][256];		// // //
 extern std::vector<BankDefine> bankDefines;		// // //
 
 extern std::map<fs::path, int> sampleToIndex;
@@ -69,8 +66,8 @@ extern int songSampleListSize;
 extern bool useAsarDLL;
 
 // Return true if an error occurred (if "dieOnError" is true).
-bool asarCompileToBIN(const fs::path &patchName, const fs::path &binOutput, bool dieOnError = true);
-bool asarPatchToROM(const fs::path &patchName, const fs::path &romName, bool dieOnError = true);
+bool asarCompileToBIN(const fs::path &patchName, const fs::path &outputName, bool dieOnError = true);
+bool asarPatchToROM(const fs::path &patchName, const fs::path &outputName, bool dieOnError = true);
 
 // // //
 class hex_formatter
@@ -119,11 +116,9 @@ void printWarning(const std::string &error, const std::string &fileName = "", in
 
 void insertValue(int value, int length, const std::string &find, std::string &str);
 
-int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM);	// // // Returns a position in the ROM with the specified amount of free space, starting at the specified position.  NOT using SNES addresses!  This function writes a RATS address at the position returned.
-
-int SNESToPC(int addr);
-
-int PCToSNES(int addr);
+// Returns a position in the ROM with the specified amount of free space, starting at the specified position.
+// NOT using SNES addresses!  This function writes a RATS address at the position returned.
+int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM);		// // //
 
 int clearRATS(int PCaddr);
 

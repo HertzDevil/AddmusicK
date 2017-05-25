@@ -16,8 +16,12 @@
 
 bool waitAtEnd = true;
 fs::path ROMName;		// // //
+std::vector<uint8_t> rom;		// // //
 
 Music musics[256];		// // //
+SoundEffect soundEffects[SFX_BANKS][256];		// // //
+//SoundEffect (&soundEffectsDF9)[256] = soundEffects[0];
+//SoundEffect (&soundEffectsDFC)[256] = soundEffects[1];
 std::vector<uint8_t> romHeader;		// // //
 
 void cleanROM();
@@ -38,6 +42,10 @@ void generateSPCs();
 void assembleSNESDriver2();
 void generateMSC();
 void cleanUpTempFiles();
+
+constexpr int SNESToPC(int addr);		// // //
+constexpr int PCToSNES(int addr);		// // //
+
 //std::time_t getLastModifiedTime();		// // //
 
 void generatePNGs();
@@ -1094,8 +1102,13 @@ void generateSPCs() {
 
 		std::stringstream timeField;		// // //
 		std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-#pragma warning ( suppress : 4996 )
-		timeField << std::put_time(std::localtime(&t), "%m/%d/%Y");
+		std::tm time;
+#ifdef _MSVC_LANG
+		::localtime_s(&time, &t);
+#else
+		::localtime_s(&t, &time);
+#endif
+		timeField << std::put_time(&time, "%m/%d/%Y");
 		auto timeStr = timeField.str();
 		std::copy_n(timeStr.cbegin(), std::min(10u, timeStr.size()), SPC.begin() + DATE);
 
@@ -1412,6 +1425,29 @@ void tryToCleanAMMData() {
 		execute("perl addmusicMRemover.pl " + ROMName.string(), false);		// // //
 		execute("xkasAnti clean.smc " + ROMName.string() + " INIT.asm");
 	}
+}
+
+// // // moved
+constexpr int SNESToPC(int addr) {			// Thanks to alcaro.
+	if (addr < 0 || addr > 0xFFFFFF ||		// not 24bit 
+		(addr & 0xFE0000) == 0x7E0000 ||	// wram 
+		(addr & 0x408000) == 0x000000)		// hardware regs 
+		return -1;
+	if (usingSA1 && addr >= 0x808000)
+		addr -= 0x400000;
+	return ((addr & 0x7F0000) >> 1 | (addr & 0x7FFF));
+}
+
+// // // moved
+constexpr int PCToSNES(int addr) {
+	if (addr < 0 || addr >= 0x400000)
+		return -1;
+	addr = ((addr << 1) & 0x7F0000) | (addr & 0x7FFF) | 0x8000;
+	if ((addr & 0xF00000) == 0x700000)
+		addr |= 0x800000;
+	if (usingSA1 && addr >= 0x400000)
+		addr += 0x400000;
+	return addr;
 }
 
 void checkMainTimeStamps()			// Disabled for now, as this only works if the ROM is linked to the program (so it wouldn't work if the program was used on multiple ROMs)

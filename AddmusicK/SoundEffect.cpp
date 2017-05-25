@@ -15,7 +15,7 @@ static bool inDefineBlock;
 		return; \
 	} while (false)
 
-#define append(value) (soundEffects[bank][index].data.push_back(value))
+#define append(value) (data.push_back(value))		// // //
 
 std::string &SoundEffect::getEffectiveName() {
 	return name == "" ? pointName : name;		// // //
@@ -371,7 +371,8 @@ void SoundEffect::compile() {
 			break;
 		}
 	}
-	if (soundEffects[bank][index].add0) append(0x00);
+	if (add0)		// // //
+		append(0x00);
 	compileASM();
 
 #undef error
