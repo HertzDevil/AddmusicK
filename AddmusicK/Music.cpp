@@ -887,15 +887,10 @@ void Music::parseHFDHex() {
 }
 
 // // //
-void Music::insertRemoteConversion(std::vector<uint8_t> &&cmd, std::vector<uint8_t> &&conv) {
+void Music::insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd) {
 	auto index = static_cast<uint16_t>(tracks[channel].data.size() + 1);
 	tracks[channel].remoteGainInfo.emplace_back(index, std::move(cmd));		// // //
-	tracks[channel].data.insert(tracks[channel].data.cend(), conv.cbegin(), conv.cend());
-}
-
-// // //
-void Music::removeRemoteConversion() {
-	tracks[channel].remoteGainInfo.pop_back();		// // //
+	append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, cmdtype, param);		// // //
 }
 
 static bool nextNoteIsForDD;
@@ -1168,50 +1163,34 @@ void Music::parseHexCommand() {
 		append(i);
 		return;
 	case AMKd::Binary::CmdType::ExtFA:
-		append(currentHex);
 		getval();
-		if (targetAMKVersion > 1 && i == 0x05)
-			error("$FA $05 in #amk 2 or above has been replaced with remote code.");		// // //
-		append(i);
-		getval();
-		// More code conversion.
-		if (targetAMKVersion == 1 && tracks[channel].data.back() == 0x05) {
+		// // // More code conversion.
+		if (targetAMKVersion == 1 && i == 0x05) {
 			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-			tracks[channel].data.pop_back();					// // // Remove the last two bytes
-			tracks[channel].data.pop_back();					// (i.e. the $FA $05)
-
 			int channelToCheck = inNormalLoop ? prevChannel : channel;
 
-			if (i != 0) {
-				// Check if this channel is using FA and FC combined...
-				if (!tracks[channelToCheck].usingFC) {		// // //
-					// Then add in a "restore instrument" remote call.
-					insertRemoteConversion({AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00},
-											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00});
+			getval();
+			tracks[channelToCheck].usingFA = (i != 0);		// // //
 
-					// Then add the "set gain" remote call.
-					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
-											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00});
-				}
+			if (tracks[channelToCheck].usingFA)
+				if (tracks[channelToCheck].usingFC)
+					insertRemoteConversion(0x05, tracks[channelToCheck].lastFCDelayValue,
+						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00});
 				else {
-					// Otherwise, add in a "2 5 combination" command.
-
-					// Then add the "set gain" remote call.
-					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
-											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05, tracks[channelToCheck].lastFCDelayValue});
-					//append(0x00);
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
+						{AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00});
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOff, 0x00,
+						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00});
 				}
-
-				// Either way, we're using FA now.
-				tracks[channelToCheck].usingFA = true;
-			}
-			else {
-				insertRemoteConversion({},
-										{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00});
-				tracks[channelToCheck].usingFA = false;
-			}
+			else
+				insertRemoteConversion(AMKd::Binary::CmdOptionFC::Disable, 0x00, {});
 			return;
 		}
+		if (targetAMKVersion > 1 && i == 0x05)
+			error("$FA $05 in #amk 2 or above has been replaced with remote code.");		// // //
+		append(currentHex);
+		append(i);
+		getval();
 		append(i);
 		return;
 	case AMKd::Binary::CmdType::Arpeggio:
@@ -1236,96 +1215,31 @@ void Music::parseHexCommand() {
 	case AMKd::Binary::CmdType::Callback:
 		if (targetAMKVersion == 1) {
 			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-				// Add in a "restore instrument" remote call.
 			int channelToCheck = inNormalLoop ? prevChannel : channel;		// // //
-			tracks[channelToCheck].usingFC = true;		// // //
-
-			// If we're just using the FC command and not the FA command as well,
-			if (!tracks[channelToCheck].usingFA) {
-				// Then add the "restore instrument command"
-				insertRemoteConversion({AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00},
-										{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOn, 0x00});
-
-				// Then add in the first part of a "apply gain before a note ends" call.
-				insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain},
-										{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Release});
-
-				// We won't know the gain and delays until later.
-			}
-			else {
-				// Then add in the first part of a "2 3 combination" call.  
-				// Theoretically we could go back and change the previous type to 5.
-				// But that's annoying if the commands are separated, so maybe some other time.
-				// Shh.  Don't tell anyone.
-
-				insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain},
-										{AMKd::Binary::CmdType::Callback, 0x00, 0x00, 0x05});
-				//append(lastFAGainValue[channelToCheck]);
-			}
 
 			getval();
-			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
+			tracks[channelToCheck].usingFC = (i != 0);
+			if (tracks[channelToCheck].usingFC) {
+				tracks[channelToCheck].lastFCDelayValue = static_cast<uint8_t>(divideByTempoRatio(i, false));		// // //
 
-			int channelToCheck = inNormalLoop ? prevChannel : channel;		// // //
-
-			if (i == 0) {							// If i is zero, we have to undo a bunch of stuff.
-				if (!tracks[channelToCheck].usingFA) {		// // // But only if this is a "pure" FC command.
-					removeRemoteConversion();
-					removeRemoteConversion();
-
-					tracks[channel].data.pop_back();		// // //
-					tracks[channel].data.pop_back();
-					tracks[channel].data.pop_back();
-					tracks[channel].data.pop_back();
-					tracks[channel].data.pop_back();
-					tracks[channel].data.pop_back();
-					tracks[channel].data.pop_back();
-					tracks[channel].data.pop_back();
-					tracks[channel].data.pop_back();
-
-					insertRemoteConversion({},
-											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::Disable, 0x00});
-				}
+				getval();
+				if (tracks[channelToCheck].usingFA)
+					insertRemoteConversion(0x05, tracks[channelToCheck].lastFCDelayValue,
+						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00});
 				else {
-					// If we're using FA and FC, then we need to "restore" the FA data.
-
-					// Same as the other "get rid of stuff", but without the "restore instrument" call.
-					removeRemoteConversion();
-
-					tracks[channel].data.pop_back();		// // //
-					tracks[channel].data.pop_back();
-					tracks[channel].data.pop_back();
-					tracks[channel].data.pop_back();
-
-					// Then add the "set gain" remote call.
-					insertRemoteConversion({AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00},
-											{AMKd::Binary::CmdType::Callback, 0x00, 0x00, AMKd::Binary::CmdOptionFC::KeyOff, 0x00});
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
+						{AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00});
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::Release, tracks[channelToCheck].lastFCDelayValue,
+						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00});
 				}
-
-				// Either way, FC gets turned off.
-				tracks[channelToCheck].usingFC = false;
-
-				//remoteGainConversion.back().push_back(AMKd::Binary::CmdType::ExtFA);
-				//remoteGainConversion.back().push_back(AMKd::Binary::CmdOptionFA::Gain);
 			}
 			else {
-				i = divideByTempoRatio(i, false);
-				tracks[channelToCheck].lastFCDelayValue = static_cast<uint8_t>(i);		// // //
-				append(i);
-			}
-
-			getval();
-			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-			// // //
-			if (!tracks[channel].remoteGainInfo.empty()) {
-				auto &conv = tracks[channel].remoteGainInfo.back().second;		// // //
-				if (!conv.empty()) {			// If the size was zero, then it has no data anyway.  Used for the 0 event type.
-//					int channelToCheck = inNormalLoop ? prevChannel : channel;			// Only saves two bytes, though.
-
-//					tracks[channelToCheck].lastFCGainValue = static_cast<uint8_t>(i);		// // //
-					conv.push_back(i);
-					conv.push_back(0x00);
-				}
+				getval();
+				if (tracks[channelToCheck].usingFA)
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOff, 0x00,
+						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00}); // check this
+				else
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::Disable, 0x00, {});
 			}
 			return;
 		}
