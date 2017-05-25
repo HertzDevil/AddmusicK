@@ -135,7 +135,11 @@ private:
 	void parseOpenParenCommand();
 	void parseLabelLoopCommand();
 	void parseLoopCommand();
+	void parseSubloopCommand();		// // //
+	void parseErrorLoopCommand();		// // //
 	void parseLoopEndCommand();
+	void parseSubloopEndCommand();		// // //
+	void parseErrorLoopEndCommand();		// // //
 	void parseStarLoopCommand();
 	void parseVibratoCommand();
 	void parseTripletOpenDirective();
@@ -172,6 +176,9 @@ private:
 	void doTremoloOff();
 	void doTempo(int speed);
 	void doSampleLoad(int index, int mult);
+	void doLoopEnter();					// Call any time a definition of a loop is entered.
+	void doLoopExit(int loopCount);			// Call any time a definition of a loop is exited.
+	void doLoopRemoteCall(int loopCount);			// Call any time a normal loop is called remotely.
 	void doSubloopEnter();		// // // Call any time a definition of a super loop is entered.
 	void doSubloopExit(int loopCount);		// // // Call any time a definition of a super loop is exited.
 	void doVolumeTable(bool louder);
@@ -217,9 +224,6 @@ private:
 	bool extraLoopIsNormal;
 	bool extraLoopIsSuper;
 
-	void handleNormalLoopEnter();					// Call any time a definition of a loop is entered.
-	void handleNormalLoopRemoteCall(int loopCount);			// Call any time a normal loop is called remotely.
-	void handleNormalLoopExit(int loopCount);			// Call any time a definition of a loop is exited.
-
 	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
+	void synchronizeQ();		// // //
 };

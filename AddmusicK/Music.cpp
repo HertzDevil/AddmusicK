@@ -273,6 +273,12 @@ void Music::compile() {
 		cmd.Insert("p", &Music::parseVibratoCommand);
 		cmd.Insert("tuning", &Music::parseTransposeDirective);
 		cmd.Insert("t", &Music::parseTempoCommand);
+		cmd.Insert("[", &Music::parseLoopCommand);
+		cmd.Insert("[[", &Music::parseSubloopCommand);
+		cmd.Insert("[[[", &Music::parseErrorLoopCommand);
+		cmd.Insert("]", &Music::parseLoopEndCommand);
+		cmd.Insert("]]", &Music::parseSubloopEndCommand);
+		cmd.Insert("]]]", &Music::parseErrorLoopEndCommand);
 
 		return cmd;
 	}();
@@ -306,8 +312,6 @@ void Music::compile() {
 			case 'o': parseOctaveDirective();		break;
 			case '@': parseInstrumentCommand();		break;
 			case '(': parseOpenParenCommand();		break;
-			case '[': parseLoopCommand();			break;
-			case ']': parseLoopEndCommand();		break;
 			case '*': parseStarLoopCommand();		break;
 			case '{': parseTripletOpenDirective();	break;
 			case '}': parseTripletCloseDirective();	break;
@@ -601,29 +605,18 @@ void Music::parseLabelLoopCommand() {
 			error("Unrecognized character '!'.");
 
 		if (channelDefined) {						// A channel's been defined, we're parsing a remote 
-			//bool negative = false;
-			int i = getInt();		// // //
-			if (i == -1)
-				error("Error parsing remote code setup.");		// // //
-			if (skipSpaces(), !trimChar(','))		// // //
-				error("Error parsing code setup.");
-			//if (peek() == '-') negative = true, skipChars(1);
-			int j;		// // //
-			try {
-				j = getIntWithNegative();
-			}
-			catch (...) {
-				error("Error parsing remote code setup. Remember that remote code cannot be defined within a channel.");
-			}
-			//if (negative) j = -j;
+			auto param = GetParameters<Int, Comma, SInt>(mml_);		// // //
+			if (!param)
+				error("Error parsing remote code setup.");
+
+			int i = param.get<0>();
+			int j = param.get<1>();
 			int k = 0;
-			if (j == 1 || j == 2) {
-				if (skipSpaces(), !trimChar(','))		// // //
+			if (j == AMKd::Binary::CmdOptionFC::Sustain || j == AMKd::Binary::CmdOptionFC::Release) {
+				if (!GetParameters<Comma>(mml_))
 					error("Error parsing remote code setup. Missing the third argument.");
-				if (skipSpaces(), trimChar('$')) {		// // //
-					k = getHex();
-					if (k == -1) error("Error parsing remote code setup. Could not parse the third argument as a hex command.");		// // //
-				}
+				if (auto len = GetParameters<Byte>(mml_))
+					k = len.get<0>();
 				else {
 					k = getNoteLength();		// // //
 					if (k > 0x100)
@@ -633,10 +626,8 @@ void Music::parseLabelLoopCommand() {
 				}
 			}
 
-			if (skipSpaces(), !trimChar(')'))		// // //
-				error("Error parsing remote setup.");
-			if (trimChar('['))		// // //
-				error("Remote code cannot be defined within a channel.");
+			if (!GetParameters<Sep<')'>, Sep<'['>>(mml_))
+				error("Error parsing remote code setup.");
 
 			tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
 			if (loopPointers.find(i) == loopPointers.cend())		// // //
@@ -644,20 +635,20 @@ void Music::parseLabelLoopCommand() {
 			append(AMKd::Binary::CmdType::Callback, loopPointers[i] & 0xFF, loopPointers[i] >> 8, j, k);
 			return;
 		}
-		else {								// We're outside of a channel, this is a remote call definition.
-			int i = getInt();		// // //
-			if (i == -1)
-				error("Error parsing remote code definition.");
-			if (skipSpaces(), !trimChar(')'))		// // //
-				error("Error parsing remote code definition.");
-			if (trimChar('['))		// // //
-				error("Error parsing remote code definition; the definition was missing.");
 
-			loopLabel = i;		// // //
-			inRemoteDefinition = true;
-			return parseLoopCommand();
-		}
+		int i = getInt();		// // // We're outside of a channel, this is a remote call definition.
+		if (i == -1)
+			error("Error parsing remote code definition.");
+		if (skipSpaces(), !trimChar(')'))		// // //
+			error("Error parsing remote code definition.");
+		if (trimChar('['))		// // //
+			error("Error parsing remote code definition; the definition was missing.");
+
+		loopLabel = i;		// // //
+		inRemoteDefinition = true;
+		return parseLoopCommand();
 	}
+
 	if (inNormalLoop)		// // //
 		error("Nested loops are not allowed.");		// // //
 
@@ -670,60 +661,41 @@ void Music::parseLabelLoopCommand() {
 	if (!trimChar(')'))		// // //
 		error("Error parsing label loop.");
 
-	tracks[channel].updateQ = true;
-	tracks[CHANNELS].updateQ = true;
-	prevNoteLength = -1;
+	synchronizeQ();		// // //
+	loopLabel = i;
 
-	if (peek() == '[') {				// If this is a loop definition...
-		loopLabel = i;				// Just set the loop label to this. The rest of the code is handled in the respective function.
-		tracks[channel].isDefiningLabelLoop = true;		// // //
+	if (trimChar('[')) {				// If this is a loop definition...
+		tracks[channel].isDefiningLabelLoop = true;		// // // The rest of the code is handled in the respective function.
+		return parseLoopCommand();
 	}
-	else {						// Otherwise, if this is a loop call...
-		loopLabel = i;
 
-		prevNoteLength = -1;
+	auto it = loopPointers.find(loopLabel);		// // // Otherwise, if this is a loop call...
+	if (it == loopPointers.cend())
+		error("Label not yet defined.");
+	int j = getInt();		// // //
+	if (j == -1)
+		j = 1;
+	if (j < 1 || j > 255)
+		error("Invalid loop count.");		// // //
 
-		auto it = loopPointers.find(loopLabel);		// // //
-		if (it == loopPointers.cend())
-			error("Label not yet defined.");
-		int j = getInt();		// // //
-		if (j == -1)
-			j = 1;
-		if (j < 1 || j > 255)
-			error("Invalid loop count.");		// // //
+	doLoopRemoteCall(j);
 
-		handleNormalLoopRemoteCall(j);
+	tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
+	append(AMKd::Binary::CmdType::Loop, it->second & 0xFF, it->second >> 8, j);
 
-		tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
-		append(AMKd::Binary::CmdType::Loop, it->second & 0xFF, it->second >> 8, j);
-
-		loopLabel = 0;
-	}
+	loopLabel = 0;
 }
 
 void Music::parseLoopCommand() {
-	if (!inNormalLoop)		// // //
-		tracks[channel].updateQ = true;
-	tracks[CHANNELS].updateQ = true;
-	prevNoteLength = -1;
-
-	if (trimChar('[')) {		// // // This is an $E6 loop.
-		if (trimChar('['))		// // //
-			fatalError("An ambiguous use of the [ and [[ loop delimiters was found (\"[[[\").  Separate\n"
-					   "the \"[[\" and \"[\" to clarify your intention.");
-		if (loopLabel > 0 && tracks[channel].isDefiningLabelLoop)		// // //
-			error("A label loop cannot define a subloop.  Use a standard or remote loop instead.");
-		return doSubloopEnter();
-	}
-	else if (inNormalLoop)		// // //
+	if (inNormalLoop)		// // //
 		error("You cannot nest standard [ ] loops.");
+	synchronizeQ();		// // //
 
 	prevLoop = tracks[CHANNELS].data.size();		// // //
 
 	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
 	channel = CHANNELS;					// So we have to back up the current channel.
 	inNormalLoop = true;		// // //
-	prevNoteLength = -1;
 	tracks[CHANNELS].instrument = tracks[prevChannel].instrument;		// // //
 	if (songTargetProgram == Target::AM4)
 		tracks[CHANNELS].ignoreTuning = tracks[prevChannel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
@@ -734,31 +706,26 @@ void Music::parseLoopCommand() {
 	if (loopLabel > 0)
 		loopPointers[loopLabel] = prevLoop;
 
-	handleNormalLoopEnter();
+	doLoopEnter();
+}
+
+// // //
+void Music::parseSubloopCommand() {
+	if (loopLabel > 0 && tracks[channel].isDefiningLabelLoop)		// // //
+		error("A label loop cannot define a subloop.  Use a standard or remote loop instead.");
+	return doSubloopEnter();
+}
+
+// // //
+void Music::parseErrorLoopCommand() {
+	fatalError("An ambiguous use of the [ and [[ loop delimiters was found (\"[[[\").  Separate\n"
+	           "the \"[[\" and \"[\" to clarify your intention.");
 }
 
 void Music::parseLoopEndCommand() {
 	if (!inNormalLoop)		// // //
-		tracks[channel].updateQ = true;		// // //
-
-	tracks[CHANNELS].updateQ = true;
-	prevNoteLength = -1;
-	if (trimChar(']')) {		// // //
-		if (trimChar(']'))
-			fatalError(R"(An ambiguous use of the ] and ]] loop delimiters was found ("]]]").  Separate\nthe "]]" and "]" to clarify your intention.)");		// // //
-
-		int i = getInt();		// // //
-		if (i == 1)
-			error("A subloop cannot only repeat once. It's pointless anyway.");
-		if (i == -1)
-			error("Error parsing subloop command; the loop count was missing.");		// // //
-			//if (i == 0)
-			//	error("A subloop cannot loop 0 times.")
-
-		return doSubloopExit(i);
-	}
-	else if (!inNormalLoop)		// // //
 		error("Loop end found outside of a loop.");
+	synchronizeQ();		// // //
 
 	int i = getInt();		// // //
 	if (i == -1)
@@ -772,7 +739,7 @@ void Music::parseLoopEndCommand() {
 	channel = prevChannel;
 	inNormalLoop = false;		// // //
 
-	handleNormalLoopExit(i);
+	doLoopExit(i);
 
 	if (!inRemoteDefinition) {
 		tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
@@ -783,24 +750,36 @@ void Music::parseLoopEndCommand() {
 	tracks[channel].isDefiningLabelLoop = false;		// // //
 }
 
+// // //
+void Music::parseSubloopEndCommand() {
+	using namespace AMKd::MML::Lexer;		// // //
+	if (auto param = GetParameters<Int>(mml_))
+		return doSubloopExit(requires(param.get<0>(), 2u, 256u, CMD_ILLEGAL("subloop", "[[ ]]")));
+	error(CMD_ERROR("subloop", "[[ ]]"));
+}
+
+// // //
+void Music::parseErrorLoopEndCommand() {
+	fatalError("An ambiguous use of the ] and ]] loop delimiters was found (\"]]]\").  Separate\n"
+	           "the \"]]\" and \"]\" to clarify your intention.");
+}
+
 void Music::parseStarLoopCommand() {
 	if (inNormalLoop)		// // //
 		error("Nested loops are not allowed.");		// // //
-
-	tracks[channel].updateQ = true;
-	tracks[CHANNELS].updateQ = true;
-	prevNoteLength = -1;
-
-	int i = getInt();		// // //
-	if (i == -1)
-		i = 1;
-	if (i < 1 || i > 255)
-		error("Invalid loop count.");
-
-	handleNormalLoopRemoteCall(i);
-
-	tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
-	append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, i);
+	synchronizeQ();		// // //
+	
+	using namespace AMKd::MML::Lexer;		// // //
+	if (auto param = GetParameters<Opt<Int>>(mml_)) {
+		int count = 1;
+		if (auto l = param.get<0>())
+			count = requires(*l, 0x01u, 0xFFu, CMD_ILLEGAL("star loop", "*"));
+		doLoopRemoteCall(count);
+		tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
+		append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, count);
+		return;
+	}
+	error(CMD_ERROR("star loop", "*"));
 }
 
 void Music::parseVibratoCommand() {
@@ -2104,67 +2083,21 @@ void Music::parseSPCInfo() {
 
 	if (author.length() > 32) {
 		author = author.substr(0, 32);
-		printWarning((std::string)("\"Author\" field was too long.  Truncating to \"") + author + "\".");
+		printWarning("\"Author\" field was too long.  Truncating to \"" + author + "\".");		// // //
 	}
 	if (game.length() > 32) {
 		game = game.substr(0, 32);
-		printWarning((std::string)("\"Game\" field was too long.  Truncating to \"") + game + "\".");
+		printWarning("\"Game\" field was too long.  Truncating to \"" + game + "\".");
 	}
 	if (comment.length() > 32) {
 		comment = comment.substr(0, 32);
-		printWarning((std::string)("\"Comment\" field was too long.  Truncating to \"") + comment + "\".");
+		printWarning("\"Comment\" field was too long.  Truncating to \"" + comment + "\".");
 	}
 	if (title.length() > 32) {
 		title = title.substr(0, 32);
-		printWarning((std::string)("\"Title\" field was too long.  Truncating to \"") + title + "\".");
+		printWarning("\"Title\" field was too long.  Truncating to \"" + title + "\".");
 	}
 }
-
-void Music::handleNormalLoopEnter() {
-	normalLoopLength = 0;
-	if (inE6Loop) {					// We're entering a normal loop that's nested in a super loop
-		baseLoopIsNormal = false;
-		baseLoopIsSuper = true;
-		extraLoopIsNormal = true;
-		extraLoopIsSuper = false;
-	}
-	else {						// We're entering a normal loop that's not nested
-		baseLoopIsNormal = true;
-		baseLoopIsSuper = false;
-		extraLoopIsNormal = false;
-		extraLoopIsSuper = false;
-	}
-}
-
-void Music::doSubloopEnter() {
-	if (inE6Loop)		// // //
-		error("You cannot nest a subloop within another subloop.");
-	superLoopLength = 0;
-	inE6Loop = true;
-
-	if (inNormalLoop) {		// // // We're entering a super loop that's nested in a normal loop
-		baseLoopIsNormal = true;
-		baseLoopIsSuper = false;
-		extraLoopIsNormal = false;
-		extraLoopIsSuper = true;
-	}
-	else {						// We're entering a super loop that's not nested
-		baseLoopIsNormal = false;
-		baseLoopIsSuper = true;
-		extraLoopIsNormal = false;
-		extraLoopIsSuper = false;
-	}
-
-	append(AMKd::Binary::CmdType::Subloop, 0x00);		// // //
-}
-
-void Music::handleNormalLoopRemoteCall(int loopCount) {
-	if (loopLabel == 0)
-		addNoteLength(normalLoopLength * loopCount);
-	else
-		addNoteLength(loopLengths[loopLabel] * loopCount);
-}
-
 
 void Music::addNoteLength(double ticks) {
 	if (extraLoopIsNormal)
@@ -2177,6 +2110,14 @@ void Music::addNoteLength(double ticks) {
 		superLoopLength += ticks;
 	else
 		tracks[channel].channelLength += ticks;		// // //
+}
+
+// // //
+void Music::synchronizeQ() {
+	if (!inNormalLoop)		// // //
+		tracks[channel].updateQ = true;		// // //
+	tracks[CHANNELS].updateQ = true;
+	prevNoteLength = -1;
 }
 
 int Music::divideByTempoRatio(int value, bool fractionIsError) {
@@ -2247,8 +2188,23 @@ void Music::doSampleLoad(int index, int mult) {
 	append(AMKd::Binary::CmdType::SampleLoad, index, mult);		// // //
 }
 
+void Music::doLoopEnter() {
+	normalLoopLength = 0;
+	if (inE6Loop) {					// We're entering a normal loop that's nested in a super loop
+		baseLoopIsNormal = false;
+		baseLoopIsSuper = true;
+		extraLoopIsNormal = true;
+		extraLoopIsSuper = false;
+	}
+	else {						// We're entering a normal loop that's not nested
+		baseLoopIsNormal = true;
+		baseLoopIsSuper = false;
+		extraLoopIsNormal = false;
+		extraLoopIsSuper = false;
+	}
+}
 
-void Music::handleNormalLoopExit(int loopCount) {
+void Music::doLoopExit(int loopCount) {
 	if (extraLoopIsNormal) {				// We're leaving a normal loop that's nested in a super loop.
 		extraLoopIsNormal = false;
 		extraLoopIsSuper = false;
@@ -2264,10 +2220,40 @@ void Music::handleNormalLoopExit(int loopCount) {
 		loopLengths[loopLabel] = normalLoopLength;
 }
 
+void Music::doLoopRemoteCall(int loopCount) {
+	addNoteLength((loopLabel ? loopLengths[loopLabel] : normalLoopLength) * loopCount);		// // //
+}
+
+void Music::doSubloopEnter() {
+	if (inE6Loop)		// // //
+		error("You cannot nest a subloop within another subloop.");
+	inE6Loop = true;
+
+	synchronizeQ();		// // //
+	superLoopLength = 0;
+
+	if (inNormalLoop) {		// // // We're entering a super loop that's nested in a normal loop
+		baseLoopIsNormal = true;
+		baseLoopIsSuper = false;
+		extraLoopIsNormal = false;
+		extraLoopIsSuper = true;
+	}
+	else {						// We're entering a super loop that's not nested
+		baseLoopIsNormal = false;
+		baseLoopIsSuper = true;
+		extraLoopIsNormal = false;
+		extraLoopIsSuper = false;
+	}
+
+	append(AMKd::Binary::CmdType::Subloop, 0x00);		// // //
+}
+
 void Music::doSubloopExit(int loopCount) {
 	if (!inE6Loop)		// // //
 		error("A subloop end was found outside of a subloop.");
 	inE6Loop = false;
+
+	synchronizeQ();		// // //
 
 	if (extraLoopIsSuper) {				// We're leaving a super loop that's nested in a normal loop.
 		extraLoopIsNormal = false;
