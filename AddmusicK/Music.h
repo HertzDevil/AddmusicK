@@ -169,11 +169,13 @@ private:
 	void parseSPCInfo();
 
 	// // // action methods, these will become objects later
+	void doOctave(int oct);
 	void doVolume(int vol);
 	void doGlobalVolume(int vol);
 	void doVibrato(int delay, int rate, int depth);
 	void doTremolo(int delay, int rate, int depth);
 	void doTremoloOff();
+	void doEnvelope(int ad, int sr);
 	void doTempo(int speed);
 	void doSampleLoad(int index, int mult);
 	void doLoopEnter();					// Call any time a definition of a loop is entered.

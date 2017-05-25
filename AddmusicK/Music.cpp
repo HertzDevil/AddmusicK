@@ -110,7 +110,6 @@ static std::string basepath;
 
 static bool usingSMWVTable;
 
-//static bool songVersionIdentified;
 //static int hTranspose = 0;00
 
 // // // vs2017 does not have fold-expressions
@@ -159,7 +158,6 @@ void Music::init() {
 	manualNoteWarning = true;
 	tempoDefined = false;
 	//am4silence = 0;
-	//songVersionIdentified = false;
 	// // //
 	hasYoshiDrums = false;
 	//onlyHadOneTempo = true;
@@ -230,10 +228,8 @@ void Music::init() {
 
 	switch (stat.target) {		// // //
 	case Target::AMM:
-		//songVersionIdentified = true;
 		break;
 	case Target::AM4:
-		//songVersionIdentified = true;
 		for (auto &t : tracks)		// // //
 			t.ignoreTuning = true; // AM4 fix for tuning[] related stuff.
 		break;
@@ -279,6 +275,11 @@ void Music::compile() {
 		cmd.Insert("]", &Music::parseLoopEndCommand);
 		cmd.Insert("]]", &Music::parseSubloopEndCommand);
 		cmd.Insert("]]]", &Music::parseErrorLoopEndCommand);
+		cmd.Insert("*", &Music::parseStarLoopCommand);
+		cmd.Insert("o", &Music::parseOctaveDirective);
+		cmd.Insert(">", &Music::parseRaiseOctaveDirective);
+		cmd.Insert("<", &Music::parseLowerOctaveDirective);
+		cmd.Insert("v", &Music::parseVolumeCommand);
 
 		return cmd;
 	}();
@@ -305,18 +306,13 @@ void Music::compile() {
 			case '#': parseChannelDirective();		break;
 			case 'l': parseLDirective();			break;
 			case 'w': parseGlobalVolumeCommand();	break;
-			case 'v': parseVolumeCommand();			break;
 			case 'q': parseQuantizationCommand();	break;
 			case 'y': parsePanCommand();			break;
 			case '/': parseIntroDirective();		break;
-			case 'o': parseOctaveDirective();		break;
 			case '@': parseInstrumentCommand();		break;
 			case '(': parseOpenParenCommand();		break;
-			case '*': parseStarLoopCommand();		break;
 			case '{': parseTripletOpenDirective();	break;
 			case '}': parseTripletCloseDirective();	break;
-			case '>': parseRaiseOctaveDirective();	break;
-			case '<': parseLowerOctaveDirective();	break;
 			case '&': parsePitchSlideCommand();		break;
 			case '$': parseHexCommand();			break;
 			case 'h': parseHDirective();			break;
@@ -501,7 +497,6 @@ void Music::parseIntroDirective() {
 	hasIntro = true;
 	tracks[channel].phrasePointers[1] = static_cast<uint16_t>(tracks[channel].data.size());		// // //
 	prevNoteLength = -1;
-	hasIntro = true;
 	introLength = static_cast<unsigned>(tracks[channel].channelLength);		// // //
 }
 
@@ -532,9 +527,8 @@ void Music::parseTransposeDirective() {
 void Music::parseOctaveDirective() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Int>(mml_))
-		octave = requires(param.get<0>(), 1u, 6u, DIR_ILLEGAL("octave (\"o\")"));
-	else
-		error(DIR_ERROR("octave (\"o\")"));
+		return doOctave(param.get<0>());
+	error(DIR_ERROR("octave (\"o\")"));
 }
 
 void Music::parseInstrumentCommand() {
@@ -815,11 +809,11 @@ void Music::parseTripletCloseDirective() {
 }
 
 void Music::parseRaiseOctaveDirective() {
-	octave = requires(octave + 1, 1, 6, "The octave has been raised too high.");		// // //
+	return doOctave(octave + 1);		// // //
 }
 
 void Music::parseLowerOctaveDirective() {
-	octave = requires(octave - 1, 1, 6, "The octave has been dropped too low.");		// // //
+	return doOctave(octave - 1);		// // //
 }
 
 void Music::parsePitchSlideCommand() {
@@ -855,53 +849,49 @@ void Music::parseHFDHex() {
 		error("Unknown HFD hex command.");
 
 	if (convert) {
+		using namespace AMKd::MML::Lexer;
 		switch (i) {
 		case 0x80:
-		{
-			int reg, val;
-			if (!getHexByte(reg) || !getHexByte(val))		// // //
-				error("Error while parsing HFD hex command.");
-
-			if (!(reg == 0x6D || reg == 0x7D))	// Do not write the HFD header hex bytes.
-				if (reg == 0x6C)			// Noise command gets special treatment.
-					append(AMKd::Binary::CmdType::Noise, val);		// // //
+			if (auto param = GetParameters<Byte, Byte>(mml_)) {		// // //
+				unsigned reg, val;
+				std::tie(reg, val) = *param;
+				if (reg == 0x6D || reg == 0x7D) // Do not write the HFD header hex bytes.
+					songTargetProgram = Target::AM4; // The HFD header bytes indicate this as being an AM4 song, so it gets AM4 treatment.
+				else if (reg == 0x6C) // Noise command gets special treatment.
+					append(AMKd::Binary::CmdType::Noise, val);
 				else
 					append(AMKd::Binary::CmdType::DSP, reg, val);		// // //
-			else
-				songTargetProgram = Target::AM4;		// // // The HFD header bytes indicate this as being an AM4 song, so it gets AM4 treatment.
-		} break;
-		case 0x81:
-			if (!getHexByte(i))		// // //
-				error("Error while parsing HFD hex command.");
-			append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Transpose, i);		// // //
-			break;
-		case 0x82:
-		{
-			int addrHi, addrLo;
-			int bytesHi, bytesLo;
-			if (!getHexByte(addrHi) || !getHexByte(addrLo) || !getHexByte(bytesHi) || !getHexByte(bytesLo))		// // //
-				error("Error while parsing HFD hex command.");
-			int addr = (addrHi << 8) | addrLo;
-			int bytes = (bytesHi << 8) | bytesLo;
-
-			if (addr == 0x6136) {
-				parseHFDInstrumentHack(addr, bytes);
+				hexLeft = 0;
 				return;
 			}
-
-			for (++bytes; bytes > 0; --bytes) {		// // //
-				if (!getHexByte(i))
-					error("Error while parsing HFD hex command.");
-				// append(AMKd::Binary::CmdType::ARAM, i, addr >> 8, addr & 0xFF);		// // // Don't do this stuff; we won't know what we're overwriting.
-				++addr;
+			break;
+		case 0x81:
+			if (auto param = GetParameters<Byte, Byte>(mml_)) {		// // //
+				append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Transpose, param.get<0>());		// // //
+				hexLeft = 0;
+				return;
 			}
-		} break;
-		case 0x83:
-			error("HFD hex command $ED$83 not implemented.");
+			break;
+		case 0x82:
+			if (auto param = GetParameters<Byte, Byte, Byte, Byte>(mml_)) {		// // //
+				int addr = (param.get<0>() << 8) | param.get<1>();
+				int bytes = (param.get<2>() << 8) | param.get<3>();
+				if (addr == 0x6136)
+					return parseHFDInstrumentHack(addr, bytes);
+				while (bytes-- >= 0) {		// // //
+					if (!GetParameters<Byte>(mml_))
+						error("Error while parsing HFD hex command.");
+					// Don't do this stuff; we won't know what we're overwriting.
+					// append(AMKd::Binary::CmdType::ARAM, i, addr >> 8, addr & 0xFF);		// // //
+					++addr;
+				}
+				hexLeft = 0;
+				return;
+			}
+			break;
 		}
-
-		hexLeft = 0;
-		return;
+		if (i >= 0x80)		// // //
+			error("Error while parsing HFD hex command.");
 	}
 
 	currentHex = AMKd::Binary::CmdType::Envelope;
@@ -925,9 +915,10 @@ void Music::removeRemoteConversion() {
 static bool nextNoteIsForDD;
 
 void Music::parseHexCommand() {
-	int i = getHex();		// // //
-	if (i < 0 || i > 0xFF)
+	auto hex = AMKd::MML::Lexer::Hex<2>()(mml_);		// // //
+	if (!hex)
 		error("Error parsing hex command.");
+	int i = *hex;
 
 	if (!validateHex) {
 		append(i);
@@ -979,11 +970,11 @@ void Music::parseHexCommand() {
 				return apply_this(&Music::doVolume, this, *param);
 			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::Envelope:
-			if (songTargetProgram == Target::AM4) {
-				parseHFDHex();
-				return;
-			}
-			break;
+			if (songTargetProgram == Target::AM4)
+				return parseHFDHex();
+			if (auto param = GetParameters<Byte, Byte>(mml_))
+				return apply_this(&Music::doEnvelope, this, *param);
+			error("Unknown hex command.");
 		case AMKd::Binary::CmdType::SampleLoad:
 			if (auto param = GetParameters<Byte, Byte>(mml_))
 				return apply_this(&Music::doSampleLoad, this, *param);
@@ -1733,36 +1724,33 @@ int Music::getPitch(int i) {
 
 // // //
 int Music::getNoteLength() {
-	//bool still = true;
+	double mult = 0.0;
+	double add = 0.0;
 
-	int len = getInt();		// // //
-
-	if (len == -1 && trimChar('=')) {		// // //
-		len = getInt();
+	if (trimChar('=')) {		// // //
+		int len = getInt();
 		if (len == -1 || len == 0)		// // // do not allow zero duration
 			[&] { error("Error parsing note"); }();
 		return len;
-		//if (len < 1) still = false; else return len;
 	}
 
-	//if (still)
-	//{
+	int len = getInt();		// // //
 	if (len < 1 || len > 192)
 		len = defaultNoteLength;
-	len = 192 / len;
 
-	int frac = len;
+	double frac = 1.0;		// // //
 
 	int times = 0;
 	while (trimChar('.')) {		// // //
-		frac /= 2;
-		len += frac;
+		frac /= 2.0;
 		if (++times == 2 && songTargetProgram == Target::AM4)
 			break;	// // // AM4 only allows two dots for whatever reason.
 	}
 
+	len = static_cast<int>(192.0 / len * (2.0 - frac));
+
 	if (triplet)
-		len = static_cast<int>(std::floor(len * 2.0 / 3.0 + 0.5));
+		len = static_cast<int>(len * 2.0 / 3.0 + 0.5);
 	return len;
 }
 
@@ -1840,7 +1828,7 @@ void Music::pointersFirstPass() {
 
 	spaceForPointersAndInstrs += instrumentData.size();
 
-	allPointersAndInstrs.resize(spaceForPointersAndInstrs);// = alloc(spaceForPointersAndInstrs);
+	allPointersAndInstrs.resize(spaceForPointersAndInstrs);
 	//for (i = 0; i < spaceForPointers; i++) allPointers[i] = 0x55;
 
 	int add = (hasIntro ? 2 : 0) + (doesntLoop ? 0 : 2) + 4;
@@ -2075,7 +2063,6 @@ void Music::parseSPCInfo() {
 				if (seconds > 999)
 					error("Songs longer than 16:39 are not allowed by the SPC format.");		// // //
 
-				seconds = seconds & 0xFFFFFF;
 				knowsLength = true;
 			}
 		}
@@ -2149,6 +2136,14 @@ const std::string &Music::getFileName() const {
 
 
 // // //
+void Music::doOctave(int oct) {
+	if (oct < 1)
+		error("The octave has been dropped too low.");
+	if (oct > 6)
+		error("The octave has been raised too high.");
+	octave = oct;
+}
+
 void Music::doVolume(int vol) {
 	append(AMKd::Binary::CmdType::Vol, vol);
 }
@@ -2169,6 +2164,10 @@ void Music::doTremolo(int delay, int rate, int depth) {
 
 void Music::doTremoloOff() {
 	append(AMKd::Binary::CmdType::Tremolo, 0x00, 0x00, 0x00);
+}
+
+void Music::doEnvelope(int ad, int sr) {
+	append(AMKd::Binary::CmdType::Envelope, ad, sr);
 }
 
 void Music::doTempo(int speed) {
