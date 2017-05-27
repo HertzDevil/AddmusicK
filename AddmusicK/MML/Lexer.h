@@ -106,7 +106,7 @@ struct tup_assigner
 template <typename T, typename U>
 struct tup_assigner<T, U, -1>
 {
-	bool operator()(SourceFile &file, U &tup) const {
+	bool operator()(SourceFile &file, U &) const {
 		file.SkipSpaces();
 		return T()(file).has_value();
 	}
@@ -119,7 +119,7 @@ bool get_impl(SourceFile &file, T &tup, std::index_sequence<I...>) {
 }
 #else
 template <typename T, typename... L>
-bool get_impl(SourceFile &file, T &tup, std::index_sequence<>) {
+bool get_impl(SourceFile &, T &, std::index_sequence<>) {
 	return true;
 }
 

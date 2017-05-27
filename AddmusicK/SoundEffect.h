@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <map>		// // //
 #include <cstdint>
 #include "Music/SongBase.h"		// // //
 
@@ -20,6 +21,9 @@ public:
 	int pointsTo = 0;		// // //
 
 private:		// // //
+	template <typename... Args>		// // //
+	void append(Args&&... value);
+
 	int getHex();
 	int getInt();
 	int getPitch(int i, int octave);
@@ -31,8 +35,6 @@ private:		// // //
 	void compileASM();
 	void parseJSR();
 
-	std::vector<std::string> asmStrings;
-	std::vector<std::string> asmNames;
-	std::vector<std::string> jmpNames;
-	std::vector<int> jmpPoses;
+	std::map<std::string, std::string> asmInfo;		// // //
+	std::vector<std::pair<std::string, int>> jmpInfo;		// // //
 };

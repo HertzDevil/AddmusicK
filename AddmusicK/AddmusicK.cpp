@@ -608,7 +608,7 @@ void compileGlobalData() {
 		for (int i = 0; i <= sfxCount[bank]; ++i) {
 			auto &sfx = soundEffects[bank][i];		// // //
 			if (sfx.exists && !sfx.pointsTo) {
-				sfx.posInARAM = getSFXSpace(0) + getSFXSpace(1) + programSize + programPos;
+				sfx.posInARAM = static_cast<uint16_t>(getSFXSpace(0) + getSFXSpace(1) + programSize + programPos);
 				sfx.compile();
 				sfxPointers[bank].push_back(sfx.posInARAM);
 				dataTotal[bank] += sfx.data.size() + sfx.code.size();
@@ -757,7 +757,7 @@ void fixMusicPointers() {
 	std::stringstream globalPointers;
 	std::stringstream incbins;
 
-	int songDataARAMPos = programSize + programPos + highestGlobalSong * 2 + 2;
+	auto songDataARAMPos = static_cast<uint16_t>(programSize + programPos + highestGlobalSong * 2 + 2);		// // //
 	//                    size + startPos + pointer to each global song + pointer to local song.
 	//int songPointerARAMPos = programSize + programPos;
 
@@ -767,8 +767,6 @@ void fixMusicPointers() {
 		if (musics[i].exists == false) continue;
 
 		musics[i].posInARAM = songDataARAMPos;
-
-		int untilJump = -1;
 
 		if (i <= highestGlobalSong) {
 			globalPointers << "\ndw song" << hex2 << i;
@@ -780,41 +778,33 @@ void fixMusicPointers() {
 			addedLocalPtr = true;
 		}
 
+		int untilJump = -1;
+
 		for (int j = 0; j < musics[i].spaceForPointersAndInstrs; j += 2) {
 			if (untilJump == 0) {
 				j += musics[i].instrumentData.size();
 				untilJump = -1;
 			}
 
-			int temp = musics[i].allPointersAndInstrs[j] | musics[i].allPointersAndInstrs[j + 1] << 8;
+			auto it = musics[i].allPointersAndInstrs.begin() + j;		// // //
+			int temp = *it | (*(it + 1) << 8);
 
 			if (temp == 0xFFFF) {		// 0xFFFF = swap with 0x0000.
-				musics[i].allPointersAndInstrs[j] = 0;
-				musics[i].allPointersAndInstrs[j + 1] = 0;
+				assign_short(it, 0);		// // //
 				untilJump = 1;
 			}
 			else if (temp == 0xFFFE) {	// 0xFFFE = swap with 0x00FF.
-				musics[i].allPointersAndInstrs[j] = 0xFF;
-				musics[i].allPointersAndInstrs[j + 1] = 0;
+				assign_short(it, 0x00FF);		// // //
 				untilJump = 2;
 			}
-			else if (temp == 0xFFFD) {	// 0xFFFD = swap with the song's position (its first track pointer).
-				musics[i].allPointersAndInstrs[j] = (musics[i].posInARAM + 2) & 0xFF;
-				musics[i].allPointersAndInstrs[j + 1] = (musics[i].posInARAM + 2) >> 8;
-			}
-			else if (temp == 0xFFFC) {	// 0xFFFC = swap with the song's position + 2 (its second track pointer).
-				musics[i].allPointersAndInstrs[j] = musics[i].posInARAM & 0xFF;
-				musics[i].allPointersAndInstrs[j + 1] = musics[i].posInARAM >> 8;
-			}
-			else if (temp == 0xFFFB) {	// 0xFFFB = swap with 0x0000, but don't set untilSkip.
-				musics[i].allPointersAndInstrs[j] = 0;
-				musics[i].allPointersAndInstrs[j + 1] = 0;
-			}
-			else {
-				temp += musics[i].posInARAM;
-				musics[i].allPointersAndInstrs[j] = temp & 0xFF;
-				musics[i].allPointersAndInstrs[j + 1] = temp >> 8;
-			}
+			else if (temp == 0xFFFD)	// 0xFFFD = swap with the song's position (its first track pointer).
+				assign_short(it, musics[i].posInARAM + 2);		// // //
+			else if (temp == 0xFFFC)	// 0xFFFC = swap with the song's position + 2 (its second track pointer).
+				assign_short(it, musics[i].posInARAM);		// // //
+			else if (temp == 0xFFFB)	// 0xFFFB = swap with 0x0000, but don't set untilSkip.
+				assign_short(it, 0);		// // //
+			else
+				assign_short(it, temp += musics[i].posInARAM);		// // //
 			untilJump--;
 		}
 
@@ -826,22 +816,12 @@ void fixMusicPointers() {
 
 		if (i > highestGlobalSong) {
 			int RATSSize = musics[i].totalSize + 4 - 1;
-			final.push_back('S');
-			final.push_back('T');
-			final.push_back('A');
-			final.push_back('R');
-
-			final.push_back(RATSSize & 0xFF);
-			final.push_back(RATSSize >> 8);
-
-			final.push_back(~RATSSize & 0xFF);
-			final.push_back(~RATSSize >> 8);
-
-			final.push_back(sizeWithPadding & 0xFF);
-			final.push_back(sizeWithPadding >> 8);
-
-			final.push_back(songDataARAMPos & 0xFF);
-			final.push_back(songDataARAMPos >> 8);
+			final.resize(0x0C);		// // //
+			assign_val<4>(final.begin(), 0x52415453); // "STAR"
+			assign_short(final.begin() + 4, RATSSize);
+			assign_short(final.begin() + 6, ~RATSSize);
+			assign_short(final.begin() + 8, sizeWithPadding);
+			assign_short(final.begin() + 10, songDataARAMPos);
 		}
 
 		musics[i].FlushSongData(final);		// // //
@@ -860,7 +840,7 @@ void fixMusicPointers() {
 		writeFile(fname.str(), final);
 
 		if (i <= highestGlobalSong) {
-			songDataARAMPos += sizeWithPadding;
+			songDataARAMPos += static_cast<uint16_t>(sizeWithPadding);		// // //
 		}
 		else {
 			if (checkEcho) {
@@ -940,14 +920,10 @@ void fixMusicPointers() {
 
 	std::vector<uint8_t> temp = openFile("asm/SNES/bin/main.bin");		// // //
 	programSize = static_cast<unsigned>(fs::file_size("asm/SNES/bin/main.bin"));		// // //
-	std::vector<uint8_t> temp2;
-	temp2.resize(temp.size() + 4);
-	temp2[0] = programSize & 0xFF;
-	temp2[1] = programSize >> 8;
-	temp2[2] = programPos & 0xFF;
-	temp2[3] = programPos >> 8;
-	for (unsigned int i = 0; i < temp.size(); i++)
-		temp2[4 + i] = temp[i];
+	std::vector<uint8_t> temp2(4);		// // //
+	assign_short(temp2.begin(), programSize);
+	assign_short(temp2.begin() + 2, programPos);
+	temp2.insert(temp2.cend(), temp.cbegin(), temp.cend());
 	writeFile("asm/SNES/bin/main.bin", temp2);
 
 	if (verbose)
@@ -1055,7 +1031,7 @@ void generateSPCs() {
 		if ((tablePos & 0xFF) != 0)
 			tablePos = (tablePos & 0xFF00) + 0x100;
 
-		int samplePos = tablePos + musics[i].mySamples.size() * 4;
+		auto samplePos = static_cast<uint16_t>(tablePos + musics[i].mySamples.size() * 4);		// // //
 		auto srcTable = SPC.begin() + RAM + tablePos;
 
 		for (const auto &id : musics[i].mySamples) {		// // //
@@ -1063,24 +1039,23 @@ void generateSPCs() {
 			unsigned short loopPoint = samp.loopPoint;
 			unsigned short newLoopPoint = loopPoint + samplePos;
 
-			*srcTable++ = static_cast<uint8_t>(samplePos & 0xFF);
-			*srcTable++ = static_cast<uint8_t>(samplePos >> 8);
-			*srcTable++ = static_cast<uint8_t>(newLoopPoint & 0xFF);
-			*srcTable++ = static_cast<uint8_t>(newLoopPoint >> 8);
+			assign_short(srcTable, samplePos);		// // //
+			assign_short(srcTable + 2, newLoopPoint);
+			srcTable += 4;
 
 			std::copy(samp.data.cbegin(), samp.data.cend(), SPC.begin() + RAM + samplePos);
-			samplePos += samp.data.size();
+			samplePos += static_cast<uint16_t>(samp.data.size());
 		}
 
 		std::copy(DSPBase.cbegin(), DSPBase.cend(), SPC.begin() + DSP_ADDR);		// // //
 
-		SPC[DSP_ADDR + 0x5D] = tablePos >> 8; // sample directory
+		SPC[DSP_ADDR + 0x5D] = static_cast<uint8_t>(tablePos >> 8); // sample directory
 
 		SPC[RAM + 0x5F] = 0x20;
 
-		SPC[LENGTH    ] = (musics[i].seconds / 100 % 10) + '0';		// Why on Earth is the value stored as plain text...?
-		SPC[LENGTH + 1] = (musics[i].seconds / 10 % 10) + '0';
-		SPC[LENGTH + 2] = (musics[i].seconds / 1 % 10) + '0';
+		SPC[LENGTH    ] = static_cast<uint8_t>(musics[i].seconds / 100 % 10) + '0';		// Why on Earth is the value stored as plain text...?
+		SPC[LENGTH + 1] = static_cast<uint8_t>(musics[i].seconds / 10 % 10) + '0';
+		SPC[LENGTH + 2] = static_cast<uint8_t>(musics[i].seconds / 1 % 10) + '0';
 
 		SPC[FADEOUT    ] = '1';
 		SPC[FADEOUT + 1] = '0';
@@ -1088,15 +1063,14 @@ void generateSPCs() {
 		SPC[FADEOUT + 3] = '0';
 		SPC[FADEOUT + 4] = '0';
 
-		SPC[PC    ] = static_cast<uint8_t>(programUploadPos & 0xFF);	// // // Set the PC to the main loop.
-		SPC[PC + 1] = static_cast<uint8_t>(programUploadPos >> 8);	// The values of the registers (besides stack which is in the file) don't matter.  They're 0 in the base file.
+		assign_short(SPC.begin() + PC, programUploadPos);		// // // Set the PC to the main loop.
 
 		i = backupIndex;
 
 		switch (mode) {		// // //
-		case MUSIC: SPC[RAM + 0xF6] = highestGlobalSong + 1; break;	// Tell the SPC to play this song.
-		case SFX1:  SPC[RAM + 0xF4] = i; break;						// Tell the SPC to play this SFX
-		case SFX2:  SPC[RAM + 0xF7] = i; break;						// Tell the SPC to play this SFX
+		case MUSIC: SPC[RAM + 0xF6] = static_cast<uint8_t>(highestGlobalSong + 1); break;	// Tell the SPC to play this song.
+		case SFX1:  SPC[RAM + 0xF4] = static_cast<uint8_t>(i); break;						// Tell the SPC to play this SFX
+		case SFX2:  SPC[RAM + 0xF7] = static_cast<uint8_t>(i); break;						// Tell the SPC to play this SFX
 		}
 		if (yoshi)		// // //
 			SPC[RAM + 0xF5] = 2;

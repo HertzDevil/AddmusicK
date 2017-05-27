@@ -247,35 +247,21 @@ int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM) {		//
 
 	pos -= size;
 
-	ROM[pos + 0] = 'S';
-	ROM[pos + 1] = 'T';
-	ROM[pos + 2] = 'A';
-	ROM[pos + 3] = 'R';
-	pos += 4;
 	size -= 9;			// Not -8.  -8 would accidentally protect one too many bytes.
-	ROM[pos + 0] = size & 0xFF;
-	ROM[pos + 1] = size >> 8;
-	size ^= 0xFFFF;
-	ROM[pos + 2] = size & 0xFF;
-	ROM[pos + 3] = size >> 8;
-	pos -= 4;
+	assign_val<4>(ROM.begin() + pos, 0x52415453);		// // // "STAR"
+	assign_short(ROM.begin() + pos + 4, size);
+	assign_short(ROM.begin() + pos + 6, ~size);
 	return pos;
 }
 
 int clearRATS(std::vector<uint8_t> &ROM, int offset) {		// // //
 	size_t size = ((ROM[offset + 5] << 8) | ROM[offset + 4]) + 9;		// // //
-	std::fill(ROM.begin() + offset, ROM.begin() + offset + size, 0);
+	std::fill(ROM.begin() + offset, ROM.begin() + offset + size, '\0');
 	return size;
 }
 
-void addSample(const fs::path &fileName, Music *music, bool important) {
-	fs::path actualPath = getSamplePath(fileName, music->name);		// // //
-	std::vector<uint8_t> temp = openFile(actualPath);
-	addSample(temp, actualPath.string(), music, important, false);
-}
-
 // // //
-void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint) {
+static void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, uint16_t loopPoint) {
 	Sample newSample;
 	newSample.important = important;		// // //
 
@@ -288,7 +274,7 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 				fatalError(errstream.str());		// // //
 			}
 
-			newSample.loopPoint = (sample[1] << 8) | (sample[0]);
+			newSample.loopPoint = static_cast<uint16_t>((sample[1] << 8) | sample[0]);
 			newSample.data.assign(sample.begin() + 2, sample.end());
 		}
 		else {
@@ -316,6 +302,11 @@ void addSample(const std::vector<uint8_t> &sample, const std::string &name, Musi
 	sampleToIndex[newSample.name] = samples.size();
 	music->mySamples.push_back(static_cast<uint16_t>(samples.size()));		// // //
 	samples.push_back(newSample);					// This is a sample we haven't encountered before.  Add it.
+}
+
+void addSample(const fs::path &fileName, Music *music, bool important) {
+	fs::path actualPath = getSamplePath(fileName, music->name);		// // //
+	addSample(openFile(actualPath), actualPath.string(), music, important, false, 0);
 }
 
 void addSampleGroup(const fs::path &groupName, Music *music) {

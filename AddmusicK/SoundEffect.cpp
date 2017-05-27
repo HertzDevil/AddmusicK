@@ -1,6 +1,7 @@
 #include "SoundEffect.h"
 #include "globals.h"		// // //
 #include "MML/Preprocessor.h"		// // //
+#include "Binary/Defines.h"		// // //
 #include <sstream>
 #include <iomanip>
 
@@ -15,7 +16,21 @@ static bool inDefineBlock;
 		return; \
 	} while (false)
 
-#define append(value) (data.push_back(value))		// // //
+// // // vs2017 does not have fold-expressions
+#define SWALLOW(x) do { \
+		using _swallow = int[]; \
+		(void)_swallow {0, ((x), 0)...}; \
+	} while (false)
+
+// // //
+template <typename... Args>
+void SoundEffect::append(Args&&... value) {
+#if 0
+	(data.push_back(static_cast<uint8_t>(value)), ...);
+#else
+	SWALLOW(data.push_back(static_cast<uint8_t>(value)));
+#endif
+}
 
 std::string &SoundEffect::getEffectiveName() {
 	return name == "" ? pointName : name;		// // //
@@ -152,7 +167,7 @@ void SoundEffect::compile() {
 			}
 			continue;
 		case '!':
-			pos = ~0;
+			pos = static_cast<unsigned>(-1);		// // //
 			continue;
 		case 'v':
 			pos++;
@@ -201,8 +216,9 @@ void SoundEffect::compile() {
 				if (j > 0x1F) error("Illegal value for noise instrument ('@,') command.  Only values between 0 and 31");
 			}
 
-			append(0xDA);
-			if (j != -1) append(0x80 | j);
+			append(AMKd::Binary::CmdType::Portamento);		// // //
+			if (j != -1)
+				append(0x80 | j);
 			append(i);
 			// instr = i;
 			break;
@@ -274,15 +290,12 @@ void SoundEffect::compile() {
 						}
 						if (updateVolume) {
 							append(volume[0]);
-							if (volume[0] != volume[1]) append(volume[1]);
+							if (volume[0] != volume[1])
+								append(volume[1]);
 							updateVolume = false;
 						}
 
-						append(0xDD);
-						append(lastNote);
-						append(0x00);
-						append(lastNoteValue);
-						append(i);
+						append(AMKd::Binary::CmdType::Portamento, lastNote, 0x00, lastNoteValue, i);		// // //
 						firstNote = false;
 					}
 				}
@@ -294,14 +307,12 @@ void SoundEffect::compile() {
 
 					if (updateVolume) {
 						append(volume[0]);
-						if (volume[0] != volume[1]) append(volume[1]);
+						if (volume[0] != volume[1])
+							append(volume[1]);
 						updateVolume = false;
 					}
 
-					append(0xEB);
-					append(0x00);
-					append(lastNoteValue);
-					append(i);
+					append(AMKd::Binary::CmdType::BendAway, 0x00, lastNoteValue, i);
 				}
 
 				if (j < 0) lastNoteValue = j;
@@ -412,49 +423,38 @@ void SoundEffect::parseASM() {
 
 	pos++;
 
-	asmStrings.push_back(text.substr(startPos, endPos - startPos));
-	asmNames.push_back(tempname);
+	asmInfo.insert(std::make_pair(tempname, text.substr(startPos, endPos - startPos)));		// // //
 }
 
 void SoundEffect::compileASM() {
 	//int codeSize = 0;
 
-	std::vector<unsigned int> codePositions;
+	std::map<const std::string *, size_t> codePositions;		// // //
 
-	for (unsigned int i = 0; i < asmStrings.size(); i++) {
-		codePositions.push_back(code.size());
+	for (const auto &inf : asmInfo) {
+		codePositions.insert(std::make_pair(&inf.first, code.size()));
 
 		std::stringstream asmCode;
 		removeFile("temp.bin");
 		removeFile("temp.asm");
-		asmCode << "arch spc700-raw\n\norg $000000\nincsrc \"" << "asm/main.asm" << "\"\nbase $" << hex4 << posInARAM + code.size() + data.size() << "\n\norg $008000\n\n" << asmStrings[i];
+		asmCode << "arch spc700-raw\n\norg $000000\nincsrc \"" << "asm/main.asm" << "\"\nbase $" <<
+			hex4 << posInARAM + code.size() + data.size() << "\n\norg $008000\n\n" << inf.second;		// // //
 		writeTextFile("temp.asm", asmCode.str());
 
 		if (!asarCompileToBIN("temp.asm", "temp.bin"))
 			error2("asar reported an error.  Refer to temp.log for details.");
 
 		std::vector<uint8_t> temp = openFile("temp.bin");		// // //
-
-		temp.erase(temp.begin(), temp.begin() + 0x08000);
-
-		for (unsigned int j = 0; j < temp.size(); j++)
-			code.push_back(temp[j]);
+		code.insert(code.cend(), temp.cbegin() + 0x8000, temp.cend());
 	}
 
-	for (unsigned int i = 0; i < asmStrings.size(); i++) {
-		int k = -1;
-		for (unsigned int j = 0; j < jmpNames.size(); j++) {
-			if (asmNames[i] == jmpNames[j]) {
-				k = j;
-				break;
-			}
-		}
-
-		if (k == -1)
+	for (const auto &inf : asmInfo) {		// // //
+		auto it = std::find_if(jmpInfo.cbegin(), jmpInfo.cend(), [&] (const auto &jump) { return jump.first == inf.first; });
+		if (it == jmpInfo.cend())
 			error2("Could not match asm and jsr names.");
-
-		data[jmpPoses[k]] = static_cast<uint8_t>((posInARAM + data.size() + codePositions[k]) & 0xFF);		// // //
-		data[jmpPoses[k] + 1] = static_cast<uint8_t>((posInARAM + data.size() + codePositions[k]) >> 8);
+		int k = std::distance(jmpInfo.cbegin(), it);
+		auto codePos = posInARAM + data.size() + codePositions[&inf.first];
+		assign_short(data.begin() + jmpInfo[k].second, codePos);		// // //
 	}
 }
 
@@ -474,11 +474,8 @@ void SoundEffect::parseJSR() {
 		tempname += text[pos++];
 	}
 
-	jmpNames.push_back(tempname);
-	append(0xFD);
-	jmpPoses.push_back(data.size());
-	append(0x00);
-	append(0x00);
+	jmpInfo.emplace_back(std::move(tempname), data.size() + 1);		// // //
+	append(0xFD, 0x00, 0x00);
 }
 
 // // //

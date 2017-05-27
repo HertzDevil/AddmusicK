@@ -52,7 +52,7 @@ static int channel, prevChannel, octave, prevNoteLength, defaultNoteLength;
 static bool inDefineBlock;
 static bool inNormalLoop;		// // //
 
-static unsigned int prevLoop;
+static uint16_t prevLoop;		// // //
 static bool doesntLoop;
 static bool triplet;
 static bool inPitchSlide;
@@ -186,7 +186,6 @@ void Music::init() {
 	prevNoteLength = -1;
 	defaultNoteLength = 8;
 
-	prevLoop = -1;
 	// // //
 
 	inDefineBlock = false;
@@ -291,7 +290,7 @@ void Music::compile() {
 				continue;
 			}
 
-			char ch = ::tolower((*mml_.Trim("."))[0]);		// // //
+			char ch = (*mml_.Trim("."))[0];		// // //
 
 			switch (ch) {
 			case '?': parseQMarkDirective();		break;
@@ -352,7 +351,7 @@ void Music::parseComment() {
 		error("Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2.");		// // //
 }
 
-void Music::printChannelDataNonVerbose(int totalSize) {
+void Music::printChannelDataNonVerbose(int size) {
 	std::cout << name << ": ";		// // //
 	for (int i = 0, n = 58 - name.size(); i < n; ++i)
 		std::cout.put('.');
@@ -360,12 +359,12 @@ void Music::printChannelDataNonVerbose(int totalSize) {
 
 	if (knowsLength) {
 		// int s = static_cast<int>((mainLength + introLength) / (2.0 * tempo) + 0.5);
-		auto seconds = static_cast<int>((introSeconds + mainSeconds + 0.5) / 60);		// // //
-		std::cout << seconds / 60 << ':' << std::setfill('0') << std::setw(2) << seconds % 60;
+		auto sec = static_cast<int>((introSeconds + mainSeconds + 0.5) / 60);		// // //
+		std::cout << sec / 60 << ':' << std::setfill('0') << std::setw(2) << sec % 60;
 	}
 	else
 		std::cout << "?:??";
-	std::cout << ", 0x" << hex4 << totalSize << std::dec << " bytes\n";
+	std::cout << ", 0x" << hex4 << size << std::dec << " bytes\n";
 }
 
 void Music::parseQMarkDirective() {
@@ -570,8 +569,8 @@ void Music::parseOpenParenCommand() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Sep<'@'>, Int>(mml_))
 		sampID = instrToSample[requires(param.get<0>(), 0u, 29u, "Illegal instrument number for sample load command.")];
-	else if (auto param = GetParameters<Sep<'\"'>, QString>(mml_)) {
-		std::string s = basepath + param.get<0>();		// // //
+	else if (auto param2 = GetParameters<Sep<'\"'>, QString>(mml_)) {
+		std::string s = basepath + param2.get<0>();		// // //
 		auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(s, this));		// // //
 		if (it == mySamples.cend())
 			error("The specified sample was not included in this song.");
@@ -604,8 +603,8 @@ void Music::parseLabelLoopCommand() {
 					error("Error parsing remote code setup. Missing the third argument.");
 				if (auto len = GetParameters<Byte>(mml_))
 					k = len.get<0>();
-				else if (auto param = GetParameters<Dur>(mml_)) {		// // //
-					k = getRawTicks(param.get<0>());
+				else if (auto len2 = GetParameters<Dur>(mml_)) {		// // //
+					k = getRawTicks(len2.get<0>());
 					if (k > 0x100)
 						error("Note length specified was too large.");		// // //
 					else if (k == 0x100)
@@ -620,7 +619,7 @@ void Music::parseLabelLoopCommand() {
 
 			tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
 			if (loopPointers.find(i) == loopPointers.cend())		// // //
-				loopPointers.insert({i, -1});
+				loopPointers.insert({i, static_cast<uint16_t>(-1)});
 			append(AMKd::Binary::CmdType::Callback, loopPointers[i] & 0xFF, loopPointers[i] >> 8, j, k);
 			return;
 		}
@@ -680,7 +679,7 @@ void Music::parseLoopCommand() {
 		error("You cannot nest standard [ ] loops.");
 	synchronizeQ();		// // //
 
-	prevLoop = tracks[CHANNELS].data.size();		// // //
+	prevLoop = static_cast<uint16_t>(tracks[CHANNELS].data.size());		// // //
 
 	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
 	channel = CHANNELS;					// So we have to back up the current channel.
@@ -817,7 +816,7 @@ void Music::parseHFDInstrumentHack(int addr, int bytes) {
 		int i;		// // //
 		if (!getHexByte(i))		// // //
 			error("Unknown HFD hex command.");
-		instrumentData.push_back(i);
+		instrumentData.push_back(static_cast<uint8_t>(i));		// // //
 		byteNum++;
 		addr++;
 		if (byteNum == 1) {
@@ -885,8 +884,8 @@ void Music::parseHFDHex() {
 
 // // //
 void Music::insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd) {
-	auto index = static_cast<uint16_t>(tracks[channel].data.size() + 1);
-	tracks[channel].remoteGainInfo.emplace_back(index, std::move(cmd));		// // //
+	auto pos = static_cast<uint16_t>(tracks[channel].data.size() + 1);
+	tracks[channel].remoteGainInfo.emplace_back(pos, std::move(cmd));		// // //
 	append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, cmdtype, param);		// // //
 }
 
@@ -1200,7 +1199,7 @@ void Music::parseHexCommand() {
 					error("Illegal value for arpeggio command.");
 				count = 2;
 			}
-			for (unsigned i = 0; i < count; ++i) {
+			for (unsigned j = 0; j < count; ++j) {
 				auto note = GetParameters<Byte>(mml_);
 				if (!note)
 					error("Error parsing arpeggio command.");
@@ -1522,14 +1521,14 @@ void Music::parseInstrumentDefinitions() {
 		else
 			fatalError("Error parsing instrument definition.");
 
-		instrumentData.push_back(i);
+		instrumentData.push_back(static_cast<uint8_t>(i));		// // //
 		if (optimizeSampleUsage)
 			usedSamples[i] = true;
 
 		for (int j = 0; j < 5; j++) {
 			if (!getHexByte(i))		// // //
 				fatalError("Error parsing instrument definition; there were too few bytes following the sample (there must be 6).");
-			instrumentData.push_back(i);
+			instrumentData.push_back(static_cast<uint8_t>(i));		// // //
 		}
 	}
 
@@ -1757,10 +1756,7 @@ void Music::pointersFirstPass() {
 		for (auto &track : tracks) for (const auto &x : track.remoteGainInfo) {		// // //
 			uint16_t dataIndex = x.first;
 			track.loopLocations.push_back(dataIndex);
-
-			track.data[dataIndex] = static_cast<uint8_t>(tracks[CHANNELS].data.size() & 0xFF);
-			track.data[dataIndex + 1] = static_cast<uint8_t>(tracks[CHANNELS].data.size() >> 8);
-
+			assign_short(track.data.begin() + dataIndex, tracks[CHANNELS].data.size());
 			tracks[CHANNELS].data.insert(tracks[CHANNELS].data.end(), x.second.cbegin(), x.second.cend());
 		}
 
@@ -1783,13 +1779,13 @@ void Music::pointersFirstPass() {
 
 		for (size_t z = 0, n = mySamples.size(); z < n; ++z)		// // //
 			if (usedSamples[z] == false && samples[mySamples[z]].important == false)
-				mySamples[z] = emptySampleIndex;
+				mySamples[z] = static_cast<uint16_t>(emptySampleIndex);		// // //
 	}
 
 	int binpos = 0;		// // //
 	for (size_t i = 0; i < CHANNELS; ++i) {
 		if (!tracks[i].data.empty())
-			tracks[i].phrasePointers[0] = binpos;
+			tracks[i].phrasePointers[0] = static_cast<uint16_t>(binpos);
 		tracks[i].phrasePointers[1] += tracks[i].phrasePointers[0];
 		binpos += tracks[i].data.size();
 	}
@@ -1812,42 +1808,33 @@ void Music::pointersFirstPass() {
 	for (size_t z = 0, n = instrumentData.size(); z < n; ++z)		// // //
 		allPointersAndInstrs[add + z] = instrumentData[z];
 
-	allPointersAndInstrs[0] = static_cast<uint8_t>((add + instrumentData.size()) & 0xFF);		// // //
-	allPointersAndInstrs[1] = static_cast<uint8_t>((add + instrumentData.size()) >> 8);
+	assign_short(allPointersAndInstrs.begin(), add + instrumentData.size());		// // //
 
-	if (doesntLoop) {
-		allPointersAndInstrs[add - 2] = 0xFF;	// Will be re-evaluated to 0000 when the pointers are adjusted later.
-		allPointersAndInstrs[add - 1] = 0xFF;
-	}
+	/*
+	FFFF -> 00, 00
+	FFFE -> FF, 00
+	FFFD -> 0002 + ARAMPos
+	FFFC -> ARAMPos
+	*/
+	if (doesntLoop)		// // //
+		assign_short(allPointersAndInstrs.begin() + add - 2, 0xFFFF);
 	else {
-		allPointersAndInstrs[add - 4] = 0xFE;	// Will be re-evaluated to FF00 when the pointers are adjusted later.
-		allPointersAndInstrs[add - 3] = 0xFF;
-		if (hasIntro) {
-			allPointersAndInstrs[add - 2] = 0xFD;	// Will be re-evaluated to 0002 + ARAMPos when the pointers are adjusted later.
-			allPointersAndInstrs[add - 1] = 0xFF;
-		}
-		else {
-			allPointersAndInstrs[add - 2] = 0xFC;	// Will be re-evaluated to ARAMPos when the pointers are adjusted later.
-			allPointersAndInstrs[add - 1] = 0xFF;
-		}
+		assign_short(allPointersAndInstrs.begin() + add - 4, 0xFFFE);
+		assign_short(allPointersAndInstrs.begin() + add - 2, hasIntro ? 0xFFFD : 0xFFFC);
 	}
-	if (hasIntro) {
-		allPointersAndInstrs[2] = static_cast<uint8_t>((add + instrumentData.size() + 16) & 0xFF);		// // //
-		allPointersAndInstrs[3] = static_cast<uint8_t>((add + instrumentData.size() + 16) >> 8);
-	}
+	if (hasIntro)
+		assign_short(allPointersAndInstrs.begin() + 2, add + instrumentData.size() + 16);		// // //
 
 	add += instrumentData.size();
 	for (size_t i = 0; i < CHANNELS; ++i) {		// // //
-		unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[0] + spaceForPointersAndInstrs);
-		allPointersAndInstrs[i * 2 + 0 + add] = static_cast<uint8_t>(adr & 0xFF);		// // //
-		allPointersAndInstrs[i * 2 + 1 + add] = static_cast<uint8_t>(adr >> 8);
+		auto adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[0] + spaceForPointersAndInstrs);
+		assign_short(allPointersAndInstrs.begin() + i * 2 + add, adr);		// // //
 	}
 
 	if (hasIntro) {
 		for (size_t i = 0; i < CHANNELS; ++i) {		// // //
-			unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[1] + spaceForPointersAndInstrs);
-			allPointersAndInstrs[i * 2 + 16 + add] = static_cast<uint8_t>(adr & 0xFF);		// // //
-			allPointersAndInstrs[i * 2 + 17 + add] = static_cast<uint8_t>(adr >> 8);
+			auto adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[1] + spaceForPointersAndInstrs);
+			assign_short(allPointersAndInstrs.begin() + i * 2 + 16 + add, adr);		// // //
 		}
 	}
 
@@ -1855,7 +1842,7 @@ void Music::pointersFirstPass() {
 
 	//if (tempo == -1) tempo = 0x36;
 	unsigned int totalLength;
-	mainLength = -1;
+	mainLength = static_cast<unsigned>(-1);		// // //
 	for (size_t i = 0; i < CHANNELS; i++)
 		if (tracks[i].channelLength != 0)		// // //
 			mainLength = std::min(mainLength, (unsigned int)tracks[i].channelLength);
@@ -1980,9 +1967,7 @@ void Music::adjustLoopPointers() {
 	for (Track &t : tracks) {		// // //
 		for (unsigned short x : t.loopLocations) {
 			int temp = (t.data[x] & 0xFF) | (t.data[x + 1] << 8);
-			temp += posInARAM + normalChannelsSize + spaceForPointersAndInstrs;
-			t.data[x] = temp & 0xFF;
-			t.data[x + 1] = temp >> 8;
+			assign_short(t.data.begin() + x, temp + posInARAM + normalChannelsSize + spaceForPointersAndInstrs);		// // //
 		}
 	}
 }
@@ -2072,7 +2057,7 @@ void Music::synchronizeQ() {
 	prevNoteLength = -1;
 }
 
-int Music::divideByTempoRatio(int value, bool fractionIsError) {
+int Music::divideByTempoRatio(int value, bool /*fractionIsError*/) {
 	int temp = value / tempoRatio;
 /*
 	if (temp * tempoRatio != value)
@@ -2146,10 +2131,10 @@ void Music::doTempo(int speed) {
 		tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
 }
 
-void Music::doSampleLoad(int index, int mult) {
+void Music::doSampleLoad(int id, int mult) {
 	if (optimizeSampleUsage)
-		usedSamples[index] = true;
-	append(AMKd::Binary::CmdType::SampleLoad, index, mult);		// // //
+		usedSamples[id] = true;
+	append(AMKd::Binary::CmdType::SampleLoad, id, mult);		// // //
 }
 
 void Music::doLoopEnter() {

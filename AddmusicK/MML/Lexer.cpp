@@ -109,7 +109,7 @@ LEXER_FUNC_START(Lexer::Dur)
 	} while (GetParameters<Sep<'^'>>(file));
 
 	return Duration {mult, add, lastMult, lastAdd};
-LEXER_FUNC_END()
+}
 
 LEXER_FUNC_START(Lexer::RestDur)
 	double mult = 0.;
@@ -148,7 +148,7 @@ LEXER_FUNC_START(Lexer::RestDur)
 	} while (GetParameters<Sep<'^'>>(file) || GetParameters<Sep<'r'>>(file)); // merge rests here
 
 	return Duration {mult, add, lastMult, lastAdd};
-LEXER_FUNC_END()
+}
 
 #undef LEXER_DECL
 #undef LEXER_FUNC_START

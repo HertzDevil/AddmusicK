@@ -123,7 +123,6 @@ int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM);		// 
 int clearRATS(std::vector<uint8_t> &ROM, int PCaddr);		// // //
 
 void addSample(const fs::path &fileName, Music *music, bool important);
-void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint = 0);		// // //
 void addSampleGroup(const fs::path &fileName, Music *music);
 void addSampleBank(const fs::path &fileName, Music *music);
 
@@ -133,3 +132,17 @@ fs::path getSamplePath(const fs::path &name, const std::string &musicName);		// 
 // // //
 
 time_t getTimeStamp(const fs::path &file);
+
+// // //
+template <std::size_t N, typename ForwardIt, typename T>
+void assign_val(ForwardIt it, T x) {
+	for (std::size_t i = 0; i < N; ++i) {
+		*it++ = static_cast<uint8_t>(x);
+		x >>= 8;
+	}
+}
+
+template <typename ForwardIt, typename T>
+void assign_short(ForwardIt it, T x) {
+	assign_val<sizeof(short), ForwardIt, T>(it, x);
+}

@@ -210,7 +210,7 @@ private:
 
 	//std::vector<std::string> defineStrings;
 
-	void printChannelDataNonVerbose(int);
+	void printChannelDataNonVerbose(int size);
 	void parseHFDHex();
 	void parseHFDInstrumentHack(int addr, int bytes);
 	void insertedZippedSamples(const std::string &path);

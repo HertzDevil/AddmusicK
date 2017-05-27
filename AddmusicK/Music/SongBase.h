@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>		// // //
+
 namespace AMKd::Music {
 
 // // // common stuff for music and sound effects
@@ -8,7 +10,7 @@ class SongBase
 public:
 	std::string name;
 	int index;
-	int posInARAM;
+	uint16_t posInARAM;
 
 	bool exists = false;
 };
