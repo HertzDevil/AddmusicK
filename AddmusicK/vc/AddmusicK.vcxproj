@@ -144,39 +144,39 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="asardll.h" />
-    <ClInclude Include="BankDefine.h" />
     <ClInclude Include="D:\C++\lodepng\lodepng.h" />
-    <ClInclude Include="Binary\Defines.h" />
-    <ClInclude Include="globals.h" />
-    <ClInclude Include="MML\Duration.h" />
-    <ClInclude Include="MML\Lexer.h" />
-    <ClInclude Include="MML\Preprocessor.h" />
-    <ClInclude Include="MML\SourceFile.h" />
-    <ClInclude Include="Music.h" />
-    <ClInclude Include="Music\SongBase.h" />
-    <ClInclude Include="Sample.h" />
-    <ClInclude Include="SampleGroup.h" />
-    <ClInclude Include="SoundEffect.h" />
-    <ClInclude Include="Utility\Exception.h" />
-    <ClInclude Include="Utility\fs.h" />
-    <ClInclude Include="Utility\Trie.h" />
+    <ClInclude Include="..\asardll.h" />
+    <ClInclude Include="..\BankDefine.h" />
+    <ClInclude Include="..\Binary\Defines.h" />
+    <ClInclude Include="..\globals.h" />
+    <ClInclude Include="..\MML\Duration.h" />
+    <ClInclude Include="..\MML\Lexer.h" />
+    <ClInclude Include="..\MML\Preprocessor.h" />
+    <ClInclude Include="..\MML\SourceFile.h" />
+    <ClInclude Include="..\Music.h" />
+    <ClInclude Include="..\Music\SongBase.h" />
+    <ClInclude Include="..\Sample.h" />
+    <ClInclude Include="..\SampleGroup.h" />
+    <ClInclude Include="..\SoundEffect.h" />
+    <ClInclude Include="..\Utility\Exception.h" />
+    <ClInclude Include="..\Utility\fs.h" />
+    <ClInclude Include="..\Utility\Trie.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AddmusicK.cpp" />
-    <ClCompile Include="asardll.c">
+    <ClCompile Include="..\AddmusicK.cpp" />
+    <ClCompile Include="..\asardll.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsCpp</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='DLL Release|Win32'">CompileAsCpp</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsCpp</CompileAs>
     </ClCompile>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp" />
-    <ClCompile Include="globals.cpp" />
-    <ClCompile Include="MML\Duration.cpp" />
-    <ClCompile Include="MML\Lexer.cpp" />
-    <ClCompile Include="MML\Preprocessor.cpp" />
-    <ClCompile Include="MML\SourceFile.cpp" />
-    <ClCompile Include="Music.cpp" />
-    <ClCompile Include="SoundEffect.cpp" />
+    <ClCompile Include="..\globals.cpp" />
+    <ClCompile Include="..\MML\Duration.cpp" />
+    <ClCompile Include="..\MML\Lexer.cpp" />
+    <ClCompile Include="..\MML\Preprocessor.cpp" />
+    <ClCompile Include="..\MML\SourceFile.cpp" />
+    <ClCompile Include="..\Music.cpp" />
+    <ClCompile Include="..\SoundEffect.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

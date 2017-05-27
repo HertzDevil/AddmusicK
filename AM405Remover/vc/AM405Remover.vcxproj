@@ -80,11 +80,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="AddMusic.h" />
-    <ClInclude Include="AM405Remover.h" />
+    <ClInclude Include="..\AddMusic.h" />
+    <ClInclude Include="..\AM405Remover.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AddMusic.cpp" />
+    <ClCompile Include="..\AddMusic.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

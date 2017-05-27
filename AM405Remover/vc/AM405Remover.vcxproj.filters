@@ -15,7 +15,15 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AM4Batch.cpp">
+    <ClInclude Include="..\AddMusic.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\AM405Remover.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\AddMusic.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

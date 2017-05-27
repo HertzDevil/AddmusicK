@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AMMBatch.cpp">
+    <ClCompile Include="..\AMMBatch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -30,88 +30,88 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="globals.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Music.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Sample.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SoundEffect.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SampleGroup.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="BankDefine.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="asardll.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MML\Lexer.h">
-      <Filter>Header Files\MML</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\Trie.h">
-      <Filter>Header Files\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="MML\SourceFile.h">
-      <Filter>Header Files\MML</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\Exception.h">
-      <Filter>Header Files\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="Binary\Defines.h">
-      <Filter>Header Files\Binary</Filter>
-    </ClInclude>
-    <ClInclude Include="Utility\fs.h">
-      <Filter>Header Files\Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="Music\SongBase.h">
-      <Filter>Header Files\Music</Filter>
-    </ClInclude>
-    <ClInclude Include="MML\Preprocessor.h">
-      <Filter>Header Files\MML</Filter>
-    </ClInclude>
-    <ClInclude Include="MML\Duration.h">
-      <Filter>Header Files\MML</Filter>
-    </ClInclude>
     <ClInclude Include="D:\C++\lodepng\lodepng.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\globals.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Music.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Sample.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\SoundEffect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\SampleGroup.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\BankDefine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\asardll.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\MML\Lexer.h">
+      <Filter>Header Files\MML</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utility\Trie.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\MML\SourceFile.h">
+      <Filter>Header Files\MML</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utility\Exception.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Binary\Defines.h">
+      <Filter>Header Files\Binary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utility\fs.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Music\SongBase.h">
+      <Filter>Header Files\Music</Filter>
+    </ClInclude>
+    <ClInclude Include="..\MML\Preprocessor.h">
+      <Filter>Header Files\MML</Filter>
+    </ClInclude>
+    <ClInclude Include="..\MML\Duration.h">
+      <Filter>Header Files\MML</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AddmusicK.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="globals.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SoundEffect.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Music.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="asardll.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MML\Lexer.cpp">
-      <Filter>Source Files\MML</Filter>
-    </ClCompile>
-    <ClCompile Include="MML\SourceFile.cpp">
-      <Filter>Source Files\MML</Filter>
-    </ClCompile>
-    <ClCompile Include="MML\Preprocessor.cpp">
-      <Filter>Source Files\MML</Filter>
-    </ClCompile>
-    <ClCompile Include="MML\Duration.cpp">
-      <Filter>Source Files\MML</Filter>
-    </ClCompile>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\AddmusicK.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\globals.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\SoundEffect.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Music.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\asardll.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\MML\Lexer.cpp">
+      <Filter>Source Files\MML</Filter>
+    </ClCompile>
+    <ClCompile Include="..\MML\SourceFile.cpp">
+      <Filter>Source Files\MML</Filter>
+    </ClCompile>
+    <ClCompile Include="..\MML\Preprocessor.cpp">
+      <Filter>Source Files\MML</Filter>
+    </ClCompile>
+    <ClCompile Include="..\MML\Duration.cpp">
+      <Filter>Source Files\MML</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
