@@ -71,6 +71,84 @@ LEXER_FUNC_START(Lexer::Time)
 			}
 LEXER_FUNC_END()
 
+LEXER_FUNC_START(Lexer::Dur)
+	double mult = 0.;
+	double add = 0.;
+	double lastMult = 0.;
+	double lastAdd = 0.;
+	using namespace Lexer;
+
+	do {
+		if (GetParameters<Sep<'='>>(file))
+			if (auto param = GetParameters<Int>(file)) {
+				lastMult = 0.;
+				add += (lastAdd = param.get<0>());
+			}
+			else
+				return std::nullopt;
+		else {
+			auto param = GetParameters<Int>(file);
+			int dots = 0;
+			while (GetParameters<Sep<'.'>>(file))
+				++dots;
+			double factor = 2. - std::pow(.5, dots);
+
+			if (param)
+				if (auto len = param.get<0>()) {
+					lastMult = 0.;
+					add += (lastAdd = Duration::WHOLE_NOTE_TICKS * factor / len);
+				}
+				else
+					return std::nullopt;
+			else {
+				mult += (lastMult = factor);
+				lastAdd = 0.;
+			}
+		}
+	} while (GetParameters<Sep<'^'>>(file));
+
+	return Duration {mult, add, lastMult, lastAdd};
+LEXER_FUNC_END()
+
+LEXER_FUNC_START(Lexer::RestDur)
+	double mult = 0.;
+	double add = 0.;
+	double lastMult = 0.;
+	double lastAdd = 0.;
+	using namespace Lexer;
+
+	do {
+		if (GetParameters<Sep<'='>>(file))
+			if (auto param = GetParameters<Int>(file)) {
+				lastMult = 0.;
+				add += (lastAdd = param.get<0>());
+			}
+			else
+				return std::nullopt;
+		else {
+			auto param = GetParameters<Int>(file);
+			int dots = 0;
+			while (GetParameters<Sep<'.'>>(file))
+				++dots;
+			double factor = 2. - std::pow(.5, dots);
+
+			if (param)
+				if (auto len = param.get<0>()) {
+					lastMult = 0.;
+					add += (lastAdd = Duration::WHOLE_NOTE_TICKS * factor / len);
+				}
+				else
+					return std::nullopt;
+			else {
+				mult += (lastMult = factor);
+				lastAdd = 0.;
+			}
+		}
+	} while (GetParameters<Sep<'^'>>(file) || GetParameters<Sep<'r'>>(file)); // merge rests here
+
+	return Duration {mult, add, lastMult, lastAdd};
+LEXER_FUNC_END()
+
 #undef LEXER_DECL
 #undef LEXER_FUNC_START
 #undef LEXER_FUNC_END

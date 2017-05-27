@@ -305,7 +305,6 @@ void Music::compile() {
 			case '(': parseOpenParenCommand();		break;
 			case '{': parseTripletOpenDirective();	break;
 			case '}': parseTripletCloseDirective();	break;
-			case '&': parsePitchSlideCommand();		break;
 			case '$': parseHexCommand();			break;
 			case 'h': parseHDirective();			break;
 			case 'n': parseNCommand();				break;
@@ -440,7 +439,7 @@ void Music::parseVolumeCommand() {
 void Music::parseQuantizationCommand() {
 	int i = getHex();		// // //
 	if (i != -1) {
-		int q = requires(i, 0x00, 0x7F, CMD_ILLEGAL("quantization", "q"));		// // //
+		int q = requires(i, 0x01, 0x7F, CMD_ILLEGAL("quantization", "q"));		// // //
 
 		if (inNormalLoop) {		// // //
 			tracks[prevChannel].q = q;		// // //
@@ -603,13 +602,15 @@ void Music::parseLabelLoopCommand() {
 					error("Error parsing remote code setup. Missing the third argument.");
 				if (auto len = GetParameters<Byte>(mml_))
 					k = len.get<0>();
-				else {
-					k = getNoteLength();		// // //
+				else if (auto param = GetParameters<Dur>(mml_)) {		// // //
+					k = getRawTicks(param.get<0>());
 					if (k > 0x100)
 						error("Note length specified was too large.");		// // //
 					else if (k == 0x100)
 						k = 0;
 				}
+				else
+					error("Error parsing remote code setup.");
 			}
 
 			if (!GetParameters<Sep<')'>, Sep<'['>>(mml_))
@@ -806,12 +807,6 @@ void Music::parseRaiseOctaveDirective() {
 
 void Music::parseLowerOctaveDirective() {
 	return doOctave(octave - 1);		// // //
-}
-
-void Music::parsePitchSlideCommand() {
-	if (inPitchSlide)		// // //
-		error("Pitch slide directive specified multiple times in a row.");
-	inPitchSlide = true;
 }
 
 void Music::parseHFDInstrumentHack(int addr, int bytes) {
@@ -1282,8 +1277,11 @@ void Music::parseNote(int ch) {		// // //
 		error("Note data must be inside a channel!");
 
 	int i;		// // //
-	if (ch == 'r')
+	bool isRest = false;		// // //
+	if (ch == 'r') {
 		i = AMKd::Binary::CmdType::Rest;		// // //
+		isRest = true;
+	}
 	else if (ch == '^')
 		i = AMKd::Binary::CmdType::Tie;
 	else {
@@ -1292,17 +1290,15 @@ void Music::parseNote(int ch) {		// // //
 
 		if (usingHTranspose)
 			i += hTranspose;
-		else {
+		else
 			if (!tracks[channel].ignoreTuning)		// // // More AM4 tuning stuff
 				i -= transposeMap[tracks[channel].instrument];
-		}
 
-		if (i < 0)
-			error("Note's pitch was too low.");		// // //
-		else if (i >= AMKd::Binary::CmdType::Tie)
+		if (i < 0x80)		// // //
+			error("Note's pitch was too low.");
+		if (i >= AMKd::Binary::CmdType::Tie)
 			error("Note's pitch was too high.");
-		else if (tracks[channel].instrument >= 21 && tracks[channel].instrument < 30)		// // //
-		{
+		if (tracks[channel].instrument >= 21 && tracks[channel].instrument < 30) {		// // //
 			i = 0xD0 + (tracks[channel].instrument - 21);
 
 			if ((channel == 6 || channel == 7 || (inNormalLoop && (prevChannel == 6 || prevChannel == 7))) == false)	// If this is not a SFX channel,
@@ -1321,77 +1317,52 @@ void Music::parseNote(int ch) {		// // //
 		return;
 	}
 
-	int j = getNoteLength();		// // //
-	skipSpaces();
+	using namespace AMKd::MML::Lexer;		// // //
+	AMKd::MML::Duration dur = isRest ? GetParameters<RestDur>(mml_).get<0>() : GetParameters<Dur>(mml_).get<0>();
 
-	while (true) {
-		AMKd::MML::SourceFile temptext {mml_};		// // //
-		if (!trimChar('^') && !(i == AMKd::Binary::CmdType::Rest && trimChar('r')))
-			break;
-
-		int tempsize = j;	// If there's a pitch bend up ahead, we need to not optimize the last tie.
-		j += getNoteLength();
-		skipSpaces();
-
-		if (mml_.Trim("$DD", true)) {
-			j = tempsize;		//
-			mml_ = temptext;		// // // "Rewind" so we forcibly place a tie before the bend.
-			break;			//
-		}
+	inPitchSlide = GetParameters<Sep<'&'>>(mml_).success();
+	int bendTicks = inPitchSlide ? getLastTicks(dur) : 0;
+	if (!inPitchSlide && mml_.Trim("\\$DD", true)) {
+		mml_.Unput();
+		bendTicks = getLastTicks(dur);
 	}
 
-	/*if (normalLoopInsideE6Loop)
-	tempLoopLength += j;
-	else if (normalLoopInsideE6Loop)
-	e6LoopLength += j;
-	else if (::inE6Loop)
-	e6LoopLength += j;
-	else if (inNormalLoop)
-	tempLoopLength += j;
-	else
-	lengths[channel] += j;*/
-
-	j = divideByTempoRatio(j, true);
-
-	addNoteLength(j);
-
-	if (j >= divideByTempoRatio(0x80, true)) {		// Note length must be less than 0x80
-		append(divideByTempoRatio(0x60, true));
-
-		if (tracks[channel].updateQ) {		// // //
-			append(tracks[channel].q);
-			tracks[channel].updateQ = false;
-			tracks[CHANNELS].updateQ = false;
-			// // //
-		}
-		append(i); j -= divideByTempoRatio(0x60, true);
-
-		while (j > divideByTempoRatio(0x60, true)) {
-			append(AMKd::Binary::CmdType::Tie);		// // //
-			j -= divideByTempoRatio(0x60, true);
-		}
-
-		if (j > 0) {
-			if (j != divideByTempoRatio(0x60, true))
-				append(j);
-			append(AMKd::Binary::CmdType::Tie);		// // //
-		}
-		prevNoteLength = j;
-		return;
+	const int CHUNK_MAX_TICKS = 0x7F; // divideByTempoRatio(0x60, true);
+	int j = getFullTicks(dur) - bendTicks;
+	if (j < 0)
+		fatalError("Something happened");
+	addNoteLength(j + bendTicks);
+	if (bendTicks > CHUNK_MAX_TICKS) {
+		warn("The pitch bend here will not fully span the note's duration from its last tie.");
+		j += bendTicks % CHUNK_MAX_TICKS;
+		bendTicks -= bendTicks % CHUNK_MAX_TICKS;
 	}
-	else if (j > 0) {
-		if (j != prevNoteLength || tracks[channel].updateQ)		// // //
-			append(j);
-		prevNoteLength = j;
+
+	const auto doNote = [this] (int note, int len) {		// // //
+		if (prevNoteLength != len)
+			append(prevNoteLength = len);
+		else if (tracks[channel].updateQ)
+			append(len);
 		if (tracks[channel].updateQ) {
 			append(tracks[channel].q);
-			tracks[channel].updateQ = false;
-			tracks[CHANNELS].updateQ = false;		// // //
-			// // //
+			tracks[channel].updateQ = tracks[CHANNELS].updateQ = false;
 		}
-		append(i);
+		append(note);
+	};
+
+	const int tieNote = i == AMKd::Binary::CmdType::Rest ? i : AMKd::Binary::CmdType::Tie;
+	while (j) {
+		int chunk = std::min(j, CHUNK_MAX_TICKS);
+		doNote(i, chunk);
+		j -= chunk;
+		i = tieNote;
 	}
-	//append(i);
+	while (bendTicks) {
+		int chunk = std::min(bendTicks, CHUNK_MAX_TICKS);
+		doNote(i, chunk);
+		bendTicks -= chunk;
+		i = tieNote;
+	}
 }
 
 void Music::parseHDirective() {
@@ -1730,35 +1701,27 @@ int Music::getPitch(int i) {
 }
 
 // // //
-int Music::getNoteLength() {
-	double mult = 0.0;
-	double add = 0.0;
+int Music::getRawTicks(const AMKd::MML::Duration &dur) const {
+	return checkTickFraction(dur.GetTicks() / tempoRatio);
+}
 
-	if (trimChar('=')) {		// // //
-		int len = getInt();
-		if (len == -1 || len == 0)		// // // do not allow zero duration
-			[&] { error("Error parsing note"); }();
-		return len;
+int Music::getFullTicks(const AMKd::MML::Duration &dur) const {
+	return checkTickFraction(dur.GetTicks(defaultNoteLength) / tempoRatio * (triplet ? 2. / 3. : 1.));
+}
+
+int Music::getLastTicks(const AMKd::MML::Duration &dur) const {
+	return checkTickFraction(dur.GetLastTicks(defaultNoteLength) / tempoRatio * (triplet ? 2. / 3. : 1.));
+}
+
+int Music::checkTickFraction(double ticks) const {
+	auto ret = static_cast<int>(ticks + .5);
+	if (/*fractionIsError*/ false) {
+		auto v1 = static_cast<intmax_t>(ticks / AMKd::MML::Duration::EPSILON + .5);
+		auto v2 = static_cast<intmax_t>(ret / AMKd::MML::Duration::EPSILON + .5);
+		if (v1 != v2)
+			warn("This note duration would produce a fractional tick count.");
 	}
-
-	int len = getInt();		// // //
-	if (len < 1 || len > 192)
-		len = defaultNoteLength;
-
-	double frac = 1.0;		// // //
-
-	int times = 0;
-	while (trimChar('.')) {		// // //
-		frac /= 2.0;
-		if (++times == 2 && songTargetProgram == Target::AM4)
-			break;	// // // AM4 only allows two dots for whatever reason.
-	}
-
-	len = static_cast<int>(192.0 / len * (2.0 - frac));
-
-	if (triplet)
-		len = static_cast<int>(len * 2.0 / 3.0 + 0.5);
-	return len;
+	return ticks;
 }
 
 // // //

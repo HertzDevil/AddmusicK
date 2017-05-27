@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <cstdlib>
 #include "SourceFile.h"
+#include "Duration.h"
 
 namespace AMKd::MML {
 
@@ -20,22 +21,25 @@ struct LexerResult
 {
 	using tuple_type = std::tuple<Args...>;
 	std::optional<tuple_type> result;
-	const tuple_type &operator*() const & {
+	constexpr const tuple_type &operator*() const & {
 		return *result;
 	}
-	tuple_type &&operator*() && {
+	constexpr tuple_type &&operator*() && {
 		return std::move(*result);
 	}
 	template <std::size_t N>
-	const auto &get() const &noexcept {
+	constexpr const auto &get() const &noexcept {
 		return std::get<N>(*result);
 	};
 	template <std::size_t N>
-	auto &&get() &&noexcept {
+	constexpr auto &&get() &&noexcept {
 		return std::move(std::get<N>(*result));
 	}
-	constexpr explicit operator bool() const noexcept {
+	constexpr bool success() const noexcept {
 		return result.has_value();
+	}
+	constexpr explicit operator bool() const noexcept {
+		return success();
 	}
 };
 template <typename... Args> // for c++17 structured binding support
@@ -173,6 +177,8 @@ LEXER_DECL(Ident, std::string)
 LEXER_DECL(String, std::string)
 LEXER_DECL(QString, std::string)
 LEXER_DECL(Time, unsigned)
+LEXER_DECL(Dur, Duration)
+LEXER_DECL(RestDur, Duration) // variant supporting 'r', will be removed when Music::Actions can merge
 
 template <typename T>
 struct Opt

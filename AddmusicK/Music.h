@@ -6,6 +6,7 @@
 #include <cstdint>		// // //
 #include "MML/SourceFile.h"		// // //
 #include "Music/SongBase.h"		// // //
+#include "MML/Duration.h"		// // //
 
 const size_t CHANNELS = 8;		// // //
 
@@ -146,7 +147,6 @@ private:
 	void parseTripletCloseDirective();
 	void parseRaiseOctaveDirective();
 	void parseLowerOctaveDirective();
-	void parsePitchSlideCommand();
 	void parseHexCommand();
 	void parseNote(int ch);		// // //
 	void parseHDirective();
@@ -199,7 +199,10 @@ private:
 	int getHex();		// // //
 	bool getHexByte(int &out);		// // //
 	int getPitch(int j);
-	int getNoteLength();		// // //
+	int getRawTicks(const AMKd::MML::Duration &dur) const;		// // //
+	int getFullTicks(const AMKd::MML::Duration &dur) const;		// // //
+	int getLastTicks(const AMKd::MML::Duration &dur) const;		// // //
+	int checkTickFraction(double ticks) const;		// // //
 	std::string getIdentifier();		// // //
 	std::string getEscapedString();		// // //
 
