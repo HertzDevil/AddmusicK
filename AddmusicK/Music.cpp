@@ -1350,19 +1350,22 @@ void Music::parseNote(int ch) {		// // //
 		append(note);
 	};
 
-	const int tieNote = i == AMKd::Binary::CmdType::Rest ? i : AMKd::Binary::CmdType::Tie;
-	while (j) {
-		int chunk = std::min(j, CHUNK_MAX_TICKS);
-		doNote(i, chunk);
-		j -= chunk;
-		i = tieNote;
-	}
-	while (bendTicks) {
-		int chunk = std::min(bendTicks, CHUNK_MAX_TICKS);
-		doNote(i, chunk);
-		bendTicks -= chunk;
-		i = tieNote;
-	}
+	const auto flushNote = [&] (int &note, int len) {		// // //
+		const int tieNote = note == AMKd::Binary::CmdType::Rest ? note : AMKd::Binary::CmdType::Tie;
+		if (len % 2 == 0 && len > CHUNK_MAX_TICKS && len <= 2 * CHUNK_MAX_TICKS) {
+			doNote(note, len / 2);
+			doNote(note = tieNote, len / 2);
+		}
+		else
+			while (len) {
+				int chunk = std::min(len, CHUNK_MAX_TICKS);
+				doNote(note, chunk);
+				len -= chunk;
+				note = tieNote;
+			}
+	};
+	flushNote(i, j);
+	flushNote(i, bendTicks);
 }
 
 void Music::parseHDirective() {

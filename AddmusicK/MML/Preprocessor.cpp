@@ -123,8 +123,9 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 				else if (row.Trim('\"')) {
 					allowDirectives = false;
 					if (auto param = Lexer::QString()(row))
-						add += *param + '\"';
-					throw AMKd::Utility::SyntaxException {"Error parsing replacement directive."};
+						add += '\"' + *param + '\"';
+					else
+						throw AMKd::Utility::SyntaxException {"Error parsing replacement directive."};
 				}
 				else if (row.Trim(';')) {
 					if (row.Trim("\\s*title\\s*=\\s*") && row)

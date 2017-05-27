@@ -18,7 +18,7 @@ private:
 	struct Node
 	{
 		std::optional<value_type> val_;
-		std::unordered_map<key_type, Node> child_;
+		std::unordered_map<key_type, std::unique_ptr<Node>> child_;
 	};
 
 public:
@@ -69,7 +69,7 @@ private:
 			auto it = current->child_.find(ch);
 			if (it == current->child_.end())
 				return;
-			current = &it->second;
+			current = it->second.get();
 			str.remove_prefix(1);
 		}
 	}
@@ -80,8 +80,8 @@ private:
 			key_type ch = str.front();
 			auto it = current->child_.find(ch);
 			if (it == current->child_.end())
-				current->child_[ch] = Node { };
-			current = &current->child_[ch];
+				current->child_[ch] = std::make_unique<Node>();
+			current = current->child_[ch].get();
 			str.remove_prefix(1);
 		}
 		return current;

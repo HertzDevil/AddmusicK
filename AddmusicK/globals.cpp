@@ -115,8 +115,11 @@ int execute(const std::string &command, bool prepend) {
 // // //
 
 void removeFile(const fs::path &fileName) {
-	if (fs::exists(fileName) && !fs::remove(fileName))		// // //
-		fatalError("Could not delete critical file \"" + fileName.string() + "\".");
+	if (fs::exists(fileName)) {		// // //
+		std::error_code ec;
+		if (!fs::remove(fileName, ec))
+			fatalError("Could not delete critical file \"" + fileName.string() + "\".");
+	}
 }
 
 void writeTextFile(const fs::path &fileName, const std::string &string) {
@@ -426,11 +429,12 @@ static bool asarDoCompile(const fs::path &patchName, const fs::path &outputName,
 			return false;
 		}
 
+		binOutput.resize(binlen);
 		writeFile(outputName, binOutput);
 		return true;
 	}
 	else {
-		remove(outputName);
+		removeFile(outputName);
 		execute("asar " + patchName.string() + " " + outputName.string() + " 2> temp.log > temp.txt");		// // //
 		return !(dieOnError && fs::exists("temp.log") && fs::file_size("temp.log") > 0);
 	}
@@ -438,7 +442,7 @@ static bool asarDoCompile(const fs::path &patchName, const fs::path &outputName,
 
 bool asarCompileToBIN(const fs::path &patchName, const fs::path &outputName, bool dieOnError) {
 	if (!useAsarDLL)
-		remove(outputName);
+		removeFile(outputName);
 	// 0x10000 instead of 0x8000 because a few things related to sound effects are stored at 0x8000 at times.
 	return asarDoCompile(patchName, outputName, dieOnError, [] { return std::vector<uint8_t>(0x10000); });
 }

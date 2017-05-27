@@ -166,6 +166,8 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	useAsarDLL = asar_init();		// // //
+
 	if (justSPCsPlease == false) {
 		if (ROMName.empty()) {		// // //
 			std::cout << "Enter your ROM name: ";		// // //
@@ -174,8 +176,6 @@ int main(int argc, char* argv[]) {
 			ROMName = temp;
 			puts("\n\n");
 		}
-
-		useAsarDLL = asar_init();		// // //
 
 		fs::path smc = fs::path {ROMName} += ".smc";		// // //
 		fs::path sfc = fs::path {ROMName} += ".sfc";
@@ -657,7 +657,7 @@ void compileGlobalData() {
 
 	writeTextFile("asm/tempmain.asm", str);
 
-	fs::remove("asm/main.bin");		// // //
+	removeFile("asm/main.bin");		// // //
 
 	if (verbose)
 		std::cout << "Compiling main SPC program, pass 2.\n";
@@ -1292,7 +1292,7 @@ void assembleSNESDriver2() {
 	ss << "\n\norg !SPCProgramLocation" << "\nincbin \"bin/main.bin\"";
 	patch += ss.str();
 
-	remove("asm/SNES/temppatch.sfc");
+	removeFile("asm/SNES/temppatch.sfc");		// // //
 
 	std::string undoPatch = openTextFile("asm/SNES/AMUndo.asm");		// // //
 	patch.insert(patch.cbegin(), undoPatch.cbegin(), undoPatch.cend());
@@ -1322,8 +1322,7 @@ void assembleSNESDriver2() {
 		std::vector<uint8_t> tempsfc = openFile("asm/SNES/temp.sfc");		// // //
 		final.insert(final.cend(), tempsfc.cbegin(), tempsfc.cend());		// // //
 
-		// // //
-		fs::remove(ROMName.string() + "~");
+		removeFile(ROMName.string() + "~");		// // //
 		fs::rename(ROMName, ROMName.string() + "~");
 
 		writeFile(ROMName, final);
