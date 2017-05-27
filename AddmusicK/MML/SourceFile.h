@@ -9,12 +9,6 @@
 
 namespace AMKd::MML {
 
-// // //
-const auto replComp = [] (const std::string &a, const std::string &b) {
-	size_t al = a.length(), bl = b.length();
-	return std::tie(al, b) > std::tie(bl, a);
-};
-
 // A SourceFile wraps around an MML string with methods for tokenization. It
 // also handles replacement macros.
 class SourceFile
@@ -72,7 +66,8 @@ private:
 	std::string_view prev_;
 	std::vector<MacroState> macros_;
 
-	std::map<std::string, std::string, decltype(replComp)> repl_ {replComp};		// // //
+	using compare_t = bool (*)(const std::string &, const std::string &);
+	std::map<std::string, std::string, compare_t> repl_;		// // //
 };
 
 } // namespace AMKd::MML

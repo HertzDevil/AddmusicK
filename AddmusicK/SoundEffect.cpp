@@ -93,7 +93,7 @@ int SoundEffect::getNoteLength(int i) {
 	}
 
 	if (triplet)
-		i = (int)floor(((double)i * 2.0 / 3.0) + 0.5);
+		i = static_cast<int>(i * 2. / 3. + .5);		// // //
 	return i;
 }
 

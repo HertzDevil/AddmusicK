@@ -3,6 +3,13 @@
 #include <regex>
 #include <unordered_map>
 
+namespace {
+	bool replComp(const std::string &a, const std::string &b) {
+		size_t al = a.length(), bl = b.length();
+		return std::tie(al, b) > std::tie(bl, a);
+	};
+}
+
 const std::regex &get_re(std::string_view re, bool ignoreCase) {
 	static std::unordered_map<std::string_view, std::regex> regex_cache;
 	auto flag = std::regex::ECMAScript | std::regex::optimize | (ignoreCase ? std::regex::icase : (std::regex_constants::syntax_option_type)0);
@@ -17,24 +24,24 @@ const std::regex &get_re(std::string_view re, bool ignoreCase) {
 
 using namespace AMKd::MML;
 
-SourceFile::SourceFile() : sv_(mml_), prev_(sv_)
+SourceFile::SourceFile() : sv_(mml_), prev_(sv_), repl_(replComp)
 {
 	Trim("\xEF\xBB\xBF"); // utf-8 bom
 }
 
 SourceFile::SourceFile(std::string_view data) :
-	mml_(data), sv_(mml_), prev_(sv_)
+	mml_(data), sv_(mml_), prev_(sv_), repl_(replComp)
 {
 }
 
 SourceFile::SourceFile(const SourceFile &other) :
-	mml_(other.mml_)
+	mml_(other.mml_), repl_(replComp)
 {
 	SetInitReadCount(other.GetReadCount());
 }
 
 SourceFile::SourceFile(SourceFile &&other) noexcept :
-	mml_(std::move(other.mml_))
+	mml_(std::move(other.mml_)), repl_(replComp)
 {
 	SetInitReadCount(mml_.size() - other.sv_.size());
 }
@@ -81,7 +88,7 @@ std::optional<std::string> SourceFile::Trim(char re) {
 
 int SourceFile::Peek() const {
 	if (sv_.empty())
-		return std::string_view::npos;
+		return -1;
 	return sv_.front();
 }
 

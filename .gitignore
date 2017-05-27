@@ -2,6 +2,7 @@
 Debug*/
 Release*/
 *.o
+*.obj
 *.db
 *.bin
 test/asm/SNES/SongSampleList.asm

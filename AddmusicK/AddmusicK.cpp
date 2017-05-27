@@ -43,8 +43,8 @@ void assembleSNESDriver2();
 void generateMSC();
 void cleanUpTempFiles();
 
-constexpr int SNESToPC(int addr);		// // //
-constexpr int PCToSNES(int addr);		// // //
+int SNESToPC(int addr);		// // //
+int PCToSNES(int addr);		// // //
 
 //std::time_t getLastModifiedTime();		// // //
 
@@ -1036,10 +1036,10 @@ void generateSPCs() {
 		std::vector<uint8_t> SPC = SPCBase;		// // //
 
 		if (mode == MUSIC) {		// // //
-			std::copy_n(musics[i].title.cbegin(), std::min(32u, musics[i].title.size()), SPC.begin() + TITLE);
-			std::copy_n(musics[i].game.cbegin(), std::min(32u, musics[i].game.size()), SPC.begin() + GAME);
-			std::copy_n(musics[i].comment.cbegin(), std::min(32u, musics[i].comment.size()), SPC.begin() + COMMENT);
-			std::copy_n(musics[i].author.cbegin(), std::min(32u, musics[i].author.size()), SPC.begin() + AUTHOR);
+			std::copy_n(musics[i].title.cbegin(), std::min<unsigned>(32u, musics[i].title.size()), SPC.begin() + TITLE);
+			std::copy_n(musics[i].game.cbegin(), std::min<unsigned>(32u, musics[i].game.size()), SPC.begin() + GAME);
+			std::copy_n(musics[i].comment.cbegin(), std::min<unsigned>(32u, musics[i].comment.size()), SPC.begin() + COMMENT);
+			std::copy_n(musics[i].author.cbegin(), std::min<unsigned>(32u, musics[i].author.size()), SPC.begin() + AUTHOR);
 		}
 
 		std::copy_n(programData.cbegin(), programSize, SPC.begin() + RAM + programPos);
@@ -1106,11 +1106,12 @@ void generateSPCs() {
 #ifdef _MSVC_LANG
 		::localtime_s(&time, &t);
 #else
-		::localtime_s(&t, &time);
+		//::localtime_s(&t, &time);
+		::localtime_r(&t, &time);
 #endif
 		timeField << std::put_time(&time, "%m/%d/%Y");
 		auto timeStr = timeField.str();
-		std::copy_n(timeStr.cbegin(), std::min(10u, timeStr.size()), SPC.begin() + DATE);
+		std::copy_n(timeStr.cbegin(), std::min<unsigned>(10u, timeStr.size()), SPC.begin() + DATE);
 
 		auto fname = fs::path {mode == SFX1 ? soundEffects[0][i].name :
 			mode == SFX2 ? soundEffects[1][i].name : musics[i].getFileName()}.stem();		// // //
@@ -1396,7 +1397,8 @@ void tryToCleanAM4Data() {
 
 		std::cout << "Attempting to erase data from Addmusic 4.05:\n";
 		std::string ROMstr = ROMName.string();		// // //
-		char *am405argv[] = {"", const_cast<char *>(ROMstr.c_str())};
+		char blank = '\0';
+		char *am405argv[] = {&blank, const_cast<char *>(ROMstr.c_str())};
 		removeAM405Data(2, am405argv);
 
 		rom = openFile(ROMName);		// // // Reopen the file.
@@ -1427,7 +1429,7 @@ void tryToCleanAMMData() {
 }
 
 // // // moved
-constexpr int SNESToPC(int addr) {			// Thanks to alcaro.
+int SNESToPC(int addr) {			// Thanks to alcaro.
 	if (addr < 0 || addr > 0xFFFFFF ||		// not 24bit 
 		(addr & 0xFE0000) == 0x7E0000 ||	// wram 
 		(addr & 0x408000) == 0x000000)		// hardware regs 
@@ -1438,7 +1440,7 @@ constexpr int SNESToPC(int addr) {			// Thanks to alcaro.
 }
 
 // // // moved
-constexpr int PCToSNES(int addr) {
+int PCToSNES(int addr) {
 	if (addr < 0 || addr >= 0x400000)
 		return -1;
 	addr = ((addr << 1) & 0x7F0000) | (addr & 0x7FFF) | 0x8000;

@@ -42,9 +42,6 @@ struct LexerResult
 		return success();
 	}
 };
-template <typename... Args> // for c++17 structured binding support
-struct std::tuple_size<LexerResult<Args...>> :
-	std::integral_constant<std::size_t, sizeof...(Args)> { };
 
 namespace details {
 
@@ -222,3 +219,7 @@ struct Hex
 } // namespace Lexer
 
 } // namespace AMKd::MML
+
+template <typename... Args> // for c++17 structured binding support
+struct std::tuple_size<AMKd::MML::Lexer::LexerResult<Args...>> :
+	std::integral_constant<std::size_t, sizeof...(Args)> { };

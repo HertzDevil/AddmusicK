@@ -45,7 +45,7 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 			const auto doDirective = [&] (auto &&f, auto&&... args) {
 				if (!allowDirectives)
 					throw AMKd::Utility::SyntaxException {"A preprocessor directive is not allowed here."};
-				std::invoke(std::forward<decltype(f)>(f), this, std::forward<decltype(args)>(args)...);
+				(this->*f)(std::forward<decltype(args)>(args)...);
 				if (row.SkipSpaces(), row.Trim(';')) {
 					bool setTitle = row.Trim("\\s*title\\s*=\\s*") && row;
 					std::string rest = *row.Trim(".*");

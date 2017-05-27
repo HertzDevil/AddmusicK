@@ -1,6 +1,7 @@
 #include "Lexer.h"
 #include <cerrno>
 #include <regex>
+#include <cmath>
 
 using namespace AMKd::MML;
 

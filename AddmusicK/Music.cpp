@@ -358,8 +358,8 @@ void Music::printChannelDataNonVerbose(int totalSize) {
 	std::cout.put(' ');
 
 	if (knowsLength) {
-		// int s = (unsigned int)std::floor((mainLength + introLength) / (2.0 * tempo) + 0.5);
-		auto seconds = static_cast<int>(std::floor((introSeconds + mainSeconds + 0.5) / 60));		// // //
+		// int s = static_cast<int>((mainLength + introLength) / (2.0 * tempo) + 0.5);
+		auto seconds = static_cast<int>((introSeconds + mainSeconds + 0.5) / 60);		// // //
 		std::cout << seconds / 60 << ':' << std::setfill('0') << std::setw(2) << seconds % 60;
 	}
 	else
@@ -1721,7 +1721,7 @@ int Music::checkTickFraction(double ticks) const {
 		if (v1 != v2)
 			warn("This note duration would produce a fractional tick count.");
 	}
-	return ticks;
+	return ret;
 }
 
 // // //
@@ -1891,13 +1891,13 @@ void Music::pointersFirstPass() {
 		}
 
 		if (hasIntro) {
-			seconds = (unsigned int)std::floor(l1 + l2 * 2 + 0.5);	// Just 2? Not 2.012584 or something?  Wow.
+			seconds = static_cast<unsigned>(l1 + l2 * 2 + 0.5);		// // // Just 2? Not 2.012584 or something?  Wow.
 			mainSeconds = l2;
 			introSeconds = l1;
 		}
 		else {
 			mainSeconds = l1;
-			seconds = (unsigned int)std::floor(l1 * 2 + 0.5);
+			seconds = static_cast<unsigned>(l1 * 2 + 0.5);		// // //
 		}
 		knowsLength = true;
 	}

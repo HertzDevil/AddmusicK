@@ -90,7 +90,7 @@ private:
 	const Node *GetNode(std::basic_string_view<key_type> str) const {
 		const Node *current = nullptr;
 		Traverse(str, [&] (const Node &n) { current = &n; });
-		return n;
+		return current;
 	}
 
 	Node head_;
