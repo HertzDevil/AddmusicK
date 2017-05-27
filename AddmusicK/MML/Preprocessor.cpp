@@ -11,7 +11,7 @@ using namespace AMKd::MML;
 namespace {
 	enum class compare_t { EQ, NE, LT, LE, GT, GE };
 
-	LEXER_DECL(Comp, compare_t);
+	LEXER_DECL(Comp, compare_t)
 	LEXER_FUNC_START(Comp)
 		if (file.Trim('=') && file.Trim('='))
 			return compare_t::EQ;

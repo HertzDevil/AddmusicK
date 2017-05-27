@@ -120,7 +120,7 @@ void insertValue(int value, int length, const std::string &find, std::string &st
 // NOT using SNES addresses!  This function writes a RATS address at the position returned.
 int findFreeSpace(unsigned int size, int start, std::vector<uint8_t> &ROM);		// // //
 
-int clearRATS(int PCaddr);
+int clearRATS(std::vector<uint8_t> &ROM, int PCaddr);		// // //
 
 void addSample(const fs::path &fileName, Music *music, bool important);
 void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, int loopPoint = 0);		// // //

@@ -401,7 +401,7 @@ static void asarOutput(F f, G g, const fs::path &filename) {
 		return;
 	std::string out;
 	for (int i = 0; i < count; ++i) {
-		out += G(msg[i]);
+		out += g(msg[i]);
 		out += '\n';
 	}
 	writeTextFile(filename, out);

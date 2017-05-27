@@ -28,6 +28,7 @@ This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will no
 - [ ] Makefile / Ruby script for inserting music into SMW
 - [ ] Make AddmusicK's core compiler cross-platform
 - [ ] Single separate program to remove any old music data
+- [ ] Merge duplicate label loops and remote code definitions
 
 #### MML stuffs
 
@@ -38,6 +39,7 @@ This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will no
 - [ ] N-SPC block support
 - [ ] Globally defined patterns
 - [ ] `#include` directive, this allows for example core instruments to be defined solely using MML
+- [ ] Using label loops and remote code before they are defined
 
 #### Things that should die (and might irreversibly break some MMLs)
 

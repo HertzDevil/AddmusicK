@@ -362,7 +362,7 @@ void cleanROM() {
 		}
 
 		int address = SNESToPC(*(unsigned int *)(rom.data() + 0x70005) & 0xFFFFFF);	// Address, in this case, is the sample numbers list.
-		clearRATS(address - 8);								// So erase it all.
+		clearRATS(rom, address - 8);		// // // So erase it all.
 
 		int baseAddress = SNESToPC(*(unsigned int *)(rom.data() + 0x70008));		// Address is now the address of the pointers to the songs and samples.
 		bool erasingSamples = false;
@@ -378,7 +378,7 @@ void cleanROM() {
 			}
 			else {
 				if (address != 0)
-					clearRATS(SNESToPC(address - 8));
+					clearRATS(rom, SNESToPC(address - 8));		// // //
 			}
 
 			i++;
@@ -1316,8 +1316,7 @@ void assembleSNESDriver2() {
 		//if (fileExists("temp.log"))
 		//	fatalError("asar reported an error.  Refer to temp.log for details.");
 
-		std::vector<uint8_t> final;		// // //
-		final = romHeader;
+		std::vector<uint8_t> final = romHeader;		// // //
 
 		std::vector<uint8_t> tempsfc = openFile("asm/SNES/temp.sfc");		// // //
 		final.insert(final.cend(), tempsfc.cbegin(), tempsfc.cend());		// // //
@@ -1378,13 +1377,13 @@ void tryToCleanSampleToolData() {
 	bool removed[0x100] = { };		// // //
 	for (int j = 0; j < 0x207; j++) {
 		if (removed[rom[j + i]]) continue;
-		sizeOfErasedData += clearRATS(SNESToPC(rom[j + i] * 0x10000 + 0x8000));
+		sizeOfErasedData += clearRATS(rom, SNESToPC(rom[j + i] * 0x10000 + 0x8000));		// // //
 		removed[rom[j + i]] = true;
 	}
 
 	int sampleDataSize = sizeOfErasedData;
 
-	sizeOfErasedData += clearRATS(hackPos);
+	sizeOfErasedData += clearRATS(rom, hackPos);		// // //
 
 	std::cout << "Erased 0x" << hex6 << sizeOfErasedData << " bytes, of which 0x" << sampleDataSize << " were sample data.";
 }
@@ -1403,10 +1402,10 @@ void tryToCleanAM4Data() {
 		rom = openFile(ROMName);		// // // Reopen the file.
 		if (rom[0x255] == 0x5C) {
 			int moreASMData = ((rom[0x255 + 3] << 16) | (rom[0x255 + 2] << 8) | (rom[0x255 + 1])) - 8;
-			clearRATS(SNESToPC(moreASMData));
+			clearRATS(rom, SNESToPC(moreASMData));		// // //
 		}
 		int romiSPCProgramAddress = (unsigned char)rom[0x2E9] | ((unsigned char)rom[0x2EE] << 8) | ((unsigned char)rom[0x2F3] << 16);
-		clearRATS(SNESToPC(romiSPCProgramAddress) - 12 + 0x200);
+		clearRATS(rom, SNESToPC(romiSPCProgramAddress) - 12 + 0x200);		// // //
 	}
 }
 

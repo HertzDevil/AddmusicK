@@ -211,8 +211,7 @@ private:
 	void parseHFDHex();
 	void parseHFDInstrumentHack(int addr, int bytes);
 	void insertedZippedSamples(const std::string &path);
-	void insertRemoteConversion(std::vector<uint8_t> &&cmd, std::vector<uint8_t> &&conv);		// // //
-	void removeRemoteConversion();		// // //
+	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd);		// // //
 
 	bool guessLength;
 	

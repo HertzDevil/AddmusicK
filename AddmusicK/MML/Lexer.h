@@ -155,24 +155,24 @@ GetParameters(SourceFile &file) {
 	struct T \
 	{ \
 		using arg_type = U; \
-		std::optional<arg_type> operator()(SourceFile &file); \
-	}
+		std::optional<arg_type> operator()(AMKd::MML::SourceFile &file); \
+	};
 
 #define LEXER_FUNC_START(T) \
-	typename std::optional<typename T::arg_type> T::operator()(SourceFile &file) {
+	typename std::optional<typename T::arg_type> T::operator()(AMKd::MML::SourceFile &file) {
 
 #define LEXER_FUNC_END() \
 		return std::nullopt; \
 	}
 
-LEXER_DECL(Int, unsigned);
-LEXER_DECL(HexInt, unsigned);
-LEXER_DECL(SInt, int);
-LEXER_DECL(Byte, unsigned);
-LEXER_DECL(Ident, std::string);
-LEXER_DECL(String, std::string);
-LEXER_DECL(QString, std::string);
-LEXER_DECL(Time, unsigned);
+LEXER_DECL(Int, unsigned)
+LEXER_DECL(HexInt, unsigned)
+LEXER_DECL(SInt, int)
+LEXER_DECL(Byte, unsigned)
+LEXER_DECL(Ident, std::string)
+LEXER_DECL(String, std::string)
+LEXER_DECL(QString, std::string)
+LEXER_DECL(Time, unsigned)
 
 template <typename T>
 struct Opt
