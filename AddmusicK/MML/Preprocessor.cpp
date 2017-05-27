@@ -127,7 +127,7 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 					else
 						throw AMKd::Utility::SyntaxException {"Error parsing replacement directive."};
 				}
-				else if (row.Trim(';')) {
+				else if (target == Target::AMM && row.Trim(';')) {
 					if (row.Trim("\\s*title\\s*=\\s*") && row)
 						title = *row.Trim(".*");
 					break;

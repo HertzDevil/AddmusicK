@@ -12,15 +12,14 @@
 	#else
 		#define EXTENSION ".so"
 	#endif
-	inline void * getlib()
-	{
-		char libname[256];
-		const char * names[]={"./libasar" EXTENSION, "libasar", NULL};
-		for (int i=0;names[i];i++)
-		{
-			void * rval=dlopen(names[i], RTLD_LAZY);
-const char*e=dlerror();if(e)puts(e);
-			if (rval) return rval;
+	inline void *getlib() {		// // //
+		const char *names[] = {"./libasar" EXTENSION, "libasar", NULL};
+		for (int i = 0; names[i]; i++) {
+			void *rval = dlopen(names[i], RTLD_LAZY);
+			if (const char *e = dlerror())
+				puts(e);
+			if (rval)
+				return rval;
 		}
 		return NULL;
 	}

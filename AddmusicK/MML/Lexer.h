@@ -30,7 +30,7 @@ struct LexerResult
 	template <std::size_t N>
 	constexpr const auto &get() const &noexcept {
 		return std::get<N>(*result);
-	};
+	}
 	template <std::size_t N>
 	constexpr auto &&get() &&noexcept {
 		return std::move(std::get<N>(*result));

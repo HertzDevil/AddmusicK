@@ -7,7 +7,7 @@ namespace {
 	bool replComp(const std::string &a, const std::string &b) {
 		size_t al = a.length(), bl = b.length();
 		return std::tie(al, b) > std::tie(bl, a);
-	};
+	}
 }
 
 const std::regex &get_re(std::string_view re, bool ignoreCase) {

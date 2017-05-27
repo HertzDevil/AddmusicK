@@ -107,7 +107,7 @@ void SoundEffect::skipSpaces() {
 }
 
 void SoundEffect::compile() {
-#define error(str) if (false); else { \
+#define error(str) { \
 		printError(str, name, line); \
 		continue; \
 	}
@@ -120,7 +120,7 @@ void SoundEffect::compile() {
 	defaultNoteValue = 8;
 	inDefineBlock = false;
 
-	unsigned int instr = -1;
+	// unsigned int instr = -1;
 	int lastNote = -1;
 	bool firstNote = true;
 	bool pitchSlide = false;
@@ -204,7 +204,7 @@ void SoundEffect::compile() {
 			append(0xDA);
 			if (j != -1) append(0x80 | j);
 			append(i);
-			instr = i;
+			// instr = i;
 			break;
 
 		case 'o':

@@ -36,8 +36,7 @@ T requires(T x, T min, T max, U&& err) {
 		throw AMKd::Utility::ParamException {std::forward<U>(err)};
 }
 
-#define warn(str) if (false); else \
-	::printWarning(str, name, mml_.GetLineNumber())
+#define warn(str) ::printWarning(str, name, mml_.GetLineNumber())
 
 #define error(str) do { \
 		::printError(str, name, mml_.GetLineNumber()); \
@@ -84,11 +83,13 @@ static bool usingHTranspose;
 //static int e6LoopLength;		// How long the current $E6 loop is.
 //static int previousLoopLength;	// How long the last encountered loop was.
 static bool inE6Loop;			// Whether or not we're in an $E6 loop.
+/*
 static int loopNestLevel;		// How deep we're "loop nested".
 // If this is 0, then any type of loop is allowed.
 // If this is 1 and we're in a normal loop, then normal loops are disallowed and $E6 loops are allowed.
 // If this is 1 and we're in an $E6 loop, then $E6 loops are disallowed and normal loops are allowed.
 // If this is 2, then no new loops are allowed.
+*/
 
 //static unsigned int lengths[CHANNELS];		// How long each channel is.
 
@@ -331,7 +332,7 @@ void Music::compile() {
 // // //
 size_t Music::getDataSize() const {
 	size_t x = 0;
-	for (int i = 0; i < CHANNELS; ++i)
+	for (size_t i = 0; i < CHANNELS; ++i)
 		x += tracks[i].data.size();
 	return x;
 }
@@ -534,13 +535,14 @@ void Music::parseInstrumentCommand() {
 				if (i >= 0x13 && i < 30)	// Change it to an HFD custom instrument.
 					i = i - 0x13 + 30;
 
-			if (optimizeSampleUsage)
+			if (optimizeSampleUsage) {
 				if (i < 30)
 					usedSamples[instrToSample[i]] = true;
 				else if ((i - 30) * 6 < static_cast<int>(instrumentData.size()))		// // //
 					usedSamples[instrumentData[(i - 30) * 6]] = true;
 				else
 					error("This custom instrument has not been defined yet.");		// // //
+			}
 
 			if (songTargetProgram == Target::AM4)		// // //
 				tracks[channel].ignoreTuning = false;
@@ -1464,7 +1466,7 @@ void Music::parseSpecialDirective() {
 
 void Music::parseReplacementDirective() {
 	std::string s = getEscapedString();		// // //
-	int i = s.find('=');
+	size_t i = s.find('=');
 	if (i == std::string::npos)
 		fatalError("Error parsing replacement directive; could not find '='");		// // //
 
@@ -1494,7 +1496,6 @@ void Music::parseInstrumentDefinitions() {
 			if (brrName.empty())
 				fatalError("Error parsing sample portion of the instrument definition.");
 			brrName = basepath + brrName;
-			int gs = getSample(brrName, this);
 			auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(brrName, this));		// // //
 			if (it == mySamples.cend())
 				fatalError("The specified sample was not included in this song.");		// // //
@@ -1595,7 +1596,7 @@ void Music::parseSampleDefinitions() {
 		if (skipSpaces(), trimChar('\"')) {		// // //
 			std::string tempstr = basepath + getEscapedString();		// // //
 			auto tmppos = tempstr.find_last_of(".");
-			if (tmppos == -1)
+			if (tmppos == std::string::npos)
 				fatalError("The filename for the sample was missing its extension; is it a .brr or .bnk?");		// // //
 			std::string extension = tempstr.substr(tmppos);
 			if (extension == ".bnk")
@@ -1763,8 +1764,9 @@ void Music::pointersFirstPass() {
 			tracks[CHANNELS].data.insert(tracks[CHANNELS].data.end(), x.second.cbegin(), x.second.cend());
 		}
 
-	for (int z = 0; z < CHANNELS; z++) if (!tracks[z].data.empty())		// // //
-		tracks[z].data.push_back(AMKd::Binary::CmdType::End);
+	for (size_t z = 0; z < CHANNELS; z++)		// // //
+		if (!tracks[z].data.empty())
+			tracks[z].data.push_back(AMKd::Binary::CmdType::End);
 
 	if (mySamples.empty())		// // // If no sample groups were provided...
 		addSampleGroup("default", this);		// // //
@@ -1785,7 +1787,7 @@ void Music::pointersFirstPass() {
 	}
 
 	int binpos = 0;		// // //
-	for (int i = 0; i < CHANNELS; ++i) {
+	for (size_t i = 0; i < CHANNELS; ++i) {
 		if (!tracks[i].data.empty())
 			tracks[i].phrasePointers[0] = binpos;
 		tracks[i].phrasePointers[1] += tracks[i].phrasePointers[0];
@@ -1835,14 +1837,14 @@ void Music::pointersFirstPass() {
 	}
 
 	add += instrumentData.size();
-	for (int i = 0; i < CHANNELS; ++i) {		// // //
+	for (size_t i = 0; i < CHANNELS; ++i) {		// // //
 		unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[0] + spaceForPointersAndInstrs);
 		allPointersAndInstrs[i * 2 + 0 + add] = static_cast<uint8_t>(adr & 0xFF);		// // //
 		allPointersAndInstrs[i * 2 + 1 + add] = static_cast<uint8_t>(adr >> 8);
 	}
 
 	if (hasIntro) {
-		for (int i = 0; i < CHANNELS; ++i) {		// // //
+		for (size_t i = 0; i < CHANNELS; ++i) {		// // //
 			unsigned short adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[1] + spaceForPointersAndInstrs);
 			allPointersAndInstrs[i * 2 + 16 + add] = static_cast<uint8_t>(adr & 0xFF);		// // //
 			allPointersAndInstrs[i * 2 + 17 + add] = static_cast<uint8_t>(adr >> 8);
@@ -1854,10 +1856,10 @@ void Music::pointersFirstPass() {
 	//if (tempo == -1) tempo = 0x36;
 	unsigned int totalLength;
 	mainLength = -1;
-	for (int i = 0; i < CHANNELS; i++)
+	for (size_t i = 0; i < CHANNELS; i++)
 		if (tracks[i].channelLength != 0)		// // //
 			mainLength = std::min(mainLength, (unsigned int)tracks[i].channelLength);
-	if (mainLength == -1)
+	if (static_cast<int>(mainLength) == -1)
 		error("This song doesn't seem to have any data.");		// // //
 
 	totalLength = mainLength;
@@ -1919,10 +1921,10 @@ void Music::pointersFirstPass() {
 	if (verbose) {
 		const hex_formatter hex3 {3};
 		std::cout << '\t';		// // //
-		for (int i = 0; i < CHANNELS / 2; ++i)
+		for (size_t i = 0; i < CHANNELS / 2; ++i)
 			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].data.size() << ' ';
 		std::cout << "Ptrs+Instrs: 0x" << hex3 << spaceForPointersAndInstrs << "\n\t";
-		for (int i = CHANNELS / 2; i < CHANNELS; ++i)
+		for (size_t i = CHANNELS / 2; i < CHANNELS; ++i)
 			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].data.size() << ' ';
 		std::cout << "Loop:        0x" << hex3 << tracks[CHANNELS].data.size();
 		std::cout << "\nSpace used by echo: 0x" << hex4 << (echoBufferSize << 11) <<
@@ -1937,7 +1939,7 @@ void Music::pointersFirstPass() {
 
 	std::stringstream statStrStream;
 
-	for (int i = 0; i < CHANNELS; ++i)		// // //
+	for (size_t i = 0; i < CHANNELS; ++i)		// // //
 		statStrStream << "CHANNEL " << ('0' + i) << " SIZE:				0x" << hex4 << tracks[i].data.size() << "\n";
 	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << tracks[CHANNELS].data.size() << "\n";
 	statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << spaceForPointersAndInstrs << "\n";
@@ -1950,7 +1952,7 @@ void Music::pointersFirstPass() {
 	else
 		statStrStream << "FREE ARAM (APPROXIMATE):		UNKNOWN\n\n";
 
-	for (int i = 0; i < CHANNELS; ++i)		// // //
+	for (size_t i = 0; i < CHANNELS; ++i)		// // //
 		statStrStream << "CHANNEL " << ('0' + i) << " TICKS:			0x" << hex4 << tracks[i].channelLength << "\n";
 	statStrStream << '\n';
 
@@ -1967,18 +1969,8 @@ void Music::pointersFirstPass() {
 
 	statStr = statStrStream.str();
 
-	std::string fname = name;
-
-	int extPos = fname.find_last_of('.');
-	if (extPos != -1)
-		fname = fname.substr(0, extPos);
-
-	if (fname.find('/') != -1)
-		fname = fname.substr(fname.find_last_of('/') + 1);
-	else if (fname.find('\\') != -1)
-		fname = fname.substr(fname.find_last_of('\\') + 1);
-	fname = "stats/" + fname + ".txt";
-
+	auto fname = "stats" / fs::path {name}.stem();		// // //
+	fname.replace_extension(".txt");
 	writeTextFile(fname, statStr);
 }
 

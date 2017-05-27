@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
 			// AddmusicK 2.0: Now with actually good programming habits! (probably not)
 
 			std::string opsubstr;
-			if (optionsString.find('\n', osPos) == -1)
+			if (optionsString.find('\n', osPos) == std::string::npos)		// // //
 				opsubstr = optionsString.substr(osPos);
 			else
 				opsubstr = optionsString.substr(osPos, optionsString.find('\n', osPos) - osPos);
@@ -389,12 +389,13 @@ void cleanROM() {
 }
 
 // // // moved
-int scanInt(const std::string &str, const std::string &value) {		// Scans an integer value that comes after the specified string within another string.  Must be in $XXXX format (or $XXXXXX, etc.).
-	int i = str.find(value);		// // //
+// Scans an integer value that comes after the specified string within another string.  Must be in $XXXX format (or $XXXXXX, etc.).
+unsigned scanInt(const std::string &str, const std::string &value) {
+	size_t i = str.find(value);		// // //
 	if (i == std::string::npos)
 		fatalError("Error: Could not find \"" + value + "\"");		// // //
 
-	int ret;
+	unsigned ret;
 	std::sscanf(str.c_str() + i + value.length(), "$%X", &ret);	// Woo C functions in C++ code!
 	return ret;
 }
@@ -677,7 +678,7 @@ void compileMusic() {
 		std::cout << "Compiling music...\n";
 
 	int totalSamplecount = 0;
-	int totalSize = 0;
+	// // //
 	for (int i = 0; i < 256; i++) {
 		if (musics[i].exists) {
 			if (!(i <= highestGlobalSong && !recompileMain)) {
@@ -752,7 +753,7 @@ void fixMusicPointers() {
 	if (verbose)
 		std::cout << "Fixing song pointers...\n";
 
-	int pointersPos = programSize + 0x400;
+	// int pointersPos = programSize + 0x400;
 	std::stringstream globalPointers;
 	std::stringstream incbins;
 
@@ -952,6 +953,9 @@ void fixMusicPointers() {
 	if (verbose)
 		std::cout << "Total space in ARAM left for local songs: 0x" << hex4 << (0x10000 - programSize - 0x400) << " bytes." << std::dec << '\n';
 
+	// Can't do this now since we can't get a sample correctly outside of a song.
+
+	/*
 	int defaultIndex = -1, optimizedIndex = -1;
 	for (unsigned int i = 0; i < bankDefines.size(); i++) {
 		if (bankDefines[i].name == "default")
@@ -960,9 +964,6 @@ void fixMusicPointers() {
 			optimizedIndex = i;
 	}
 
-	// Can't do this now since we can't get a sample correctly outside of a song.
-
-	/*
 	if (defaultIndex != -1)
 	{
 		int groupSize = 0;
@@ -1116,6 +1117,7 @@ void generateSPCs() {
 		auto fname = fs::path {mode == SFX1 ? soundEffects[0][i].name :
 			mode == SFX2 ? soundEffects[1][i].name : musics[i].getFileName()}.stem();		// // //
 		switch (mode) {
+		case MUSIC: break;
 		case SFX1: fname = "1DF9" / fname; break;
 		case SFX2: fname = "1DFC" / fname; break;
 		}

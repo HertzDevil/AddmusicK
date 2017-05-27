@@ -19,14 +19,15 @@ This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will no
 - [ ] Decompose pretty much everything in `Music.cpp`
 - [ ] `AMKd::Music::Action` and `AMKd::Binary::Command` classes
 - [ ] Bring in the `Chunk` classes I wrote a while ago (originally for 0CC-FT) (maybe)
-- [ ] Makefiles (maybe)
+- [x] Makefiles
+- [ ] Better makefiles (maybe)
 
 #### Compiler stuffs
 
 - [ ] Run AMK from anywhere as long as it is available in `$PATH`
 - [ ] Conditional compilation for both sound driver and music data
 - [ ] Makefile / Ruby script for inserting music into SMW
-- [ ] Make AddmusicK's core compiler cross-platform
+- [x] Make AddmusicK's core compiler cross-platform
 - [ ] Single separate program to remove any old music data
 - [ ] Merge duplicate label loops and remote code definitions
 
@@ -50,6 +51,7 @@ This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will no
 #### Things that have actually been added
 
 - There can be spaces between `#` and the preprocessor directive identifier
+- full nesting of `#ifdef` and friends for both music and sound effects
 - `#if` produces false instead of failing if the preprocessor constant is not defined
 - `#else`, `#elseif`
 - `#error` (mentioned in the doc but never really worked)

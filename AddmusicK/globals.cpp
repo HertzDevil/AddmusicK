@@ -359,7 +359,7 @@ void addSampleBank(const fs::path &fileName, Music *music) {
 
 		size_t pos = startPosition;		// // //
 		while (pos < bankFile.size()) {
-			for (int i = 0; i <= CHANNELS; ++i)
+			for (size_t i = 0; i <= CHANNELS; ++i)
 				tempSample.data.push_back(bankFile[pos++]);
 			if ((tempSample.data[tempSample.data.size() - 9] & 1) == 1)
 				break;
