@@ -18,23 +18,22 @@ inline int macro_SNEStoPC(int a) {
 //but that would possibly change the functioning of addmusic.
 
 void fread_safe(void *dest, size_t size, FILE *file) {		// // //
-	if (fread(dest, 1, size, file)) {
+	if (::fread(dest, 1, size, file)) {
 		return;
 	}
 }
 
 void fwrite_safe(const void *src, size_t size, FILE *file) {		// // //
-	if (fwrite(src, 1, size, file)) {
+	if (::fwrite(src, 1, size, file)) {
 		return;
 	}
 }
 
 bool fopen_safe(FILE **file, const char *str, const char *mode) {
-	*file = fopen(str, mode);
-	if (!*file) {
-		return false;
+	if (!::fopen_s(file, str, mode)) {		// // //
+		return true;
 	}
-	return true;
+	return false;
 }
 
 /***************************************************************

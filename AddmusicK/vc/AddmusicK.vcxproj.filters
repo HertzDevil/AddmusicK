@@ -81,6 +81,9 @@
     <ClInclude Include="..\MML\Duration.h">
       <Filter>Header Files\MML</Filter>
     </ClInclude>
+    <ClInclude Include="..\MML\Tokenizer.h">
+      <Filter>Header Files\MML</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp">

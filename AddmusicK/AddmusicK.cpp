@@ -392,11 +392,12 @@ void cleanROM() {
 // Scans an integer value that comes after the specified string within another string.  Must be in $XXXX format (or $XXXXXX, etc.).
 unsigned scanInt(const std::string &str, const std::string &value) {
 	size_t i = str.find(value);		// // //
-	if (i == std::string::npos)
+	if (i == std::string::npos || str[i + value.size()] != '$')
 		fatalError("Error: Could not find \"" + value + "\"");		// // //
 
 	unsigned ret;
-	std::sscanf(str.c_str() + i + value.length(), "$%X", &ret);	// Woo C functions in C++ code!
+	std::stringstream ss {str.substr(i + value.size() + 1, 8)};		// // //
+	ss >> std::hex >> ret;
 	return ret;
 }
 

@@ -9,13 +9,11 @@
 #include <locale>		// // //
 
 #include "globals.h"		// // //
-#include "Utility/Exception.h"		// // //
 #include "Binary/Defines.h"		// // //
 #include "MML/Lexer.h"		// // //
 #include "MML/Preprocessor.h"		// // //
+#include "MML/Tokenizer.h"		// // //
 #include <functional>
-
-//#include "Preprocessor.h"
 
 
 // // //
@@ -280,12 +278,13 @@ void Music::compile() {
 
 		return cmd;
 	}();
+	AMKd::MML::Tokenizer tok;
 
 	init();
 
 	try {
 		while (hasNextToken()) {		// // //
-			if (auto token = mml_.ExtractToken(CMDS)) {		// // //
+			if (auto token = tok(mml_, CMDS)) {		// // //
 				(this->*(*token))();
 				continue;
 			}

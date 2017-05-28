@@ -4,8 +4,6 @@
 #include <vector>
 #include <map>
 #include <optional>
-#include <algorithm>
-#include "../Utility/Trie.h"
 
 namespace AMKd::MML {
 
@@ -42,14 +40,7 @@ public:
 	bool PopMacro();
 
 	bool HasNextToken();
-	template <typename T, typename U>
-	std::optional<T> ExtractToken(const AMKd::Utility::Trie<T, U> &cmds) {
-		prev_ = sv_;
-		if (auto result = cmds.SearchValue(sv_))
-			return *result;
-		sv_ = prev_;
-		return std::nullopt;
-	}
+	friend struct Tokenizer;
 
 	std::size_t GetLineNumber() const;
 	std::size_t GetReadCount() const;
