@@ -7,6 +7,10 @@
 
 namespace AMKd::MML {
 
+namespace Lexer {
+struct Tokenizer;
+}
+
 // A SourceFile wraps around an MML string with methods for tokenization. It
 // also handles replacement macros.
 class SourceFile
@@ -40,7 +44,7 @@ public:
 	bool PopMacro();
 
 	bool HasNextToken();
-	friend struct Tokenizer;
+	friend struct Lexer::Tokenizer;
 
 	std::size_t GetLineNumber() const;
 	std::size_t GetReadCount() const;

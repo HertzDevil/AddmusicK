@@ -11,6 +11,7 @@
 #include "globals.h"		// // //
 #include "Binary/Defines.h"		// // //
 #include "MML/Lexer.h"		// // //
+#include "MML/Lexers/Option.h"		// // //
 #include "MML/Preprocessor.h"		// // //
 #include "MML/Tokenizer.h"		// // //
 #include <functional>
@@ -278,7 +279,7 @@ void Music::compile() {
 
 		return cmd;
 	}();
-	AMKd::MML::Tokenizer tok;
+	AMKd::MML::Lexer::Tokenizer tok;
 
 	init();
 
@@ -757,7 +758,7 @@ void Music::parseStarLoopCommand() {
 	synchronizeQ();		// // //
 	
 	using namespace AMKd::MML::Lexer;		// // //
-	if (auto param = GetParameters<Opt<Int>>(mml_)) {
+	if (auto param = GetParameters<Option<Int>>(mml_)) {
 		int count = 1;
 		if (auto l = param.get<0>())
 			count = requires(*l, 0x01u, 0xFFu, CMD_ILLEGAL("star loop", "*"));
@@ -2018,7 +2019,7 @@ void Music::parseSPCInfo() {
 			error("Unexpected type name found in SPC info command.  Only \"author\", \"comment\", \"title\", \"game\", and \"length\" are allowed.");
 	}
 
-	if (!GetParameters<Sep<'}'>>)
+	if (!GetParameters<Sep<'}'>>(mml_))
 		fatalError("Unexpected end of SPC info command.");
 }
 

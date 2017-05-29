@@ -4,7 +4,7 @@
 #include "../Utility/Trie.h"
 #include <optional>
 
-namespace AMKd::MML {
+namespace AMKd::MML::Lexer {
 
 struct Tokenizer
 {
@@ -18,4 +18,4 @@ struct Tokenizer
 	}
 };
 
-} // AMKd::MML
+} // namespace AMKd::MML::Lexer

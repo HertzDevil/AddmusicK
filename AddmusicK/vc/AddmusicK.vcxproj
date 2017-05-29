@@ -151,6 +151,8 @@
     <ClInclude Include="..\globals.h" />
     <ClInclude Include="..\MML\Duration.h" />
     <ClInclude Include="..\MML\Lexer.h" />
+    <ClInclude Include="..\MML\Lexers\Multi.h" />
+    <ClInclude Include="..\MML\Lexers\Select.h" />
     <ClInclude Include="..\MML\Preprocessor.h" />
     <ClInclude Include="..\MML\SourceFile.h" />
     <ClInclude Include="..\MML\Tokenizer.h" />

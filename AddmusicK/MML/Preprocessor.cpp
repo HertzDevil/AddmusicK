@@ -2,6 +2,7 @@
 #include "../globals.h"
 #include "../Music.h" // CHANNELS
 #include "Lexer.h"
+#include "Lexers/Option.h"		// // //
 
 using namespace AMKd::MML;
 
@@ -61,7 +62,7 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 					auto spaces = *row.Trim("\\s*");
 					if (auto ident = Ident()(row))
 						if (*ident == "define") {
-							auto param = GetParameters<Ident, Opt<SInt>>(row);
+							auto param = GetParameters<Ident, Option<SInt>>(row);
 							param ? doDirective(&Preprocessor::doDefine, param.get<0>(), param.get<1>() ? *param.get<1>() : 1) :
 								throw AMKd::Utility::SyntaxException {MISSING("#define")};
 						}
@@ -102,8 +103,9 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 						else if (*ident == "am4")
 							doDirective(&Preprocessor::doTarget, Target::AM4);
 						else if (*ident == "amk") {
-							auto param = GetParameters<Opt<Sep<'='>>, SInt>(row);
-							param ? doDirective(&Preprocessor::doVersion, param.get<1>()) :
+							GetParameters<Sep<'='>>(row);
+							auto param = GetParameters<SInt>(row);
+							param ? doDirective(&Preprocessor::doVersion, param.get<0>()) :
 								throw AMKd::Utility::SyntaxException {MISSING("#amk")};
 						}
 						else

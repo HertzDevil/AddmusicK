@@ -8,10 +8,10 @@
 #include "Duration.h"
 
 namespace AMKd::MML {
-
 class SourceFile;
+} // namespace AMKd::MML
 
-namespace Lexer {
+namespace AMKd::MML::Lexer {
 
 template <typename>
 struct Bypass : std::false_type { };
@@ -177,15 +177,6 @@ LEXER_DECL(Time, unsigned)
 LEXER_DECL(Dur, Duration)
 LEXER_DECL(RestDur, Duration) // variant supporting 'r', will be removed when Music::Actions can merge
 
-template <typename T>
-struct Opt
-{
-	using arg_type = std::optional<typename T::arg_type>;
-	std::optional<arg_type> operator()(SourceFile &file) {
-		return std::optional<arg_type>(arg_type {T()(file)});
-	}
-};
-
 template <char C>
 struct Sep
 {
@@ -216,9 +207,7 @@ struct Hex
 	}
 };
 
-} // namespace Lexer
-
-} // namespace AMKd::MML
+} // namespace AMKd::MML::Lexer
 
 template <typename... Args> // for c++17 structured binding support
 struct std::tuple_size<AMKd::MML::Lexer::LexerResult<Args...>> :

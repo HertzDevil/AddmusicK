@@ -13,6 +13,7 @@
 #include "SoundEffect.h"		// // //
 #include "Music.h"		// // //
 #include "MML/Lexer.h"		// // //
+#include "MML/Lexers/Option.h"		// // //
 
 bool waitAtEnd = true;
 fs::path ROMName;		// // //
@@ -498,7 +499,7 @@ void loadSampleList() {
 		BankDefine sg;		// // //
 		sg.name = nameParam.get<0>();
 
-		while (auto item = GetParameters<QString, Opt<Sep<'!'>>>(list)) {
+		while (auto item = GetParameters<QString, Option<Sep<'!'>>>(list)) {
 			sg.samples.push_back(item.get<0>());
 			sg.importants.push_back(item.get<1>().has_value());
 		}

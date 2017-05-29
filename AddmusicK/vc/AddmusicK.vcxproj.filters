@@ -19,14 +19,17 @@
     <Filter Include="Header Files\MML">
       <UniqueIdentifier>{8ad6734a-d88e-4804-8dd7-7cbcca0fae0c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\MML">
-      <UniqueIdentifier>{509f9eea-9ae4-4006-8ef1-9d9729218ed4}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\Utility">
       <UniqueIdentifier>{6fb9062c-9640-4bc6-afe9-6e297165bdf0}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\Binary">
       <UniqueIdentifier>{7648e274-1a2c-4e2b-a8fc-d7bb2a038859}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\MML">
+      <UniqueIdentifier>{509f9eea-9ae4-4006-8ef1-9d9729218ed4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\MML\Lexers">
+      <UniqueIdentifier>{435aa14c-3e4e-439b-9664-cac487d324c0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -54,9 +57,6 @@
     <ClInclude Include="..\asardll.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\MML\Lexer.h">
-      <Filter>Header Files\MML</Filter>
-    </ClInclude>
     <ClInclude Include="..\Utility\Trie.h">
       <Filter>Header Files\Utility</Filter>
     </ClInclude>
@@ -81,8 +81,17 @@
     <ClInclude Include="..\MML\Duration.h">
       <Filter>Header Files\MML</Filter>
     </ClInclude>
+    <ClInclude Include="..\MML\Lexers\Multi.h">
+      <Filter>Header Files\MML\Lexers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\MML\Lexer.h">
+      <Filter>Header Files\MML\Lexers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\MML\Lexers\Select.h">
+      <Filter>Header Files\MML\Lexers</Filter>
+    </ClInclude>
     <ClInclude Include="..\MML\Tokenizer.h">
-      <Filter>Header Files\MML</Filter>
+      <Filter>Header Files\MML\Lexers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
