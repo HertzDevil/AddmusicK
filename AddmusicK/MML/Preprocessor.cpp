@@ -89,7 +89,7 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 						else if (*ident == "else")
 							doDirective(&Preprocessor::doElse);
 						else if (*ident == "include") {
-							auto param = GetParameters<Sep<'\"'>, QString>(row);
+							auto param = GetParameters<QString>(row);
 							throw AMKd::Utility::SyntaxException {"TODO: Implement #include"};
 						}
 						else if (*ident == "error") {
@@ -119,12 +119,9 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 						add += *row.Trim(".*");
 					}
 				}
-				else if (row.Trim('\"')) {
+				else if (auto param = Lexer::QString()(row)) {
 					allowDirectives = false;
-					if (auto param = Lexer::QString()(row))
-						add += '\"' + *param + '\"';
-					else
-						throw AMKd::Utility::SyntaxException {"Error parsing replacement directive."};
+					add += '\"' + *param + '\"';
 				}
 				else if (target != Target::AMM && row.Trim(';')) {
 					if (row.Trim("\\s*title\\s*=\\s*") && row)

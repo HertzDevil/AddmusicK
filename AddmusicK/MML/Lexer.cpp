@@ -50,13 +50,11 @@ LEXER_FUNC_START(Lexer::String)
 LEXER_FUNC_END()
 
 LEXER_FUNC_START(Lexer::QString)
-	const std::regex ESC1 {R"(\\\\)"};
-	const std::regex ESC2 {R"(\\")"};
-//	if (auto x = file.Trim(R"/("([^\\"]|\\\\|\\")*")/"))
-	if (auto x = file.Trim(R"/(([^\\"]|\\\\|\\")*")/")) {
+	const std::regex ESC1 {R"(\\\\)", std::regex::optimize};
+	const std::regex ESC2 {R"(\\")", std::regex::optimize};
+	if (auto x = file.Trim(R"/("([^\\"]|\\\\|\\")*")/")) {
 		auto str = std::regex_replace(std::regex_replace(*x, ESC1, "\\"), ESC2, "\"");
-		str.pop_back(); // final quotation mark
-		return str;
+		return str.substr(1, str.size() - 2);
 	}
 LEXER_FUNC_END()
 

@@ -568,7 +568,7 @@ void Music::parseOpenParenCommand() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Sep<'@'>, Int>(mml_))
 		sampID = instrToSample[requires(param.get<0>(), 0u, 29u, "Illegal instrument number for sample load command.")];
-	else if (auto param2 = GetParameters<Sep<'\"'>, QString>(mml_)) {
+	else if (auto param2 = GetParameters<QString>(mml_)) {
 		std::string s = basepath + param2.get<0>();		// // //
 		auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(s, this));		// // //
 		if (it == mySamples.cend())
@@ -1463,10 +1463,15 @@ void Music::parseSpecialDirective() {
 }
 
 void Music::parseReplacementDirective() {
-	std::string s = getEscapedString();		// // //
+	using namespace AMKd::MML::Lexer;		// // //
+	mml_.Unput();
+	auto param = GetParameters<QString>(mml_);
+	if (!param)
+		fatalError("Unexpected end of replacement directive.");
+	std::string s = param.get<0>();
 	size_t i = s.find('=');
 	if (i == std::string::npos)
-		fatalError("Error parsing replacement directive; could not find '='");		// // //
+		error("Error parsing replacement directive; could not find '='");		// // //
 
 	std::string findStr = s.substr(0, i);
 	std::string replStr = s.substr(i + 1);
@@ -1475,7 +1480,7 @@ void Music::parseReplacementDirective() {
 	while (!findStr.empty() && isspace(findStr.back()))
 		findStr.pop_back();
 	if (findStr.empty())
-		fatalError("Error parsing replacement directive; string to find was of zero length.");
+		error("Error parsing replacement directive; string to find was of zero length.");
 
 	while (!replStr.empty() && isspace(replStr.front()))
 		replStr.erase(0, 1);
@@ -1484,17 +1489,18 @@ void Music::parseReplacementDirective() {
 }
 
 void Music::parseInstrumentDefinitions() {
+	using namespace AMKd::MML::Lexer;		// // //
+
 	if (skipSpaces(), !trimChar('{'))		// // //
 		fatalError("Could not find opening curly brace in instrument definition.");
 
 	while (skipSpaces(), !trimChar('}')) {
 		int i;		// // //
-		if (trimChar('\"')) {		// // //
-			std::string brrName = getEscapedString();
+		if (auto param = GetParameters<QString>(mml_)) {		// // //
+			const std::string &brrName = param.get<0>();
 			if (brrName.empty())
 				fatalError("Error parsing sample portion of the instrument definition.");
-			brrName = basepath + brrName;
-			auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(brrName, this));		// // //
+			auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath + brrName, this));		// // //
 			if (it == mySamples.cend())
 				fatalError("The specified sample was not included in this song.");		// // //
 			i = std::distance(mySamples.cbegin(), it);
@@ -1587,16 +1593,15 @@ void Music::parseInstrumentDefinitions() {
 }
 
 void Music::parseSampleDefinitions() {
-	if (skipSpaces(), !trimChar('{'))		// // //
-		fatalError("Unexpected character in sample group definition.  Expected \"{\".");
+	using namespace AMKd::MML::Lexer;		// // //
+
+	if (!GetParameters<Sep<'{'>>(mml_))
+		fatalError("Could not find opening brace in sample group definition.");
 
 	while (true) {		// // //
-		if (skipSpaces(), trimChar('\"')) {		// // //
-			std::string tempstr = basepath + getEscapedString();		// // //
-			auto tmppos = tempstr.find_last_of(".");
-			if (tmppos == std::string::npos)
-				fatalError("The filename for the sample was missing its extension; is it a .brr or .bnk?");		// // //
-			std::string extension = tempstr.substr(tmppos);
+		if (auto param = GetParameters<QString>(mml_)) {
+			fs::path tempstr = basepath + param.get<0>();		// // //
+			auto extension = tempstr.extension();
 			if (extension == ".bnk")
 				addSampleBank(tempstr, this);
 			else if (extension == ".brr")
@@ -1604,13 +1609,14 @@ void Music::parseSampleDefinitions() {
 			else
 				fatalError("The filename for the sample was invalid.  Only \".brr\" and \".bnk\" are allowed.");		// // //
 		}
-		else if (trimChar('#'))
-			addSampleGroup(getIdentifier(), this);		// // //
-		else if (trimChar('}'))
-			return;
+		else if (auto group = GetParameters<Sep<'#'>, Ident>(mml_))
+			addSampleGroup(group.get<0>(), this);		// // //
 		else
-			fatalError("Unexpected end of sample group definition.");
+			break;
 	}
+
+	if (!GetParameters<Sep<'}'>>(mml_))
+		fatalError("Unexpected end of sample group definition.");
 }
 
 void Music::parsePadDefinition() {
@@ -1630,12 +1636,11 @@ void Music::parseLouderCommand() {
 }
 
 void Music::parsePath() {
-	if (skipSpaces(), !trimChar('\"'))
+	using namespace AMKd::MML::Lexer;		// // //
+	if (auto param = GetParameters<QString>(mml_))
+		basepath = "./" + param.get<0>() + "/";
+	else
 		fatalError("Unexpected symbol found in path command. Expected a quoted string.");
-	auto str = getEscapedString();		// // //
-	if (str.empty())
-		fatalError("Unexpected symbol found in path command. Expected a quoted string.");
-	basepath = "./" + str + "/";
 }
 
 // // //
@@ -1974,65 +1979,47 @@ void Music::adjustLoopPointers() {
 // // //
 
 void Music::parseSPCInfo() {
-	if (skipSpaces(), !trimChar('{'))
-		error("Could not find opening brace in SPC info command.");
+	using namespace AMKd::MML::Lexer;		// // //
 
-	while (skipSpaces(), !trimChar('}')) {
-		if (!trimChar('#'))		// // //
-			error("Unexpected symbol found in SPC info command.  Expected \'#\'.");
-		std::string typeName = getIdentifier();		// // //
+	if (!GetParameters<Sep<'{'>>(mml_))
+		fatalError("Could not find opening brace in SPC info command.");
 
-		if (typeName != "author" && typeName != "comment" && typeName != "title" && typeName != "game" && typeName != "length")
-			error("Unexpected type name found in SPC info command.  Only \"author\", \"comment\", \"title\", \"game\", and \"length\" are allowed.");
+	while (auto item = GetParameters<Sep<'#'>, Ident, QString>(mml_)) {
+		const std::string &metaName = item.get<0>();
+		std::string metaParam = item.get<1>();
 
-		if (skipSpaces(), !trimChar('\"'))
-			error("Error while parsing parameter for SPC info command.");
-		std::string parameter = getEscapedString();		// // //
-
-		if (typeName == "author")
-			author = parameter;
-		else if (typeName == "comment")
-			comment = parameter;
-		else if (typeName == "title")
-			title = parameter;
-		else if (typeName == "game")
-			game = parameter;
-		else if (typeName == "length") {
-			if (parameter == "auto")
-				guessLength = true;
-			else {
-				guessLength = false;
-				AMKd::MML::SourceFile field {parameter};		// // //
+		if (metaName == "length") {
+			if (!(guessLength = (metaParam == "auto"))) {
+				AMKd::MML::SourceFile field {metaParam};		// // //
 				auto param = AMKd::MML::Lexer::Time()(field);
 				if (param && !field)
-					seconds = *param;
+					seconds = requires(*param, 0u, 999u, "Songs longer than 16:39 are not allowed by the SPC format.");		// // //
 				else
 					error("Error parsing SPC length field.  Format must be m:ss or \"auto\".");		// // //
-
-				if (seconds > 999)
-					error("Songs longer than 16:39 are not allowed by the SPC format.");		// // //
-
 				knowsLength = true;
 			}
+			continue;
 		}
+
+		if (metaParam.size() > 32) {
+			metaParam.erase(32);
+			printWarning('#' + metaName + " field was too long.  Truncating to \"" + metaParam + "\".");		// // //
+		}
+
+		if (metaName == "author")
+			author = metaParam;
+		else if (metaName == "comment")
+			comment = metaParam;
+		else if (metaName == "title")
+			title = metaParam;
+		else if (metaName == "game")
+			game = metaParam;
+		else
+			error("Unexpected type name found in SPC info command.  Only \"author\", \"comment\", \"title\", \"game\", and \"length\" are allowed.");
 	}
 
-	if (author.length() > 32) {
-		author = author.substr(0, 32);
-		printWarning("\"Author\" field was too long.  Truncating to \"" + author + "\".");		// // //
-	}
-	if (game.length() > 32) {
-		game = game.substr(0, 32);
-		printWarning("\"Game\" field was too long.  Truncating to \"" + game + "\".");
-	}
-	if (comment.length() > 32) {
-		comment = comment.substr(0, 32);
-		printWarning("\"Comment\" field was too long.  Truncating to \"" + comment + "\".");
-	}
-	if (title.length() > 32) {
-		title = title.substr(0, 32);
-		printWarning("\"Title\" field was too long.  Truncating to \"" + title + "\".");
-	}
+	if (!GetParameters<Sep<'}'>>)
+		fatalError("Unexpected end of SPC info command.");
 }
 
 void Music::addNoteLength(double ticks) {

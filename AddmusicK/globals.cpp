@@ -144,8 +144,8 @@ void writeTextFile(const fs::path &fileName, const std::string &string) {
 }
 
 void insertValue(int value, int length, const std::string &find, std::string &str) {
-	int pos = str.find(find);
-	if (pos == -1)		// // //
+	size_t pos = str.find(find);
+	if (pos == std::string::npos)		// // //
 		fatalError("Error: \"" + find + "\" could not be found.");
 	pos += find.length();
 

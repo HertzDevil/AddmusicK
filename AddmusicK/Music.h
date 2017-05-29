@@ -55,63 +55,15 @@ private:
 
 class Music : public AMKd::Music::SongBase		// // //
 {
-	double introSeconds;
-	double mainSeconds;
-
-	int tempoRatio;
-	int divideByTempoRatio(int, bool fractionIsError);		// Divides a value by tempoRatio.  Errors out if it can't be done without a decimal (if the parameter is set).
-	int multiplyByTempoRatio(int);					// Multiplies a value by tempoRatio.  Errors out if it goes higher than 255.
-
 public:
+	Music();
+	
 	const std::string &getFileName() const;		// // //
 
-private:		// // //
-	bool hasIntro;
-	std::map<int, uint16_t> loopPointers;		// // //
-	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
-	AMKd::MML::SourceFile mml_;		// // //
-
-//public:		// // //
-	Track tracks[CHANNELS + 1];		// // //
-
-	unsigned int introLength;
-	unsigned int mainLength;
-
-	bool knowsLength;
-
-public:		// // //
 	size_t getDataSize() const;		// // //
 	void FlushSongData(std::vector<uint8_t> &buf) const;		// // //
 	void adjustLoopPointers();		// // //
 
-	SpaceInfo spaceInfo;
-	std::vector<uint8_t> instrumentData;
-	std::vector<uint8_t> finalData;
-	std::vector<uint8_t> allPointersAndInstrs;		// // //
-	std::vector<unsigned short> mySamples;
-	size_t totalSize;		// // //
-	size_t minSize;		// // //
-	int spaceForPointersAndInstrs;
-	int echoBufferSize;
-	bool hasYoshiDrums;
-
-	std::string title;
-	std::string author;
-	std::string game;
-	std::string comment;
-	unsigned int seconds;
-
-private:
-	std::string statStr;
-
-	bool usedSamples[256];		// Holds a record of which samples have been used for this song.
-
-	// // //
-	bool inRemoteDefinition;
-	//int remoteDefinitionArg;
-
-public:		// // //
-	Music();
 	void compile();
 
 private:
@@ -187,6 +139,7 @@ private:
 
 	template <typename... Args>		// // //
 	void append(Args&&... value);
+
 	bool trimChar(char c);		// // //
 	bool trimDirective(std::string_view str);		// // //
 	void skipSpaces();		// // //
@@ -208,13 +161,62 @@ private:
 
 	[[noreturn]] void fatalError(const std::string &str);		// // //
 
-	//std::vector<std::string> defineStrings;
-
 	void printChannelDataNonVerbose(int size);
 	void parseHFDHex();
 	void parseHFDInstrumentHack(int addr, int bytes);
 	void insertedZippedSamples(const std::string &path);
 	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd);		// // //
+
+	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
+	void synchronizeQ();		// // //
+
+	int divideByTempoRatio(int, bool fractionIsError);		// Divides a value by tempoRatio.  Errors out if it can't be done without a decimal (if the parameter is set).
+	int multiplyByTempoRatio(int);					// Multiplies a value by tempoRatio.  Errors out if it goes higher than 255.
+
+public:		// // //
+	SpaceInfo spaceInfo;
+	std::vector<uint8_t> instrumentData;
+	std::vector<uint8_t> finalData;
+	std::vector<uint8_t> allPointersAndInstrs;		// // //
+	std::vector<unsigned short> mySamples;
+	size_t totalSize;		// // //
+	size_t minSize;		// // //
+	int spaceForPointersAndInstrs;
+	int echoBufferSize;
+	bool hasYoshiDrums;
+
+	std::string title;
+	std::string author;
+	std::string game;
+	std::string comment;
+	unsigned int seconds;
+
+private:
+	double introSeconds;
+	double mainSeconds;
+
+	int tempoRatio;
+
+	bool hasIntro;
+	std::map<int, uint16_t> loopPointers;		// // //
+	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
+	AMKd::MML::SourceFile mml_;		// // //
+
+	Track tracks[CHANNELS + 1];		// // //
+
+	unsigned int introLength;
+	unsigned int mainLength;
+
+	bool knowsLength;
+
+private:
+	std::string statStr;
+
+	bool usedSamples[256];		// Holds a record of which samples have been used for this song.
+
+	// // //
+	bool inRemoteDefinition;
+	//int remoteDefinitionArg;
 
 	bool guessLength;
 	
@@ -228,6 +230,4 @@ private:
 	bool extraLoopIsNormal;
 	bool extraLoopIsSuper;
 
-	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
-	void synchronizeQ();		// // //
 };

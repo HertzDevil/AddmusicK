@@ -498,7 +498,7 @@ void loadSampleList() {
 		BankDefine sg;		// // //
 		sg.name = nameParam.get<0>();
 
-		while (auto item = GetParameters<Sep<'\"'>, QString, Opt<Sep<'!'>>>(list)) {
+		while (auto item = GetParameters<QString, Opt<Sep<'!'>>>(list)) {
 			sg.samples.push_back(item.get<0>());
 			sg.importants.push_back(item.get<1>().has_value());
 		}
@@ -646,14 +646,13 @@ void compileGlobalData() {
 
 	std::string str = openTextFile("asm/main.asm");		// // //
 
-	int pos;
-	pos = str.find("SFXTable0:");
-	if (pos == -1)
+	size_t pos = str.find("SFXTable0:");
+	if (pos == std::string::npos)
 		fatalError("Error: SFXTable0 not found in main.asm.");
 	str.insert(pos + 10, "\r\nincbin \"SFX1DF9Table.bin\"\r\n");
 
 	pos = str.find("SFXTable1:");
-	if (pos == -1)
+	if (pos == std::string::npos)
 		fatalError("Error: SFXTable1 not found in main.asm.");
 	str.insert(pos + 10, "\r\nincbin \"SFX1DFCTable.bin\"\r\nincbin \"SFXData.bin\"\r\n");
 
@@ -1168,8 +1167,8 @@ void assembleSNESDriver2() {
 	insertValue(mainLoopPos, 4, "!DefARAMRet = ", patch);
 	insertValue(songCount, 2, "!SongCount = ", patch);
 
-	int pos = patch.find("MusicPtrs:");		// // //
-	if (pos == -1)
+	size_t pos = patch.find("MusicPtrs:");		// // //
+	if (pos == std::string::npos)
 		fatalError("Error: \"MusicPtrs:"" could not be found.");
 
 	patch = patch.substr(0, pos) + openTextFile("asm/SNES/patch2.asm");		// // //
