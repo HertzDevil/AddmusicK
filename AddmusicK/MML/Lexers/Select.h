@@ -19,8 +19,8 @@ struct SelectImpl<std::index_sequence<I, Js...>, select_tag_t<Vs...>, T, Us...>
 {
 	using arg_type = std::variant<typename Vs::arg_type...>;
 	std::optional<arg_type> operator()(SourceFile &file) {
-		if (auto param = GetParameters<T>(file))
-			return arg_type {std::in_place_index_t<I>(), std::move(param.get<0>())};
+		if (auto param = T()(file))
+			return arg_type {std::in_place_index_t<I>(), std::move(*param)};
 		return SelectImpl<std::index_sequence<Js...>, select_tag_t<Vs...>, Us...>()(file);
 	}
 };

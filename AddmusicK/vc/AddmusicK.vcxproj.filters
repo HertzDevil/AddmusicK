@@ -93,6 +93,9 @@
     <ClInclude Include="..\MML\Tokenizer.h">
       <Filter>Header Files\MML\Lexers</Filter>
     </ClInclude>
+    <ClInclude Include="..\MML\Lexers\Option.h">
+      <Filter>Header Files\MML\Lexers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp">

@@ -104,7 +104,7 @@ static bool channelDefined;
 //static bool normalLoopInsideE6Loop;
 //static bool e6LoopInsideNormalLoop;
 
-static std::string basepath;
+static fs::path basepath;		// // //
 
 static bool usingSMWVTable;
 
@@ -151,7 +151,7 @@ Music::Music() {
 }
 
 void Music::init() {
-	basepath = "./";
+	basepath = ".";		// // //
 	prevChannel = 0;
 	manualNoteWarning = true;
 	tempoDefined = false;
@@ -570,8 +570,7 @@ void Music::parseOpenParenCommand() {
 	if (auto param = GetParameters<Sep<'@'>, Int>(mml_))
 		sampID = instrToSample[requires(param.get<0>(), 0u, 29u, "Illegal instrument number for sample load command.")];
 	else if (auto param2 = GetParameters<QString>(mml_)) {
-		std::string s = basepath + param2.get<0>();		// // //
-		auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(s, this));		// // //
+		auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath / param2.get<0>(), this));		// // //
 		if (it == mySamples.cend())
 			error("The specified sample was not included in this song.");
 		sampID = std::distance(mySamples.cbegin(), it);
@@ -1501,7 +1500,7 @@ void Music::parseInstrumentDefinitions() {
 			const std::string &brrName = param.get<0>();
 			if (brrName.empty())
 				fatalError("Error parsing sample portion of the instrument definition.");
-			auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath + brrName, this));		// // //
+			auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath / brrName, this));		// // //
 			if (it == mySamples.cend())
 				fatalError("The specified sample was not included in this song.");		// // //
 			i = std::distance(mySamples.cbegin(), it);
@@ -1601,7 +1600,7 @@ void Music::parseSampleDefinitions() {
 
 	while (true) {		// // //
 		if (auto param = GetParameters<QString>(mml_)) {
-			fs::path tempstr = basepath + param.get<0>();		// // //
+			fs::path tempstr = basepath / param.get<0>();		// // //
 			auto extension = tempstr.extension();
 			if (extension == ".bnk")
 				addSampleBank(tempstr, this);
@@ -1639,7 +1638,7 @@ void Music::parseLouderCommand() {
 void Music::parsePath() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<QString>(mml_))
-		basepath = "./" + param.get<0>() + "/";
+		basepath = fs::path {"."} / param.get<0>();
 	else
 		fatalError("Unexpected symbol found in path command. Expected a quoted string.");
 }
@@ -1990,7 +1989,8 @@ void Music::parseSPCInfo() {
 		std::string metaParam = item.get<1>();
 
 		if (metaName == "length") {
-			if (!(guessLength = (metaParam == "auto"))) {
+			guessLength = (metaParam == "auto");
+			if (!guessLength) {
 				AMKd::MML::SourceFile field {metaParam};		// // //
 				auto param = AMKd::MML::Lexer::Time()(field);
 				if (param && !field)
