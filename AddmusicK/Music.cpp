@@ -75,8 +75,6 @@ static const int hexLengths[] = {
 };
 static int transposeMap[256];
 //static bool htranspose[256];
-static int hTranspose;
-static bool usingHTranspose;
 
 //static int tempLoopLength;		// How long the current [ ] loop is.
 //static int e6LoopLength;		// How long the current $E6 loop is.
@@ -107,8 +105,6 @@ static bool channelDefined;
 static fs::path basepath;		// // //
 
 static bool usingSMWVTable;
-
-//static int hTranspose = 0;00
 
 // // // vs2017 does not have fold-expressions
 #define SWALLOW(x) do { \
@@ -205,8 +201,6 @@ void Music::init() {
 	inE6Loop = false;
 	seconds = 0;
 
-	hTranspose = 0;
-	usingHTranspose = false;
 	// // //
 
 	inDefineBlock = false;
@@ -419,9 +413,7 @@ void Music::parseChannelDirective() {
 		channel = requires(i, 0, static_cast<int>(CHANNELS) - 1, DIR_ILLEGAL("channel"));
 		resetStates();		// // //
 		tracks[channel].lastDuration = 0;
-
-		hTranspose = 0;
-		usingHTranspose = false;
+		tracks[channel].usingH = false;
 		channelDefined = true;
 		/*for (int u = 0; u < CHANNELS * 2; u++)
 		{
@@ -1285,11 +1277,10 @@ void Music::parseNote(int ch) {		// // //
 		//am4silence++;
 		i = getPitch(ch);
 
-		if (usingHTranspose)
-			i += hTranspose;
-		else
-			if (!tracks[channel].ignoreTuning)		// // // More AM4 tuning stuff
-				i -= transposeMap[tracks[channel].instrument];
+		if (tracks[channel].usingH)		// // //
+			i += tracks[channel].h;
+		else if (!tracks[channel].ignoreTuning)		// // // More AM4 tuning stuff
+			i -= transposeMap[tracks[channel].instrument];
 
 		if (i < 0x80)		// // //
 			error("Note's pitch was too low.");
@@ -1366,10 +1357,8 @@ void Music::parseNote(int ch) {		// // //
 void Music::parseHDirective() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<SInt>(mml_)) {
-		hTranspose = param.get<0>();
-		usingHTranspose = true;
-		//transposeMap[tracks[channel].instrument] = -param.get<0>();		// // //
-		//htranspose[tracks[channel].instrument] = true;
+		tracks[channel].usingH = true;		// // //
+		tracks[channel].h = param.get<0>();
 		return;
 	}
 	error(DIR_ERROR("transpose (\"h\")"));

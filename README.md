@@ -33,7 +33,7 @@ This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will no
 
 #### MML stuffs
 
-- [ ] Separate `o`/`l`/`h`/`q` states for each track
+- [x] Separate `o`/`l`/`h`/`q` states for each track
 - [ ] Key signature and full accidental support
 - [ ] Legible names for all commands
 - [ ] Track multiplexing (e.g. `#0123`)

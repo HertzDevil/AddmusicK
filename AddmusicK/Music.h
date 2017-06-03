@@ -56,6 +56,8 @@ private:
 	TrackState o {4};		// // //
 	TrackState l {8};		// // //
 	uint8_t lastDuration = 0;		// // // replaces prevNoteLength
+	int8_t h = 0;		// // //
+	bool usingH = false;		// // //
 	int instrument = 0;
 	//uint8_t lastFAGainValue = 0;
 	//uint8_t lastFADelayValue = 0;
