@@ -24,6 +24,22 @@ struct SpaceInfo {
 
 };
 
+class TrackState		// // //
+{
+public:
+	explicit TrackState(uint8_t val = 0);
+
+	uint8_t Get() const;
+	void Update();
+	bool NeedsUpdate() const;
+	TrackState &operator=(uint8_t val);
+	TrackState &operator=(const TrackState &) = default;
+
+private:
+	uint8_t val_ = 0;
+	mutable bool update_ = true;
+};
+
 // // // eventually replace this with AMKd::Music::Track
 class Track
 {
@@ -36,7 +52,7 @@ private:
 	std::vector<std::pair<uint16_t, std::vector<uint8_t>>> remoteGainInfo;		// // // holds position and remote call data for gain command conversions
 
 	double channelLength = 0.; // How many ticks are in each channel.
-	int q = 0x7F;
+	TrackState q {0x7F};		// // //
 	int instrument = 0;
 	//uint8_t lastFAGainValue = 0;
 	//uint8_t lastFADelayValue = 0;
@@ -46,7 +62,6 @@ private:
 	unsigned short phrasePointers[2] = {0, 0}; // first 8 only
 	bool noMusic[2] = {false, false}; // first 8 only
 	bool passedIntro = false; // first 8 only
-	bool updateQ = true;
 	bool usingFA = false;
 	bool usingFC = false;
 	bool ignoreTuning = false; // Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
@@ -132,7 +147,7 @@ private:
 	void doSampleLoad(int index, int mult);
 	void doLoopEnter();					// Call any time a definition of a loop is entered.
 	void doLoopExit(int loopCount);			// Call any time a definition of a loop is exited.
-	void doLoopRemoteCall(int loopCount);			// Call any time a normal loop is called remotely.
+	void doLoopRemoteCall(int loopCount, uint16_t loopAdr);		// // // Call any time a normal loop is called remotely.
 	void doSubloopEnter();		// // // Call any time a definition of a super loop is entered.
 	void doSubloopExit(int loopCount);		// // // Call any time a definition of a super loop is exited.
 	void doVolumeTable(bool louder);
@@ -168,7 +183,9 @@ private:
 	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd);		// // //
 
 	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
-	void synchronizeQ();		// // //
+	void writeState(TrackState (Track::*state), uint8_t val);		// // //
+	void resetStates();		// // //
+	void synchronizeStates();		// // //
 
 	int divideByTempoRatio(int, bool fractionIsError);		// Divides a value by tempoRatio.  Errors out if it can't be done without a decimal (if the parameter is set).
 	int multiplyByTempoRatio(int);					// Multiplies a value by tempoRatio.  Errors out if it goes higher than 255.

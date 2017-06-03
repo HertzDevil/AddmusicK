@@ -119,6 +119,33 @@ static bool usingSMWVTable;
 
 
 // // //
+
+TrackState::TrackState(uint8_t val) : val_(val)
+{
+}
+
+uint8_t TrackState::Get() const {
+	return val_;
+}
+
+void TrackState::Update() {
+	update_ = true;
+}
+
+bool TrackState::NeedsUpdate() const {
+	return std::exchange(update_, false);
+}
+
+TrackState &TrackState::operator=(uint8_t val) {
+//	if (val != val_)
+		Update();
+	val_ = val;
+	return *this;
+}
+
+
+
+// // //
 template <typename... Args>
 void Music::append(Args&&... value) {
 #if 0
@@ -395,8 +422,7 @@ void Music::parseChannelDirective() {
 	int i = getInt();		// // //
 	if (i != -1) {
 		channel = requires(i, 0, static_cast<int>(CHANNELS) - 1, DIR_ILLEGAL("channel"));
-		tracks[CHANNELS].q = tracks[channel].q;		// // //
-		tracks[CHANNELS].updateQ = tracks[channel].updateQ;
+		resetStates();		// // //
 		prevNoteLength = -1;
 
 		hTranspose = 0;
@@ -437,25 +463,11 @@ void Music::parseVolumeCommand() {
 }
 
 void Music::parseQuantizationCommand() {
-	int i = getHex();		// // //
-	if (i != -1) {
-		int q = requires(i, 0x01, 0x7F, CMD_ILLEGAL("quantization", "q"));		// // //
-
-		if (inNormalLoop) {		// // //
-			tracks[prevChannel].q = q;		// // //
-			tracks[prevChannel].updateQ = true;
-		}
-		else {
-			tracks[channel].q = q;
-			tracks[channel].updateQ = true;
-		}
-
-		tracks[CHANNELS].q = q;
-		tracks[CHANNELS].updateQ = true;
-		return;
-	}
-
-	error(CMD_ERROR("quantization", "q"));		// // //
+	using namespace AMKd::MML::Lexer;		// // //
+	if (auto param = GetParameters<Hex<2>>(mml_))
+		return writeState(&Track::q, requires(param.get<0>(), 0x01u, 0x7Fu, CMD_ILLEGAL("quantization", "q")));
+	else
+		error(CMD_ERROR("quantization", "q"));		// // //
 }
 
 void Music::parsePanCommand() {
@@ -648,7 +660,7 @@ void Music::parseLabelLoopCommand() {
 	if (!trimChar(')'))		// // //
 		error("Error parsing label loop.");
 
-	synchronizeQ();		// // //
+	synchronizeStates();		// // //
 	loopLabel = i;
 
 	if (trimChar('[')) {				// If this is a loop definition...
@@ -665,10 +677,7 @@ void Music::parseLabelLoopCommand() {
 	if (j < 1 || j > 255)
 		error("Invalid loop count.");		// // //
 
-	doLoopRemoteCall(j);
-
-	tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
-	append(AMKd::Binary::CmdType::Loop, it->second & 0xFF, it->second >> 8, j);
+	doLoopRemoteCall(j, it->second);		// // //
 
 	loopLabel = 0;
 }
@@ -676,7 +685,7 @@ void Music::parseLabelLoopCommand() {
 void Music::parseLoopCommand() {
 	if (inNormalLoop)		// // //
 		error("You cannot nest standard [ ] loops.");
-	synchronizeQ();		// // //
+	synchronizeStates();		// // //
 
 	prevLoop = static_cast<uint16_t>(tracks[CHANNELS].data.size());		// // //
 
@@ -712,7 +721,7 @@ void Music::parseErrorLoopCommand() {
 void Music::parseLoopEndCommand() {
 	if (!inNormalLoop)		// // //
 		error("Loop end found outside of a loop.");
-	synchronizeQ();		// // //
+	synchronizeStates();		// // //
 
 	int i = getInt();		// // //
 	if (i == -1)
@@ -751,20 +760,14 @@ void Music::parseErrorLoopEndCommand() {
 	           "the \"]]\" and \"]\" to clarify your intention.");
 }
 
-void Music::parseStarLoopCommand() {
-	if (inNormalLoop)		// // //
-		error("Nested loops are not allowed.");		// // //
-	synchronizeQ();		// // //
-	
+void Music::parseStarLoopCommand() {	
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Option<Int>>(mml_)) {
-		int count = 1;
-		if (auto l = param.get<0>())
-			count = requires(*l, 0x01u, 0xFFu, CMD_ILLEGAL("star loop", "*"));
-		doLoopRemoteCall(count);
-		tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
-		append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, count);
-		return;
+		if (inNormalLoop)		// // //
+			error("Nested loops are not allowed.");		// // //
+		synchronizeStates();		// // //
+		auto l = param.get<0>();		// // //
+		return doLoopRemoteCall(requires(l ? *l : 1, 0x01u, 0xFFu, CMD_ILLEGAL("star loop", "*")), prevLoop);
 	}
 	error(CMD_ERROR("star loop", "*"));
 }
@@ -1339,14 +1342,12 @@ void Music::parseNote(int ch) {		// // //
 	}
 
 	const auto doNote = [this] (int note, int len) {		// // //
+		if (tracks[channel].q.NeedsUpdate()) {
+			append(prevNoteLength = len);
+			append(tracks[channel].q.Get());
+		}
 		if (prevNoteLength != len)
 			append(prevNoteLength = len);
-		else if (tracks[channel].updateQ)
-			append(len);
-		if (tracks[channel].updateQ) {
-			append(tracks[channel].q);
-			tracks[channel].updateQ = tracks[CHANNELS].updateQ = false;
-		}
 		append(note);
 	};
 
@@ -2037,10 +2038,19 @@ void Music::addNoteLength(double ticks) {
 }
 
 // // //
-void Music::synchronizeQ() {
+void Music::writeState(TrackState (Track::*state), uint8_t val) {
+	tracks[inNormalLoop ? prevChannel : channel].*state = val;		// // //
+	tracks[CHANNELS].*state = val;
+}
+
+void Music::resetStates() {
+	tracks[CHANNELS].q = tracks[channel].q;
+}
+
+void Music::synchronizeStates() {
 	if (!inNormalLoop)		// // //
-		tracks[channel].updateQ = true;		// // //
-	tracks[CHANNELS].updateQ = true;
+		tracks[channel].q.Update();		// // //
+	tracks[CHANNELS].q.Update();
 	prevNoteLength = -1;
 }
 
@@ -2156,8 +2166,10 @@ void Music::doLoopExit(int loopCount) {
 		loopLengths[loopLabel] = normalLoopLength;
 }
 
-void Music::doLoopRemoteCall(int loopCount) {
+void Music::doLoopRemoteCall(int loopCount, uint16_t loopAdr) {
 	addNoteLength((loopLabel ? loopLengths[loopLabel] : normalLoopLength) * loopCount);		// // //
+	tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
+	append(AMKd::Binary::CmdType::Loop, loopAdr & 0xFF, loopAdr >> 8, loopCount);
 }
 
 void Music::doSubloopEnter() {
@@ -2165,7 +2177,7 @@ void Music::doSubloopEnter() {
 		error("You cannot nest a subloop within another subloop.");
 	inE6Loop = true;
 
-	synchronizeQ();		// // //
+	synchronizeStates();		// // //
 	superLoopLength = 0;
 
 	if (inNormalLoop) {		// // // We're entering a super loop that's nested in a normal loop
@@ -2189,7 +2201,7 @@ void Music::doSubloopExit(int loopCount) {
 		error("A subloop end was found outside of a subloop.");
 	inE6Loop = false;
 
-	synchronizeQ();		// // //
+	synchronizeStates();		// // //
 
 	if (extraLoopIsSuper) {				// We're leaving a super loop that's nested in a normal loop.
 		extraLoopIsNormal = false;
