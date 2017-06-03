@@ -48,7 +48,7 @@ void Music::fatalError(const std::string &str) {
 }
 
 static bool inDefineBlock;
-static int channel, prevChannel, prevNoteLength, defaultNoteLength;
+static int channel, prevChannel;
 static bool inNormalLoop;		// // //
 
 static uint16_t prevLoop;		// // //
@@ -207,10 +207,6 @@ void Music::init() {
 
 	hTranspose = 0;
 	usingHTranspose = false;
-	// // //
-	prevNoteLength = -1;
-	defaultNoteLength = 8;
-
 	// // //
 
 	inDefineBlock = false;
@@ -422,7 +418,7 @@ void Music::parseChannelDirective() {
 	if (i != -1) {
 		channel = requires(i, 0, static_cast<int>(CHANNELS) - 1, DIR_ILLEGAL("channel"));
 		resetStates();		// // //
-		prevNoteLength = -1;
+		tracks[channel].lastDuration = 0;
 
 		hTranspose = 0;
 		usingHTranspose = false;
@@ -442,9 +438,8 @@ void Music::parseChannelDirective() {
 void Music::parseLDirective() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Int>(mml_))
-		defaultNoteLength = requires(param.get<0>(), 1u, 192u, DIR_ILLEGAL("note length (\"l\")"));		// // //
-	else
-		error(DIR_ERROR("note length (\"l\")"));
+		return writeState(&Track::l, requires(param.get<0>(), 1u, 192u, DIR_ILLEGAL("note length (\"l\")")));		// // //
+	error(DIR_ERROR("note length (\"l\")"));
 }
 
 void Music::parseGlobalVolumeCommand() {
@@ -498,7 +493,7 @@ void Music::parseIntroDirective() {
 
 	hasIntro = true;
 	tracks[channel].phrasePointers[1] = static_cast<uint16_t>(tracks[channel].data.size());		// // //
-	prevNoteLength = -1;
+	tracks[channel].lastDuration = 0;
 	introLength = static_cast<unsigned>(tracks[channel].channelLength);		// // //
 }
 
@@ -1310,13 +1305,13 @@ void Music::parseNote(int ch) {		// // //
 
 	if (inPitchSlide) {
 		inPitchSlide = false;
-		append(AMKd::Binary::CmdType::Portamento, 0x00, prevNoteLength, i);		// // //
 	}
 
 	if (nextNoteIsForDD) {
 		append(i);
 		nextNoteIsForDD = false;
 		return;
+		append(AMKd::Binary::CmdType::Portamento, 0x00, tracks[channel].lastDuration, i);		// // //
 	}
 
 	using namespace AMKd::MML::Lexer;		// // //
@@ -1342,11 +1337,11 @@ void Music::parseNote(int ch) {		// // //
 
 	const auto doNote = [this] (int note, int len) {		// // //
 		if (tracks[channel].q.NeedsUpdate()) {
-			append(prevNoteLength = len);
+			append(tracks[channel].lastDuration = len);
 			append(tracks[channel].q.Get());
 		}
-		if (prevNoteLength != len)
-			append(prevNoteLength = len);
+		if (tracks[channel].lastDuration != len)
+			append(tracks[channel].lastDuration = len);
 		append(note);
 	};
 
@@ -1713,11 +1708,11 @@ int Music::getRawTicks(const AMKd::MML::Duration &dur) const {
 }
 
 int Music::getFullTicks(const AMKd::MML::Duration &dur) const {
-	return checkTickFraction(dur.GetTicks(defaultNoteLength) / tempoRatio * (triplet ? 2. / 3. : 1.));
+	return checkTickFraction(dur.GetTicks(tracks[channel].l.Get()) / tempoRatio * (triplet ? 2. / 3. : 1.));
 }
 
 int Music::getLastTicks(const AMKd::MML::Duration &dur) const {
-	return checkTickFraction(dur.GetLastTicks(defaultNoteLength) / tempoRatio * (triplet ? 2. / 3. : 1.));
+	return checkTickFraction(dur.GetLastTicks(tracks[channel].l.Get()) / tempoRatio * (triplet ? 2. / 3. : 1.));
 }
 
 int Music::checkTickFraction(double ticks) const {
@@ -2045,16 +2040,19 @@ void Music::writeState(TrackState (Track::*state), uint8_t val) {
 void Music::resetStates() {
 	tracks[CHANNELS].q = tracks[channel].q;
 	tracks[CHANNELS].o = tracks[channel].o;
+	tracks[CHANNELS].l = tracks[channel].l;
 }
 
 void Music::synchronizeStates() {
 	if (!inNormalLoop) {		// // //
 		tracks[channel].q.Update();
 		tracks[channel].o.Update();
+		tracks[channel].l.Update();
 	}
 	tracks[CHANNELS].q.Update();
 	tracks[CHANNELS].o.Update();
-	prevNoteLength = -1;
+	tracks[CHANNELS].l.Update();
+	tracks[channel].lastDuration = 0;
 }
 
 int Music::divideByTempoRatio(int value, bool /*fractionIsError*/) {

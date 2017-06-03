@@ -54,6 +54,8 @@ private:
 	double channelLength = 0.; // How many ticks are in each channel.
 	TrackState q {0x7F};		// // //
 	TrackState o {4};		// // //
+	TrackState l {8};		// // //
+	uint8_t lastDuration = 0;		// // // replaces prevNoteLength
 	int instrument = 0;
 	//uint8_t lastFAGainValue = 0;
 	//uint8_t lastFADelayValue = 0;
