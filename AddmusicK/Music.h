@@ -53,6 +53,7 @@ private:
 
 	double channelLength = 0.; // How many ticks are in each channel.
 	TrackState q {0x7F};		// // //
+	TrackState o {4};		// // //
 	int instrument = 0;
 	//uint8_t lastFAGainValue = 0;
 	//uint8_t lastFADelayValue = 0;
@@ -137,6 +138,8 @@ private:
 
 	// // // action methods, these will become objects later
 	void doOctave(int oct);
+	void doRaiseOctave();
+	void doLowerOctave();
 	void doVolume(int vol);
 	void doGlobalVolume(int vol);
 	void doVibrato(int delay, int rate, int depth);

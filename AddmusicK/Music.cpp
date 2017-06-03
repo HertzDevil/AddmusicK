@@ -47,8 +47,8 @@ void Music::fatalError(const std::string &str) {
 	::fatalError(str, name, mml_.GetLineNumber());		// // //
 }
 
-static int channel, prevChannel, octave, prevNoteLength, defaultNoteLength;
 static bool inDefineBlock;
+static int channel, prevChannel, prevNoteLength, defaultNoteLength;
 static bool inNormalLoop;		// // //
 
 static uint16_t prevLoop;		// // //
@@ -208,7 +208,6 @@ void Music::init() {
 	hTranspose = 0;
 	usingHTranspose = false;
 	// // //
-	octave = 4;
 	prevNoteLength = -1;
 	defaultNoteLength = 8;
 
@@ -303,6 +302,7 @@ void Music::compile() {
 		cmd.Insert(">", &Music::parseRaiseOctaveDirective);
 		cmd.Insert("<", &Music::parseLowerOctaveDirective);
 		cmd.Insert("v", &Music::parseVolumeCommand);
+		cmd.Insert("q", &Music::parseQuantizationCommand);
 
 		return cmd;
 	}();
@@ -325,7 +325,6 @@ void Music::compile() {
 			case '#': parseChannelDirective();		break;
 			case 'l': parseLDirective();			break;
 			case 'w': parseGlobalVolumeCommand();	break;
-			case 'q': parseQuantizationCommand();	break;
 			case 'y': parsePanCommand();			break;
 			case '/': parseIntroDirective();		break;
 			case '@': parseInstrumentCommand();		break;
@@ -805,11 +804,11 @@ void Music::parseTripletCloseDirective() {
 }
 
 void Music::parseRaiseOctaveDirective() {
-	return doOctave(octave + 1);		// // //
+	return doRaiseOctave();		// // //
 }
 
 void Music::parseLowerOctaveDirective() {
-	return doOctave(octave - 1);		// // //
+	return doLowerOctave();		// // //
 }
 
 void Music::parseHFDInstrumentHack(int addr, int bytes) {
@@ -1694,7 +1693,7 @@ bool Music::getHexByte(int &out) {
 int Music::getPitch(int i) {
 	static const int pitches[] = {9, 11, 0, 2, 4, 5, 7};
 
-	i = pitches[i - 'a'] + (octave - 1) * 12 + 0x80;		// // //
+	i = pitches[i - 'a'] + (tracks[channel].o.Get() - 1) * 12 + 0x80;		// // //
 	if (trimChar('+'))
 		++i;
 	else if (trimChar('-'))
@@ -2045,12 +2044,16 @@ void Music::writeState(TrackState (Track::*state), uint8_t val) {
 
 void Music::resetStates() {
 	tracks[CHANNELS].q = tracks[channel].q;
+	tracks[CHANNELS].o = tracks[channel].o;
 }
 
 void Music::synchronizeStates() {
-	if (!inNormalLoop)		// // //
-		tracks[channel].q.Update();		// // //
+	if (!inNormalLoop) {		// // //
+		tracks[channel].q.Update();
+		tracks[channel].o.Update();
+	}
 	tracks[CHANNELS].q.Update();
+	tracks[CHANNELS].o.Update();
 	prevNoteLength = -1;
 }
 
@@ -2084,11 +2087,21 @@ const std::string &Music::getFileName() const {
 
 // // //
 void Music::doOctave(int oct) {
-	if (oct < 1)
-		error("The octave has been dropped too low.");
-	if (oct > 6)
+	return writeState(&Track::o, requires(oct, 1, 6, DIR_ILLEGAL("octave (\"o\")")));
+}
+
+void Music::doRaiseOctave() {
+	uint8_t oct = tracks[channel].o.Get();		// // //
+	if (oct >= 6)
 		error("The octave has been raised too high.");
-	octave = oct;
+	return writeState(&Track::o, ++oct);
+}
+
+void Music::doLowerOctave() {
+	uint8_t oct = tracks[channel].o.Get();		// // //
+	if (oct <= 1)
+		error("The octave has been dropped too low.");
+	return writeState(&Track::o, --oct);
 }
 
 void Music::doVolume(int vol) {
