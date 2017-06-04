@@ -13,7 +13,6 @@
 #include "SoundEffect.h"		// // //
 #include "Music.h"		// // //
 #include "MML/Lexer.h"		// // //
-#include "MML/Lexers/Option.h"		// // //
 
 bool waitAtEnd = true;
 fs::path ROMName;		// // //

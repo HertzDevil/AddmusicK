@@ -152,6 +152,7 @@
     <ClInclude Include="..\MML\Accidental.h" />
     <ClInclude Include="..\MML\Duration.h" />
     <ClInclude Include="..\MML\Lexer.h" />
+    <ClInclude Include="..\MML\Lexers\Core.h" />
     <ClInclude Include="..\MML\Lexers\Multi.h" />
     <ClInclude Include="..\MML\Lexers\Option.h" />
     <ClInclude Include="..\MML\Lexers\Select.h" />

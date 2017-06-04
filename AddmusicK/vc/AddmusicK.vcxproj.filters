@@ -99,6 +99,9 @@
     <ClInclude Include="..\MML\Accidental.h">
       <Filter>Header Files\MML</Filter>
     </ClInclude>
+    <ClInclude Include="..\MML\Lexers\Core.h">
+      <Filter>Header Files\MML\Lexers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp">

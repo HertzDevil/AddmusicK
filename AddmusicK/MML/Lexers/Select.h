@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Lexer.h"
+#include "Core.h"
 #include <variant>
 #include <type_traits>
 

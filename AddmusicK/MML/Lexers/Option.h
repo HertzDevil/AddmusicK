@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Lexer.h"
+#include "Core.h"
 
 namespace AMKd::MML::Lexer {
 

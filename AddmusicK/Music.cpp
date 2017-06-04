@@ -11,14 +11,14 @@
 #include "globals.h"		// // //
 #include "Binary/Defines.h"		// // //
 #include "MML/Lexer.h"		// // //
-#include "MML/Lexers/Option.h"		// // //
 #include "MML/Preprocessor.h"		// // //
 #include "MML/Tokenizer.h"		// // //
+#include "Utility/Exception.h"		// // //
 #include <functional>
 
 
-// // //
 
+// // //
 #define CMD_ERROR(name, abbr) "Error parsing " name " (\"" abbr "\") command."
 #define CMD_ILLEGAL(name, abbr) "Illegal value for " name " (\"" abbr "\") command."
 #define DIR_ERROR(name) "Error parsing " name " directive."
