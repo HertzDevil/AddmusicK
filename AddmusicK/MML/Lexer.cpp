@@ -148,6 +148,15 @@ LEXER_FUNC_START(Lexer::RestDur)
 	return Duration {mult, add, lastMult, lastAdd};
 }
 
+LEXER_FUNC_START(Lexer::Acc)
+	Accidental s;
+	s.neutral = file.Trim('_').has_value();
+	for (char ch : *file.Trim("[+-]{0,3}"))
+//	for (char ch : *file.Trim("[+-]*"))
+		s.offset += ch == '+' ? 1 : -1;
+	return s;
+}
+
 #undef LEXER_DECL
 #undef LEXER_FUNC_START
 #undef LEXER_FUNC_END

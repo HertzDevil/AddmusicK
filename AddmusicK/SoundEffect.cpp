@@ -9,7 +9,6 @@ static unsigned int pos;
 static int line;
 static bool triplet;
 static int defaultNoteValue;
-static bool inDefineBlock;
 
 #define error2(str) do { \
 		printError(str, name, line); \
@@ -133,7 +132,6 @@ void SoundEffect::compile() {
 	line = 0;
 	triplet = false;
 	defaultNoteValue = 8;
-	inDefineBlock = false;
 
 	// unsigned int instr = -1;
 	int lastNote = -1;

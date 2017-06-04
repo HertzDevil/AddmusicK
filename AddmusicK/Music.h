@@ -27,16 +27,16 @@ struct SpaceInfo {
 class TrackState		// // //
 {
 public:
-	explicit TrackState(uint8_t val = 0);
+	explicit TrackState(int val = 0);
 
-	uint8_t Get() const;
+	int Get() const;
 	void Update();
 	bool NeedsUpdate() const;
-	TrackState &operator=(uint8_t val);
+	TrackState &operator=(int val);
 	TrackState &operator=(const TrackState &) = default;
 
 private:
-	uint8_t val_ = 0;
+	int val_ = 0;
 	mutable bool update_ = true;
 };
 
@@ -120,10 +120,22 @@ private:
 	void parseRaiseOctaveDirective();
 	void parseLowerOctaveDirective();
 	void parseHexCommand();
-	void parseNote(int ch);		// // //
 	void parseHDirective();
 	void parseReplacementDirective();
 	void parseNCommand();
+	void parseBarDirective();		// // //
+	
+	void parseNote(int note);		// // //
+	void parseNoteCommon(int offset);
+	void parseNoteC();
+	void parseNoteD();
+	void parseNoteE();
+	void parseNoteF();
+	void parseNoteG();
+	void parseNoteA();
+	void parseNoteB();
+	void parseTie();
+	void parseRest();
 
 	void parseOptionDirective();
 	
@@ -141,6 +153,7 @@ private:
 	void parseSPCInfo();
 
 	// // // action methods, these will become objects later
+	void doNote(int note, int fullTicks, int bendTicks, bool nextPorta);
 	void doOctave(int oct);
 	void doRaiseOctave();
 	void doLowerOctave();
@@ -190,7 +203,7 @@ private:
 	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd);		// // //
 
 	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
-	void writeState(TrackState (Track::*state), uint8_t val);		// // //
+	void writeState(TrackState (Track::*state), int val);		// // //
 	void resetStates();		// // //
 	void synchronizeStates();		// // //
 

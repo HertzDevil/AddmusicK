@@ -62,3 +62,4 @@ This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will no
 - `#define` and friends no longer accept arguments on a different line
 - Replacement macros are still allowed but each result must form complete tokens (tokens cannot cross macro boundaries)
 - Hex commands will become exactly identical to plain-text equivalents
+- `$DD` no longer accepts a note as its last parameter, it never worked properly and I have never seen anyone using it

@@ -1,4 +1,5 @@
 #include "Duration.h"
+#include "../Utility/Exception.h"
 
 using namespace AMKd::MML;
 

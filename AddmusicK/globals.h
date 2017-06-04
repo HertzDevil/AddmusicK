@@ -78,8 +78,7 @@ public:
 	template <typename Char, typename Traits>
 	friend std::basic_ostream<Char, Traits> &
 	operator<<(std::basic_ostream<Char, Traits> &os, const hex_formatter &f) {
-		os << std::setw(f.width_) << std::setfill('0') << std::uppercase << std::hex;
-		return os;
+		return os << std::setw(f.width_) << std::setfill('0') << std::uppercase << std::hex;
 	}
 };
 

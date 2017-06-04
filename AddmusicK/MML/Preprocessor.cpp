@@ -108,8 +108,10 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 							param ? doDirective(&Preprocessor::doVersion, param.get<0>()) :
 								throw AMKd::Utility::SyntaxException {MISSING("#amk")};
 						}
-						else
-							add += '#' + spaces + *ident + *row.Trim(".*");
+						else {
+							allowDirectives = false;
+							add += '#' + spaces + *ident;
+						}
 					else {
 						allowDirectives = false;
 						add += '#' + spaces;
@@ -118,7 +120,6 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 							for (char ch : *num)
 								firstChannel = std::min(firstChannel, ch - '0');
 						}
-						add += *row.Trim(".*");
 					}
 				}
 				else if (auto param = Lexer::QString()(row)) {

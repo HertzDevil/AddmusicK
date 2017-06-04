@@ -149,6 +149,7 @@
     <ClInclude Include="..\BankDefine.h" />
     <ClInclude Include="..\Binary\Defines.h" />
     <ClInclude Include="..\globals.h" />
+    <ClInclude Include="..\MML\Accidental.h" />
     <ClInclude Include="..\MML\Duration.h" />
     <ClInclude Include="..\MML\Lexer.h" />
     <ClInclude Include="..\MML\Lexers\Multi.h" />

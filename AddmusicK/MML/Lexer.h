@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include "SourceFile.h"
 #include "Duration.h"
+#include "Accidental.h"
 
 namespace AMKd::MML {
 class SourceFile;
@@ -176,6 +177,7 @@ LEXER_DECL(QString, std::string)
 LEXER_DECL(Time, unsigned)
 LEXER_DECL(Dur, Duration)
 LEXER_DECL(RestDur, Duration) // variant supporting 'r', will be removed when Music::Actions can merge
+LEXER_DECL(Acc, Accidental)
 
 template <char C>
 struct Sep
