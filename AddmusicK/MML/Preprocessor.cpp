@@ -2,6 +2,7 @@
 #include "../globals.h"
 #include "../Music.h" // CHANNELS
 #include "Lexer.h"		// // //
+#include "../Utility/Exception.h"		// // //
 
 using namespace AMKd::MML;
 

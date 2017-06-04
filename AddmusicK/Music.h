@@ -71,6 +71,8 @@ private:
 	bool usingFC = false;
 	bool ignoreTuning = false; // Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
 	bool isDefiningLabelLoop = false;		// // //
+	bool inPitchSlide = false;		// // //
+	bool inTriplet = false;		// // //
 };
 
 class Music : public AMKd::Music::SongBase		// // //
@@ -107,6 +109,7 @@ private:
 	void parseInstrumentCommand();
 	void parseOpenParenCommand();
 	void parseLabelLoopCommand();
+	void parseRemoteCodeCommand();		// // //
 	void parseLoopCommand();
 	void parseSubloopCommand();		// // //
 	void parseErrorLoopCommand();		// // //
@@ -262,9 +265,6 @@ private:
 	double superLoopLength;					// How many ticks were in the most previously declared super loop.
 	std::vector<std::pair<double, int>> tempoChanges;	// Where any changes in tempo occur. A negative tempo marks the beginning of the main loop, if an intro exists.
 
-	bool baseLoopIsNormal;
-	bool baseLoopIsSuper;
-	bool extraLoopIsNormal;
-	bool extraLoopIsSuper;
-
+	enum class LoopType { none, normal, sub };		// // //
+	LoopType loopState1 = LoopType::none, loopState2 = LoopType::none;
 };

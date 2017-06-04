@@ -52,8 +52,6 @@ static bool inNormalLoop;		// // //
 
 static uint16_t prevLoop;		// // //
 static bool doesntLoop;
-static bool triplet;
-static bool inPitchSlide;
 
 using AMKd::MML::Target;		// // //
 static Target songTargetProgram = Target::Unknown;
@@ -91,7 +89,6 @@ static int loopNestLevel;		// How deep we're "loop nested".
 
 static unsigned int tempo;
 //static bool onlyHadOneTempo;
-static bool tempoDefined;
 
 static bool manualNoteWarning;
 
@@ -174,9 +171,7 @@ Music::Music() {
 
 void Music::init() {
 	basepath = ".";		// // //
-	prevChannel = 0;
 	manualNoteWarning = true;
-	tempoDefined = false;
 	//am4silence = 0;
 	// // //
 	hasYoshiDrums = false;
@@ -191,21 +186,18 @@ void Music::init() {
 	//remoteDefinitionArg = 0;
 	inRemoteDefinition = false;
 	inNormalLoop = false;		// // //
+	inE6Loop = false;
 
 	superLoopLength = normalLoopLength = 0;
 
-	baseLoopIsNormal = baseLoopIsSuper = extraLoopIsNormal = extraLoopIsSuper = false;
 	// // //
 
-	inE6Loop = false;
 	seconds = 0;
 
 	// // //
 
 	hasIntro = false;
 	doesntLoop = false;
-	triplet = false;
-	inPitchSlide = false;
 
 	loopLabel = 0;
 	// // //
@@ -218,13 +210,7 @@ void Music::init() {
 	for (int z = 0; z < 19; z++)
 		transposeMap[z] = tmpTrans[z];
 
-	title = name.substr(0, name.find_last_of('.'));		// // //
-	size_t p = name.find_last_of('/');
-	if (p != std::string::npos)
-		title = name.substr(p + 1);
-	p = name.find_last_of('\\');
-	if (p != std::string::npos)
-		title = name.substr(p);
+	title = fs::path {name}.stem().string();		// // //
 
 	//std::string backup = text;
 
@@ -263,60 +249,60 @@ void Music::init() {
 	// // // We can't just insert this at the end due to looping complications and such.
 	if (validateHex && index > highestGlobalSong && stat.firstChannel != CHANNELS) {
 		channel = stat.firstChannel;
-		if (targetAMKVersion > 1)
+		if (!usingSMWVTable)
 			doVolumeTable(true);
 		append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::EchoBuffer, echoBufferSize);
 	}
 
-	channel = 0;
+	prevChannel = channel = 0;
 }
 
 void Music::compile() {
 	static const auto CMDS = [] {		// // //
 		AMKd::Utility::Trie<void (Music::*)()> cmd;
 
+		cmd.Insert("!", &Music::parseExMarkDirective);
+		cmd.Insert("\"", &Music::parseReplacementDirective);
+		cmd.Insert("#", &Music::parseChannelDirective);
+		cmd.Insert("$", &Music::parseHexCommand);
+		cmd.Insert("(", &Music::parseOpenParenCommand);
+		cmd.Insert("(!", &Music::parseRemoteCodeCommand);
+		cmd.Insert("*", &Music::parseStarLoopCommand);
+		cmd.Insert("/", &Music::parseIntroDirective);
+		cmd.Insert(";", &Music::parseComment);
+		cmd.Insert("<", &Music::parseLowerOctaveDirective);
+		cmd.Insert(">", &Music::parseRaiseOctaveDirective);
+		cmd.Insert("?", &Music::parseQMarkDirective);
+		cmd.Insert("@", &Music::parseInstrumentCommand);
+		cmd.Insert("a", &Music::parseNoteA);
+		cmd.Insert("b", &Music::parseNoteB);
+		cmd.Insert("c", &Music::parseNoteC);
+		cmd.Insert("d", &Music::parseNoteD);
+		cmd.Insert("e", &Music::parseNoteE);
+		cmd.Insert("f", &Music::parseNoteF);
+		cmd.Insert("g", &Music::parseNoteG);
+		cmd.Insert("h", &Music::parseHDirective);
+		cmd.Insert("l", &Music::parseLDirective);
+		cmd.Insert("n", &Music::parseNCommand);
+		cmd.Insert("o", &Music::parseOctaveDirective);
 		cmd.Insert("p", &Music::parseVibratoCommand);
-		cmd.Insert("tuning", &Music::parseTransposeDirective);
+		cmd.Insert("q", &Music::parseQuantizationCommand);
+		cmd.Insert("r", &Music::parseRest);
 		cmd.Insert("t", &Music::parseTempoCommand);
+		cmd.Insert("tuning", &Music::parseTransposeDirective);
+		cmd.Insert("v", &Music::parseVolumeCommand);
+		cmd.Insert("w", &Music::parseGlobalVolumeCommand);
+		cmd.Insert("y", &Music::parsePanCommand);
 		cmd.Insert("[", &Music::parseLoopCommand);
 		cmd.Insert("[[", &Music::parseSubloopCommand);
 		cmd.Insert("[[[", &Music::parseErrorLoopCommand);
 		cmd.Insert("]", &Music::parseLoopEndCommand);
 		cmd.Insert("]]", &Music::parseSubloopEndCommand);
 		cmd.Insert("]]]", &Music::parseErrorLoopEndCommand);
-		cmd.Insert("*", &Music::parseStarLoopCommand);
-		cmd.Insert("o", &Music::parseOctaveDirective);
-		cmd.Insert(">", &Music::parseRaiseOctaveDirective);
-		cmd.Insert("<", &Music::parseLowerOctaveDirective);
-		cmd.Insert("v", &Music::parseVolumeCommand);
-		cmd.Insert("q", &Music::parseQuantizationCommand);
-		cmd.Insert("w", &Music::parseGlobalVolumeCommand);
-		cmd.Insert("l", &Music::parseLDirective);
-		cmd.Insert("y", &Music::parsePanCommand);
-		cmd.Insert("?", &Music::parseQMarkDirective);
-		cmd.Insert("!", &Music::parseExMarkDirective);
-		cmd.Insert("#", &Music::parseChannelDirective);
-		cmd.Insert("/", &Music::parseIntroDirective);
-		cmd.Insert("@", &Music::parseInstrumentCommand);
-		cmd.Insert("(", &Music::parseOpenParenCommand);
-		cmd.Insert("{", &Music::parseTripletOpenDirective);
-		cmd.Insert("}", &Music::parseTripletCloseDirective);
-		cmd.Insert("$", &Music::parseHexCommand);
-		cmd.Insert("h", &Music::parseHDirective);
-		cmd.Insert("n", &Music::parseNCommand);
-		cmd.Insert("\"", &Music::parseReplacementDirective);
-		cmd.Insert(";", &Music::parseComment);
-		cmd.Insert("|", &Music::parseBarDirective);
-		cmd.Insert("c", &Music::parseNoteC);
-		cmd.Insert("d", &Music::parseNoteD);
-		cmd.Insert("e", &Music::parseNoteE);
-		cmd.Insert("f", &Music::parseNoteF);
-		cmd.Insert("g", &Music::parseNoteG);
-		cmd.Insert("a", &Music::parseNoteA);
-		cmd.Insert("b", &Music::parseNoteB);
 		cmd.Insert("^", &Music::parseTie);
-		cmd.Insert("r", &Music::parseRest);
+		cmd.Insert("{", &Music::parseTripletOpenDirective);
 		cmd.Insert("|", &Music::parseBarDirective);
+		cmd.Insert("}", &Music::parseTripletCloseDirective);
 
 		return cmd;
 	}();
@@ -358,10 +344,9 @@ void Music::FlushSongData(std::vector<uint8_t> &buf) const {
 }
 
 void Music::parseComment() {
-//	if (songTargetProgram == Target::AMM)		// // //
-		mml_.Trim(".*?\\n");
-//	else
+//	if (songTargetProgram != Target::AMM)		// // //
 //		error("Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2.");		// // //
+	mml_.Trim(".*?\\n");
 }
 
 void Music::printChannelDataNonVerbose(int size) {
@@ -579,59 +564,6 @@ void Music::parseOpenParenCommand() {
 
 void Music::parseLabelLoopCommand() {
 	using namespace AMKd::MML::Lexer;
-	if (trimChar('!')) {		// // //
-		if (targetAMKVersion < 2)
-			error("Unrecognized character '!'.");
-
-		if (channelDefined) {						// A channel's been defined, we're parsing a remote 
-			auto param = GetParameters<Int, Comma, SInt>(mml_);		// // //
-			if (!param)
-				error("Error parsing remote code setup.");
-
-			int i = param.get<0>();
-			int j = param.get<1>();
-			int k = 0;
-			if (j == AMKd::Binary::CmdOptionFC::Sustain || j == AMKd::Binary::CmdOptionFC::Release) {
-				if (!GetParameters<Comma>(mml_))
-					error("Error parsing remote code setup. Missing the third argument.");
-				if (auto len = GetParameters<Byte>(mml_))
-					k = len.get<0>();
-				else if (auto len2 = GetParameters<Dur>(mml_)) {		// // //
-					k = getRawTicks(len2.get<0>());
-					if (k > 0x100)
-						error("Note length specified was too large.");		// // //
-					else if (k == 0x100)
-						k = 0;
-				}
-				else
-					error("Error parsing remote code setup.");
-			}
-
-			if (!GetParameters<Sep<')'>, Sep<'['>>(mml_))
-				error("Error parsing remote code setup.");
-
-			tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
-			if (loopPointers.find(i) == loopPointers.cend())		// // //
-				loopPointers.insert({i, static_cast<uint16_t>(-1)});
-			append(AMKd::Binary::CmdType::Callback, loopPointers[i] & 0xFF, loopPointers[i] >> 8, j, k);
-			return;
-		}
-
-		int i = getInt();		// // // We're outside of a channel, this is a remote call definition.
-		if (i == -1)
-			error("Error parsing remote code definition.");
-		if (skipSpaces(), !trimChar(')'))		// // //
-			error("Error parsing remote code definition.");
-		if (trimChar('['))		// // //
-			error("Error parsing remote code definition; the definition was missing.");
-
-		loopLabel = i;		// // //
-		inRemoteDefinition = true;
-		return parseLoopCommand();
-	}
-
-	if (inNormalLoop)		// // //
-		error("Nested loops are not allowed.");		// // //
 
 	int i = getInt();		// // //
 	if (i == -1)
@@ -642,6 +574,8 @@ void Music::parseLabelLoopCommand() {
 	if (!trimChar(')'))		// // //
 		error("Error parsing label loop.");
 
+	if (inNormalLoop)		// // //
+		error("Nested loops are not allowed.");		// // //
 	synchronizeStates();		// // //
 	loopLabel = i;
 
@@ -664,25 +598,67 @@ void Music::parseLabelLoopCommand() {
 	loopLabel = 0;
 }
 
+// // //
+void Music::parseRemoteCodeCommand() {
+	using namespace AMKd::MML::Lexer;
+
+	if (targetAMKVersion < 2)
+		error("Remote code commands requires #amk 2 or above.");
+
+	if (channelDefined) {						// A channel's been defined, we're parsing a remote 
+		auto param = GetParameters<Int, Comma, SInt>(mml_);		// // //
+		if (!param)
+			error("Error parsing remote code setup.");
+
+		int i = param.get<0>();
+		int j = param.get<1>();
+		int k = 0;
+		if (j == AMKd::Binary::CmdOptionFC::Sustain || j == AMKd::Binary::CmdOptionFC::Release) {
+			if (!GetParameters<Comma>(mml_))
+				error("Error parsing remote code setup. Missing the third argument.");
+			if (auto len = GetParameters<Byte>(mml_))
+				k = len.get<0>();
+			else if (auto len2 = GetParameters<Dur>(mml_)) {		// // //
+				k = getRawTicks(len2.get<0>());
+				if (k > 0x100)
+					error("Note length specified was too large.");		// // //
+				else if (k == 0x100)
+					k = 0;
+			}
+			else
+				error("Error parsing remote code setup.");
+		}
+
+		if (!GetParameters<Sep<')'>, Sep<'['>>(mml_))
+			error("Error parsing remote code setup.");
+
+		tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
+		if (loopPointers.find(i) == loopPointers.cend())		// // //
+			loopPointers.insert({i, static_cast<uint16_t>(-1)});
+		append(AMKd::Binary::CmdType::Callback, loopPointers[i] & 0xFF, loopPointers[i] >> 8, j, k);
+		return;
+	}
+
+	int i = getInt();		// // // We're outside of a channel, this is a remote call definition.
+	if (i == -1)
+		error("Error parsing remote code definition.");
+	if (skipSpaces(), !trimChar(')'))		// // //
+		error("Error parsing remote code definition.");
+	if (trimChar('['))		// // //
+		error("Error parsing remote code definition; the definition was missing.");
+
+	loopLabel = i;		// // //
+	inRemoteDefinition = true;
+	return parseLoopCommand();
+}
+
 void Music::parseLoopCommand() {
-	if (inNormalLoop)		// // //
-		error("You cannot nest standard [ ] loops.");
-	synchronizeStates();		// // //
-
 	prevLoop = static_cast<uint16_t>(tracks[CHANNELS].data.size());		// // //
-
-	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
-	channel = CHANNELS;					// So we have to back up the current channel.
-	inNormalLoop = true;		// // //
-	tracks[CHANNELS].instrument = tracks[prevChannel].instrument;		// // //
-	if (songTargetProgram == Target::AM4)
-		tracks[CHANNELS].ignoreTuning = tracks[prevChannel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
-
-	if (loopLabel > 0 && loopPointers.find(loopLabel) != loopPointers.cend())		// // //
-		error("Label redefinition.");
-
-	if (loopLabel > 0)
+	if (loopLabel > 0) {
+		if (loopPointers.find(loopLabel) != loopPointers.cend())		// // //
+			error("Label redefinition.");
 		loopPointers[loopLabel] = prevLoop;
+	}
 
 	doLoopEnter();
 }
@@ -701,8 +677,6 @@ void Music::parseErrorLoopCommand() {
 }
 
 void Music::parseLoopEndCommand() {
-	if (!inNormalLoop)		// // //
-		error("Loop end found outside of a loop.");
 	synchronizeStates();		// // //
 
 	int i = getInt();		// // //
@@ -715,7 +689,6 @@ void Music::parseLoopEndCommand() {
 
 	append(0);
 	channel = prevChannel;
-	inNormalLoop = false;		// // //
 
 	doLoopExit(i);
 
@@ -775,15 +748,13 @@ void Music::parseVibratoCommand() {
 }
 
 void Music::parseTripletOpenDirective() {
-	if (triplet)		// // //
+	if (std::exchange(tracks[channel].inTriplet, true))		// // //
 		error("Triplet on directive found within a triplet block.");
-	triplet = true;
 }
 
 void Music::parseTripletCloseDirective() {
-	if (!triplet)		// // //
+	if (!std::exchange(tracks[channel].inTriplet, false))		// // //
 		error("Triplet off directive found outside of a triplet block.");
-	triplet = false;
 }
 
 void Music::parseRaiseOctaveDirective() {
@@ -1468,60 +1439,6 @@ void Music::parseInstrumentDefinitions() {
 			instrumentData.push_back(static_cast<uint8_t>(i));		// // //
 		}
 	}
-
-	/*
-	enum parseState
-	{
-		lookingForOpenBrace,
-		lookingForAnything,
-		lookingForDollarSign,
-		lookingForOpenQuote,
-		gettingName,
-		gettingValue,
-	};
-
-	parseState state = lookingForOpenBrace;
-
-	//unsigned char temp;
-	int count = 0;
-
-	while (pos < text.length()) {
-		switch (state) {
-		case lookingForOpenBrace:
-			if (isspace(peek())) break;
-			if (peek() != '{')
-				error("Could not find opening curly brace in instrument definition.");
-			state = lookingForDollarSign;
-			break;
-		case lookingForDollarSign:
-			if (peek() == '\n')
-				count = 0;
-			if (isspace(peek())) break;
-			if (peek() == '$') {
-				if (count == 6) error("Invalid number of arguments for instrument.  Total number of bytes must be a multiple of 6.");
-				state = gettingValue;
-				break;
-			}
-			if (peek() == '}') {
-				if (count != 0)
-					error("Invalid number of arguments for instrument.  Total number of bytes must be a multiple of 6.");
-				skipChars(1);
-				return;
-			}
-
-			error("Error parsing instrument definition.");
-			break;
-		case gettingValue:
-			int val = getHex();
-			if (val == -1 || val > 255) error("Error parsing instrument definition.");
-			instrumentData.push_back(val);
-			state = lookingForDollarSign;
-			count++;
-			break;
-		}
-		skipChars(1);
-	}
-	*/
 }
 
 void Music::parseSampleDefinitions() {
@@ -1641,11 +1558,11 @@ int Music::getRawTicks(const AMKd::MML::Duration &dur) const {
 }
 
 int Music::getFullTicks(const AMKd::MML::Duration &dur) const {
-	return checkTickFraction(dur.GetTicks(tracks[channel].l.Get()) / tempoRatio * (triplet ? 2. / 3. : 1.));
+	return checkTickFraction(dur.GetTicks(tracks[channel].l.Get()) / tempoRatio * (tracks[channel].inTriplet ? 2. / 3. : 1.));
 }
 
 int Music::getLastTicks(const AMKd::MML::Duration &dur) const {
-	return checkTickFraction(dur.GetLastTicks(tracks[channel].l.Get()) / tempoRatio * (triplet ? 2. / 3. : 1.));
+	return checkTickFraction(dur.GetLastTicks(tracks[channel].l.Get()) / tempoRatio * (tracks[channel].inTriplet ? 2. / 3. : 1.));
 }
 
 int Music::checkTickFraction(double ticks) const {
@@ -1952,14 +1869,10 @@ void Music::parseSPCInfo() {
 }
 
 void Music::addNoteLength(double ticks) {
-	if (extraLoopIsNormal)
-		normalLoopLength += ticks;
-	else if (extraLoopIsSuper)
-		superLoopLength += ticks;
-	else if (baseLoopIsNormal)
-		normalLoopLength += ticks;
-	else if (baseLoopIsSuper)
-		superLoopLength += ticks;
+	if (loopState2 != LoopType::none)		// // //
+		(loopState2 == LoopType::sub ? superLoopLength : normalLoopLength) += ticks;
+	else if (loopState1 != LoopType::none)
+		(loopState1 == LoopType::sub ? superLoopLength : normalLoopLength) += ticks;
 	else
 		tracks[channel].channelLength += ticks;		// // //
 }
@@ -2059,9 +1972,9 @@ void Music::doNote(int note, int fullTicks, int bendTicks, bool nextPorta) {
 			}
 	};
 
-	if (inPitchSlide)
+	if (tracks[channel].inPitchSlide)		// // //
 		append(AMKd::Binary::CmdType::Portamento, 0x00, tracks[channel].lastDuration, note);		// // //
-	inPitchSlide = nextPorta;
+	tracks[channel].inPitchSlide = nextPorta;
 	flushNote(note, flatTicks);
 	flushNote(note, bendTicks);
 }
@@ -2112,7 +2025,6 @@ void Music::doEnvelope(int ad, int sr) {
 
 void Music::doTempo(int speed) {
 	tempo = requires(divideByTempoRatio(speed, false), 0x01, 0xFF, "Tempo has been zeroed out by #halvetempo");		// // //
-	tempoDefined = true;
 	append(AMKd::Binary::CmdType::Tempo, tempo);		// // //
 
 	if (inNormalLoop || inE6Loop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
@@ -2128,30 +2040,38 @@ void Music::doSampleLoad(int id, int mult) {
 }
 
 void Music::doLoopEnter() {
+	synchronizeStates();		// // //
+	if (std::exchange(inNormalLoop, true))		// // //
+		error("You cannot nest standard [ ] loops.");
+
 	normalLoopLength = 0;
-	if (inE6Loop) {					// We're entering a normal loop that's nested in a super loop
-		baseLoopIsNormal = false;
-		baseLoopIsSuper = true;
-		extraLoopIsNormal = true;
-		extraLoopIsSuper = false;
+
+	if (inE6Loop) {					// We're entering a normal loop that's nested in a subloop
+		loopState1 = LoopType::sub;		// // //
+		loopState2 = LoopType::normal;
 	}
 	else {						// We're entering a normal loop that's not nested
-		baseLoopIsNormal = true;
-		baseLoopIsSuper = false;
-		extraLoopIsNormal = false;
-		extraLoopIsSuper = false;
+		loopState1 = LoopType::normal;
+		loopState2 = LoopType::none;
 	}
+
+	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
+	channel = CHANNELS;					// So we have to back up the current channel.
+	tracks[CHANNELS].instrument = tracks[prevChannel].instrument;		// // //
+	if (songTargetProgram == Target::AM4)
+		tracks[CHANNELS].ignoreTuning = tracks[prevChannel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
 }
 
 void Music::doLoopExit(int loopCount) {
-	if (extraLoopIsNormal) {				// We're leaving a normal loop that's nested in a super loop.
-		extraLoopIsNormal = false;
-		extraLoopIsSuper = false;
+	if (!std::exchange(inNormalLoop, false))		// // //
+		error("Loop end found outside of a loop.");
+
+	if (loopState2 == LoopType::normal) {				// We're leaving a normal loop that's nested in a subloop.
+		loopState2 = LoopType::none;
 		superLoopLength += normalLoopLength * loopCount;
 	}
-	else if (baseLoopIsNormal) {			// We're leaving a normal loop that's not nested.
-		baseLoopIsNormal = false;
-		baseLoopIsSuper = false;
+	else if (loopState1 == LoopType::normal) {			// We're leaving a normal loop that's not nested.
+		loopState1 = LoopType::none;
 		tracks[channel].channelLength += normalLoopLength * loopCount;		// // //
 	}
 
@@ -2166,44 +2086,35 @@ void Music::doLoopRemoteCall(int loopCount, uint16_t loopAdr) {
 }
 
 void Music::doSubloopEnter() {
-	if (inE6Loop)		// // //
-		error("You cannot nest a subloop within another subloop.");
-	inE6Loop = true;
-
 	synchronizeStates();		// // //
+	if (std::exchange(inE6Loop, true))		// // //
+		error("You cannot nest a subloop within another subloop.");
+
 	superLoopLength = 0;
 
-	if (inNormalLoop) {		// // // We're entering a super loop that's nested in a normal loop
-		baseLoopIsNormal = true;
-		baseLoopIsSuper = false;
-		extraLoopIsNormal = false;
-		extraLoopIsSuper = true;
+	if (inNormalLoop) {		// // // We're entering a subloop that's nested in a normal loop
+		loopState1 = LoopType::normal;		// // //
+		loopState2 = LoopType::sub;
 	}
-	else {						// We're entering a super loop that's not nested
-		baseLoopIsNormal = false;
-		baseLoopIsSuper = true;
-		extraLoopIsNormal = false;
-		extraLoopIsSuper = false;
+	else {						// We're entering a subloop that's not nested
+		loopState1 = LoopType::sub;
+		loopState2 = LoopType::none;
 	}
 
 	append(AMKd::Binary::CmdType::Subloop, 0x00);		// // //
 }
 
 void Music::doSubloopExit(int loopCount) {
-	if (!inE6Loop)		// // //
-		error("A subloop end was found outside of a subloop.");
-	inE6Loop = false;
-
 	synchronizeStates();		// // //
+	if (!std::exchange(inE6Loop, false))		// // //
+		error("A subloop end was found outside of a subloop.");
 
-	if (extraLoopIsSuper) {				// We're leaving a super loop that's nested in a normal loop.
-		extraLoopIsNormal = false;
-		extraLoopIsSuper = false;
+	if (loopState2 == LoopType::sub) {				// We're leaving a subloop that's nested in a normal loop.
+		loopState2 = LoopType::none;
 		normalLoopLength += superLoopLength * loopCount;
 	}
-	else if (baseLoopIsSuper) {			// We're leaving a super loop that's not nested.
-		baseLoopIsNormal = false;
-		baseLoopIsSuper = false;
+	else if (loopState1 == LoopType::sub) {			// We're leaving a subloop that's not nested.
+		loopState1 = LoopType::none;
 		tracks[channel].channelLength += superLoopLength * loopCount;		// // //
 	}
 
