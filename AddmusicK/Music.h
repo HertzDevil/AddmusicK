@@ -168,7 +168,7 @@ public:		// // //
 	std::vector<unsigned short> mySamples;
 	size_t totalSize;		// // //
 	size_t minSize;		// // //
-	int spaceForPointersAndInstrs;
+	int instrumentPos;		// // //
 	int echoBufferSize;
 	bool hasYoshiDrums;
 

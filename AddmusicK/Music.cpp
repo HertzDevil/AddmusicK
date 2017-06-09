@@ -120,7 +120,6 @@ void Music::append(Args&&... value) {
 Music::Music() {
 	knowsLength = false;
 	totalSize = 0;
-	spaceForPointersAndInstrs = 0;
 	echoBufferSize = 0;
 }
 
@@ -1501,6 +1500,11 @@ void Music::pointersFirstPass() {
 				mySamples[z] = static_cast<uint16_t>(emptySampleIndex);		// // //
 	}
 
+	const auto insertPtr = [this] (unsigned adr) {		// // //
+		allPointersAndInstrs.push_back(static_cast<uint8_t>(adr));
+		allPointersAndInstrs.push_back(static_cast<uint8_t>(adr >> 8));
+	};
+
 	int binpos = 0;		// // //
 	for (size_t i = 0; i < CHANNELS; ++i) {
 		if (!tracks[i].data.empty())
@@ -1508,59 +1512,29 @@ void Music::pointersFirstPass() {
 		tracks[i].phrasePointers[1] += tracks[i].phrasePointers[0];
 		binpos += tracks[i].data.size();
 	}
-	// // //
-	spaceForPointersAndInstrs = 20;
 
+	int headerSize = 20 + (hasIntro ? 18 : 0) + (doesntLoop ? 0 : 2) + instrumentData.size();		// // //
+	instrumentPos = (hasIntro ? 4 : 2) + (doesntLoop ? 2 : 4);		// // //
+
+	insertPtr(instrumentPos + instrumentData.size());		// // //
 	if (hasIntro)
-		spaceForPointersAndInstrs += 18;
-	if (!doesntLoop)
-		spaceForPointersAndInstrs += 2;
-
-	spaceForPointersAndInstrs += instrumentData.size();
-
-	allPointersAndInstrs.resize(spaceForPointersAndInstrs);
-	//for (i = 0; i < spaceForPointers; i++) allPointers[i] = 0x55;
-
-	int add = (hasIntro ? 2 : 0) + (doesntLoop ? 0 : 2) + 4;
-
-	//memcpy(allPointersAndInstrs.data() + add, instrumentData.base, instrumentData.size());
-	for (size_t z = 0, n = instrumentData.size(); z < n; ++z)		// // //
-		allPointersAndInstrs[add + z] = instrumentData[z];
-
-	assign_short(allPointersAndInstrs.begin(), add + instrumentData.size());		// // //
-
-	/*
-	FFFF -> 00, 00
-	FFFE -> FF, 00
-	FFFD -> 0002 + ARAMPos
-	FFFC -> ARAMPos
-	*/
-	if (doesntLoop)		// // //
-		assign_short(allPointersAndInstrs.begin() + add - 2, 0xFFFF);
+		insertPtr(instrumentPos + instrumentData.size() + 16);
+	if (doesntLoop)
+		insertPtr(0xFFFF); // 00 00
 	else {
-		assign_short(allPointersAndInstrs.begin() + add - 4, 0xFFFE);
-		assign_short(allPointersAndInstrs.begin() + add - 2, hasIntro ? 0xFFFD : 0xFFFC);
+		insertPtr(0xFFFE); // FF 00
+		insertPtr(hasIntro ? 0x0002 : 0x0000); // pointer to frame at loop point
 	}
+	allPointersAndInstrs.insert(allPointersAndInstrs.cend(), instrumentData.cbegin(), instrumentData.cend());
+	for (size_t i = 0; i < CHANNELS; ++i)		// // //
+		insertPtr(tracks[i].data.empty() ? 0xFFFF : (tracks[i].phrasePointers[0] + headerSize));
 	if (hasIntro)
-		assign_short(allPointersAndInstrs.begin() + 2, add + instrumentData.size() + 16);		// // //
+		for (size_t i = 0; i < CHANNELS; ++i)		// // //
+			insertPtr(tracks[i].data.empty() ? 0xFFFF : (tracks[i].phrasePointers[1] + headerSize));
 
-	add += instrumentData.size();
-	for (size_t i = 0; i < CHANNELS; ++i) {		// // //
-		auto adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[0] + spaceForPointersAndInstrs);
-		assign_short(allPointersAndInstrs.begin() + i * 2 + add, adr);		// // //
-	}
-
-	if (hasIntro) {
-		for (size_t i = 0; i < CHANNELS; ++i) {		// // //
-			auto adr = tracks[i].data.empty() ? 0xFFFB : (tracks[i].phrasePointers[1] + spaceForPointersAndInstrs);
-			assign_short(allPointersAndInstrs.begin() + i * 2 + 16 + add, adr);		// // //
-		}
-	}
-
-	totalSize = spaceForPointersAndInstrs + tracks[CHANNELS].data.size() + getDataSize();		// // //
+	totalSize = headerSize + tracks[CHANNELS].data.size() + getDataSize();		// // //
 
 	//if (tempo == -1) tempo = 0x36;
-	unsigned int totalLength;
 	mainLength = static_cast<unsigned>(-1);		// // //
 	for (size_t i = 0; i < CHANNELS; i++)
 		if (tracks[i].channelLength != 0)		// // //
@@ -1568,8 +1542,7 @@ void Music::pointersFirstPass() {
 	if (static_cast<int>(mainLength) == -1)
 		error("This song doesn't seem to have any data.");		// // //
 
-	totalLength = mainLength;
-
+	unsigned totalLength = mainLength;		// // //
 	if (hasIntro)
 		mainLength -= introLength;
 
@@ -1578,14 +1551,11 @@ void Music::pointersFirstPass() {
 		bool onL1 = true;
 
 		std::sort(tempoChanges.begin(), tempoChanges.end());		// // //
-		if (tempoChanges.empty() || tempoChanges[0].first != 0) {
+		if (tempoChanges.empty() || tempoChanges[0].first != 0)
 			tempoChanges.insert(tempoChanges.begin(), std::make_pair(0., 0x36)); // Stick the default tempo at the beginning if necessary.
-		}
-
 		tempoChanges.emplace_back(totalLength, 0);		// // // Add in a dummy tempo change at the very end.
 
-		for (size_t z = 0, n = tempoChanges.size() - 1; z < n; ++z)		// // //
-		{
+		for (size_t z = 0, n = tempoChanges.size() - 1; z < n; ++z) {		// // //
 			if (tempoChanges[z].first > totalLength) {
 				warn("A tempo change was found beyond the end of the song.");		// // //
 				break;
@@ -1595,10 +1565,7 @@ void Music::pointersFirstPass() {
 				onL1 = false;
 
 			double difference = tempoChanges[z + 1].first - tempoChanges[z].first;
-			if (onL1)
-				l1 += difference / (2 * std::abs(tempoChanges[z].second));
-			else
-				l2 += difference / (2 * std::abs(tempoChanges[z].second));
+			(onL1 ? l1 : l2) += difference / (2 * std::abs(tempoChanges[z].second));
 		}
 
 		if (hasIntro) {
@@ -1629,7 +1596,7 @@ void Music::pointersFirstPass() {
 		std::cout << '\t';		// // //
 		for (size_t i = 0; i < CHANNELS / 2; ++i)
 			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].data.size() << ' ';
-		std::cout << "Ptrs+Instrs: 0x" << hex3 << spaceForPointersAndInstrs << "\n\t";
+		std::cout << "Ptrs+Instrs: 0x" << hex3 << headerSize << "\n\t";
 		for (size_t i = CHANNELS / 2; i < CHANNELS; ++i)
 			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].data.size() << ' ';
 		std::cout << "Loop:        0x" << hex3 << tracks[CHANNELS].data.size();
@@ -1648,7 +1615,7 @@ void Music::pointersFirstPass() {
 	for (size_t i = 0; i < CHANNELS; ++i)		// // //
 		statStrStream << "CHANNEL " << ('0' + i) << " SIZE:				0x" << hex4 << tracks[i].data.size() << "\n";
 	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << tracks[CHANNELS].data.size() << "\n";
-	statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << spaceForPointersAndInstrs << "\n";
+	statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << headerSize << "\n";
 	statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
 	statStrStream << "ECHO SIZE:				0x" << hex4 << (echoBufferSize << 11) << "\n";
 	statStrStream << "SONG TOTAL DATA SIZE:			0x" << hex4 << totalSize << "\n";		// // //
@@ -1686,7 +1653,7 @@ void Music::adjustLoopPointers() {
 	for (Track &t : tracks) {		// // //
 		for (unsigned short x : t.loopLocations) {
 			int temp = (t.data[x] & 0xFF) | (t.data[x + 1] << 8);
-			assign_short(t.data.begin() + x, temp + posInARAM + normalChannelsSize + spaceForPointersAndInstrs);		// // //
+			assign_short(t.data.begin() + x, temp + posInARAM + normalChannelsSize + allPointersAndInstrs.size());		// // //
 		}
 	}
 }
@@ -1954,10 +1921,10 @@ void Music::doLoopEnter() {
 	}
 
 	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
-	channel = CHANNELS;					// So we have to back up the current channel.
-	tracks[CHANNELS].instrument = tracks[prevChannel].instrument;		// // //
+	tracks[CHANNELS].instrument = tracks[channel].instrument;		// // //
 	if (songTargetProgram == Target::AM4)
-		tracks[CHANNELS].ignoreTuning = tracks[prevChannel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
+		tracks[CHANNELS].ignoreTuning = tracks[channel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
+	channel = CHANNELS;					// So we have to back up the current channel.
 }
 
 void Music::doLoopExit(int loopCount) {

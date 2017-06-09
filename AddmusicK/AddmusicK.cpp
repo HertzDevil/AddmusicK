@@ -779,34 +779,19 @@ void fixMusicPointers() {
 			addedLocalPtr = true;
 		}
 
-		int untilJump = -1;
-
-		for (int j = 0; j < musics[i].spaceForPointersAndInstrs; j += 2) {
-			if (untilJump == 0) {
+		for (int j = 0, n = musics[i].allPointersAndInstrs.size(); j < n; j += 2) {		// // //
+			if (j == musics[i].instrumentPos)		// // //
 				j += musics[i].instrumentData.size();
-				untilJump = -1;
-			}
 
 			auto it = musics[i].allPointersAndInstrs.begin() + j;		// // //
 			int temp = *it | (*(it + 1) << 8);
 
-			if (temp == 0xFFFF) {		// 0xFFFF = swap with 0x0000.
+			if (temp == 0xFFFF)		// 0xFFFF = swap with 0x0000.
 				assign_short(it, 0);		// // //
-				untilJump = 1;
-			}
-			else if (temp == 0xFFFE) {	// 0xFFFE = swap with 0x00FF.
+			else if (temp == 0xFFFE)	// 0xFFFE = swap with 0x00FF.
 				assign_short(it, 0x00FF);		// // //
-				untilJump = 2;
-			}
-			else if (temp == 0xFFFD)	// 0xFFFD = swap with the song's position (its first track pointer).
-				assign_short(it, musics[i].posInARAM + 2);		// // //
-			else if (temp == 0xFFFC)	// 0xFFFC = swap with the song's position + 2 (its second track pointer).
-				assign_short(it, musics[i].posInARAM);		// // //
-			else if (temp == 0xFFFB)	// 0xFFFB = swap with 0x0000, but don't set untilSkip.
-				assign_short(it, 0);		// // //
 			else
-				assign_short(it, temp += musics[i].posInARAM);		// // //
-			untilJump--;
+				assign_short(it, temp + musics[i].posInARAM);		// // //
 		}
 
 		musics[i].adjustLoopPointers();		// // //
