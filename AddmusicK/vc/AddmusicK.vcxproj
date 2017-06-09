@@ -178,7 +178,7 @@
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp" />
     <ClCompile Include="..\globals.cpp" />
     <ClCompile Include="..\MML\Duration.cpp" />
-    <ClCompile Include="..\MML\Lexer.cpp" />
+    <ClCompile Include="..\MML\Lexers\Core.cpp" />
     <ClCompile Include="..\MML\Preprocessor.cpp" />
     <ClCompile Include="..\MML\SourceFile.cpp" />
     <ClCompile Include="..\Music.cpp" />

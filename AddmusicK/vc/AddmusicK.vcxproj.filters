@@ -31,6 +31,9 @@
     <Filter Include="Header Files\MML\Lexers">
       <UniqueIdentifier>{435aa14c-3e4e-439b-9664-cac487d324c0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\MML\Lexers">
+      <UniqueIdentifier>{607c2673-b4fe-4f93-8451-9ccf97b85467}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="D:\C++\lodepng\lodepng.h">
@@ -122,9 +125,6 @@
     <ClCompile Include="..\asardll.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\MML\Lexer.cpp">
-      <Filter>Source Files\MML</Filter>
-    </ClCompile>
     <ClCompile Include="..\MML\SourceFile.cpp">
       <Filter>Source Files\MML</Filter>
     </ClCompile>
@@ -133,6 +133,9 @@
     </ClCompile>
     <ClCompile Include="..\MML\Duration.cpp">
       <Filter>Source Files\MML</Filter>
+    </ClCompile>
+    <ClCompile Include="..\MML\Lexers\Core.cpp">
+      <Filter>Source Files\MML\Lexers</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -4,6 +4,7 @@
 #include <fstream>
 #include <vector>
 #include <iomanip>
+#include <algorithm>		// // //
 // // //
 #include "../AM405Remover/AM405Remover.h"
 #include <cstdint>
@@ -544,7 +545,7 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 				fatalError("Invalid sound effect index.", SFX_LIST, list.GetLineNumber());
 			int index = param.get<0>();
 
-			bool isPointer = list.Trim('*').has_value();
+			bool isPointer = list.Trim('*');
 			bool add0 = !isPointer && !list.Trim('?');
 			auto name = (list.SkipSpaces(), list.Trim("[^\\r\\n]+"));
 			if (!name)

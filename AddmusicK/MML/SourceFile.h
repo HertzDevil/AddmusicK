@@ -31,7 +31,7 @@ public:
 	SourceFile &operator=(SourceFile &&other);
 
 	std::optional<std::string> Trim(std::string_view re, bool ignoreCase = false);
-	std::optional<std::string> Trim(char re);
+	bool Trim(char re);
 	int Peek() const;		// // //
 	bool SkipSpaces(); // true if at least one character is skipped
 

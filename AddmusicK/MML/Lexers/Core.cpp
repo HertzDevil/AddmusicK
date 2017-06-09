@@ -1,4 +1,4 @@
-#include "Lexers/Core.h"
+#include "Core.h"
 #include <cerrno>
 #include <regex>
 #include <cmath>
@@ -32,11 +32,8 @@ LEXER_FUNC_START(Lexer::SInt)
 LEXER_FUNC_END()
 
 LEXER_FUNC_START(Lexer::Byte)
-	if (auto x = file.Trim("\\$[[:xdigit:]]{2}")) {
-		auto ret = static_cast<arg_type>(std::strtoul(x->c_str() + 1, nullptr, 16));
-		if (errno != ERANGE)
-			return ret;
-	}
+	if (auto x = file.Trim("\\$[[:xdigit:]]{2}"))
+		return static_cast<arg_type>(std::strtoul(x->c_str() + 1, nullptr, 16));
 LEXER_FUNC_END()
 
 LEXER_FUNC_START(Lexer::Ident)
@@ -76,24 +73,21 @@ LEXER_FUNC_START(Lexer::Dur)
 	double lastMult = 0.;
 	double lastAdd = 0.;
 	using namespace Lexer;
-
+	
 	do {
-		if (GetParameters<Sep<'='>>(file))
-			if (auto param = GetParameters<Int>(file)) {
-				lastMult = 0.;
-				add += (lastAdd = param.get<0>());
-			}
-			else
-				return std::nullopt;
+		if (auto param = GetParameters<Sep<'='>, Int>(file)) {
+			lastMult = 0.;
+			add += (lastAdd = param.get<0>());
+		}
 		else {
-			auto param = GetParameters<Int>(file);
+			auto param2 = GetParameters<Int>(file);
 			int dots = 0;
 			while (GetParameters<Sep<'.'>>(file))
 				++dots;
 			double factor = 2. - std::pow(.5, dots);
 
-			if (param)
-				if (auto len = param.get<0>()) {
+			if (param2)
+				if (auto len = param2.get<0>()) {
 					lastMult = 0.;
 					add += (lastAdd = Duration::WHOLE_NOTE_TICKS * factor / len);
 				}
@@ -117,22 +111,19 @@ LEXER_FUNC_START(Lexer::RestDur)
 	using namespace Lexer;
 
 	do {
-		if (GetParameters<Sep<'='>>(file))
-			if (auto param = GetParameters<Int>(file)) {
-				lastMult = 0.;
-				add += (lastAdd = param.get<0>());
-			}
-			else
-				return std::nullopt;
+		if (auto param = GetParameters<Sep<'='>, Int>(file)) {
+			lastMult = 0.;
+			add += (lastAdd = param.get<0>());
+		}
 		else {
-			auto param = GetParameters<Int>(file);
+			auto param2 = GetParameters<Int>(file);
 			int dots = 0;
 			while (GetParameters<Sep<'.'>>(file))
 				++dots;
 			double factor = 2. - std::pow(.5, dots);
 
-			if (param)
-				if (auto len = param.get<0>()) {
+			if (param2)
+				if (auto len = param2.get<0>()) {
 					lastMult = 0.;
 					add += (lastAdd = Duration::WHOLE_NOTE_TICKS * factor / len);
 				}
@@ -150,12 +141,21 @@ LEXER_FUNC_START(Lexer::RestDur)
 
 LEXER_FUNC_START(Lexer::Acc)
 	Accidental s;
-	s.neutral = file.Trim('_').has_value();
+	s.neutral = file.Trim('_');
 	for (char ch : *file.Trim("[+-]{0,3}"))
 //	for (char ch : *file.Trim("[+-]*"))
 		s.offset += ch == '+' ? 1 : -1;
 	return s;
 }
+
+LEXER_FUNC_START(Lexer::Chan)
+	if (auto param = file.Trim("[0-7]+")) {
+		std::bitset</*CHANNELS*/ 8> ret;
+		for (char ch : *param)
+			ret[ch - '0'] = true;
+		return ret;
+	}
+LEXER_FUNC_END()
 
 #undef LEXER_DECL
 #undef LEXER_FUNC_START

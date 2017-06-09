@@ -141,7 +141,15 @@ private:
 	void parseRest();
 
 	void parseOptionDirective();
-	
+
+	// // //
+	void parseSMWVTable();
+	void parseNSPCVTable();
+	void parseTempoImmunity();
+	void parseNoLoop();
+	void parseDivideTempo();
+	void parseHalveTempo();
+
 	void parseSpecialDirective();
 	void parseInstrumentDefinitions();
 	void parseSampleDefinitions();
@@ -178,24 +186,11 @@ private:
 	template <typename... Args>		// // //
 	void append(Args&&... value);
 
-	bool trimChar(char c);		// // //
-	bool trimDirective(std::string_view str);		// // //
-	void skipSpaces();		// // //
-
-	bool hasNextToken();		// // //
-	int peek();		// // //
-
-	int getInt();
-	int getIntWithNegative();
-	int getHex();		// // //
-	bool getHexByte(int &out);		// // //
 	int getPitch(int j);
 	int getRawTicks(const AMKd::MML::Duration &dur) const;		// // //
 	int getFullTicks(const AMKd::MML::Duration &dur) const;		// // //
 	int getLastTicks(const AMKd::MML::Duration &dur) const;		// // //
 	int checkTickFraction(double ticks) const;		// // //
-	std::string getIdentifier();		// // //
-	std::string getEscapedString();		// // //
 
 	[[noreturn]] void fatalError(const std::string &str);		// // //
 

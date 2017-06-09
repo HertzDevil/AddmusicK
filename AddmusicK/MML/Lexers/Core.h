@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <tuple>
 #include <utility>
 #include <initializer_list>
@@ -22,11 +23,21 @@ struct LexerResult
 {
 	using tuple_type = std::tuple<Args...>;
 	std::optional<tuple_type> result;
+	constexpr tuple_type &operator*() & {
+		return *result;
+	}
 	constexpr const tuple_type &operator*() const & {
 		return *result;
 	}
 	constexpr tuple_type &&operator*() && {
 		return std::move(*result);
+	}
+	constexpr auto operator->() const &noexcept {
+		return &std::get<0>(*result);
+	}
+	template <std::size_t N>
+	constexpr auto &get() &noexcept {
+		return std::get<N>(*result);
 	}
 	template <std::size_t N>
 	constexpr const auto &get() const &noexcept {
@@ -170,7 +181,7 @@ GetParameters(SourceFile &file) {
 LEXER_DECL(Int, unsigned)
 LEXER_DECL(HexInt, unsigned)
 LEXER_DECL(SInt, int)
-LEXER_DECL(Byte, unsigned)
+LEXER_DECL(Byte, uint8_t)
 LEXER_DECL(Ident, std::string)
 LEXER_DECL(String, std::string)
 LEXER_DECL(QString, std::string)
@@ -178,19 +189,33 @@ LEXER_DECL(Time, unsigned)
 LEXER_DECL(Dur, Duration)
 LEXER_DECL(RestDur, Duration) // variant supporting 'r', will be removed when Music::Actions can merge
 LEXER_DECL(Acc, Accidental)
+LEXER_DECL(Chan, std::bitset</*CHANNELS*/ 8>)
 
-template <char C>
+template <char... Cs>
 struct Sep
 {
-	using arg_type = char;
-	std::optional<arg_type> operator()(SourceFile &file) {
+	using arg_type = char; // bool;
+
+private:
+	std::optional<arg_type> call_impl(SourceFile &file, std::index_sequence<>) = delete;
+	template <char C, std::size_t I>
+	std::optional<arg_type> call_impl(SourceFile &file, std::index_sequence<I>) {
 		if (file.Trim(C))
 			return C;
 		return std::nullopt;
 	}
+	template <char C, char... Cs_, std::size_t I, std::size_t... Is>
+	std::optional<arg_type> call_impl(SourceFile &file, std::index_sequence<I, Is...>) {
+		return !file.Trim(C) ? std::nullopt : call_impl<Cs_...>(file, std::index_sequence<Is...> { });
+	}
+
+public:
+	std::optional<arg_type> operator()(SourceFile &file) {
+		return call_impl<Cs...>(file, std::make_index_sequence<sizeof...(Cs)> { });
+	}
 };
-template <char C>
-struct Bypass<Sep<C>> : std::true_type { };
+template <char... Cs>
+struct Bypass<Sep<Cs...>> : std::true_type { };
 using Comma = Sep<','>;
 BYPASS_DECL(Comma);
 

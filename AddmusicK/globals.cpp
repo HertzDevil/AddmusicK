@@ -75,6 +75,9 @@ time_t getTimeStamp(const fs::path &file) {
 void printError(const std::string &error, const std::string &fileName, int line) {
 	printWarning(error, fileName, line);		// // //
 	++errorCount;
+#ifdef _DEBUG
+	_CrtDbgBreak();
+#endif
 }
 
 void printWarning(const std::string &error, const std::string &fileName, int line) {

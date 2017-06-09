@@ -74,16 +74,14 @@ std::optional<std::string> SourceFile::Trim(std::string_view re, bool ignoreCase
 	return z;
 }
 
-std::optional<std::string> SourceFile::Trim(char re) {
-	std::optional<std::string> z;
-
+bool SourceFile::Trim(char re) {
 	prev_ = sv_;
 	if (!sv_.empty() && sv_.front() == re) {
-		z = std::string(1, re);
 		sv_.remove_prefix(1);
+		return true;
 	}
 
-	return z;
+	return false;
 }
 
 int SourceFile::Peek() const {

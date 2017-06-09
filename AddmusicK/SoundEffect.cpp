@@ -4,6 +4,7 @@
 #include "Binary/Defines.h"		// // //
 #include <sstream>
 #include <iomanip>
+#include <algorithm>		// // //
 
 static unsigned int pos;
 static int line;

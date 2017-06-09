@@ -63,7 +63,7 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 					if (auto ident = Ident()(row))
 						if (*ident == "define") {
 							auto param = GetParameters<Ident, Option<SInt>>(row);
-							param ? doDirective(&Preprocessor::doDefine, param.get<0>(), param.get<1>() ? *param.get<1>() : 1) :
+							param ? doDirective(&Preprocessor::doDefine, param.get<0>(), param.get<1>().value_or(1)) :
 								throw AMKd::Utility::SyntaxException {MISSING("#define")};
 						}
 						else if (*ident == "undef") {
