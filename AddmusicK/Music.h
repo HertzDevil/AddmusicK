@@ -7,6 +7,7 @@
 #include "MML/SourceFile.h"		// // //
 #include "Music/SongBase.h"		// // //
 #include "MML/Duration.h"		// // //
+#include "Music/Track.h"		// // //
 
 const size_t CHANNELS = 8;		// // //
 
@@ -22,57 +23,6 @@ struct SpaceInfo {
 	int echoBufferEndPos;
 	int echoBufferStartPos;
 
-};
-
-class TrackState		// // //
-{
-public:
-	explicit TrackState(int val = 0);
-
-	int Get() const;
-	void Update();
-	bool NeedsUpdate() const;
-	TrackState &operator=(int val);
-	TrackState &operator=(const TrackState &) = default;
-
-private:
-	int val_ = 0;
-	mutable bool update_ = true;
-};
-
-// // // eventually replace this with AMKd::Music::Track
-class Track
-{
-public:
-	friend class Music;
-
-private:
-	std::vector<uint8_t> data;		// // //
-	std::vector<uint16_t> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
-	std::vector<std::pair<uint16_t, std::vector<uint8_t>>> remoteGainInfo;		// // // holds position and remote call data for gain command conversions
-
-	double channelLength = 0.; // How many ticks are in each channel.
-	TrackState q {0x7F};		// // //
-	TrackState o {4};		// // //
-	TrackState l {8};		// // //
-	uint8_t lastDuration = 0;		// // // replaces prevNoteLength
-	int8_t h = 0;		// // //
-	bool usingH = false;		// // //
-	int instrument = 0;
-	//uint8_t lastFAGainValue = 0;
-	//uint8_t lastFADelayValue = 0;
-	//uint8_t lastFCGainValue = 0;
-	uint8_t lastFCDelayValue = 0;
-
-	unsigned short phrasePointers[2] = {0, 0}; // first 8 only
-	bool noMusic[2] = {false, false}; // first 8 only
-	bool passedIntro = false; // first 8 only
-	bool usingFA = false;
-	bool usingFC = false;
-	bool ignoreTuning = false; // Used for AM4 compatibility.  Until an instrument is explicitly declared on a channel, it must not use tuning.
-	bool isDefiningLabelLoop = false;		// // //
-	bool inPitchSlide = false;		// // //
-	bool inTriplet = false;		// // //
 };
 
 class Music : public AMKd::Music::SongBase		// // //
@@ -107,6 +57,7 @@ private:
 	void parseTransposeDirective();
 	void parseOctaveDirective();
 	void parseInstrumentCommand();
+	void parseDirectInstCommand();		// // //
 	void parseOpenParenCommand();
 	void parseLabelLoopCommand();
 	void parseRemoteCodeCommand();		// // //
@@ -170,6 +121,7 @@ private:
 	void doLowerOctave();
 	void doVolume(int vol);
 	void doGlobalVolume(int vol);
+	void doInstrument(int inst, bool add);
 	void doVibrato(int delay, int rate, int depth);
 	void doTremolo(int delay, int rate, int depth);
 	void doTremoloOff();
@@ -201,7 +153,7 @@ private:
 	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd);		// // //
 
 	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
-	void writeState(TrackState (Track::*state), int val);		// // //
+	void writeState(AMKd::Music::TrackState (AMKd::Music::Track::*state), int val);		// // //
 	void resetStates();		// // //
 	void synchronizeStates();		// // //
 
@@ -237,7 +189,7 @@ private:
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
 	AMKd::MML::SourceFile mml_;		// // //
 
-	Track tracks[CHANNELS + 1];		// // //
+	AMKd::Music::Track tracks[CHANNELS + 1];		// // //
 
 	unsigned int introLength;
 	unsigned int mainLength;

@@ -25,6 +25,9 @@
     <Filter Include="Header Files\Binary">
       <UniqueIdentifier>{7648e274-1a2c-4e2b-a8fc-d7bb2a038859}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Music">
+      <UniqueIdentifier>{17415cdb-9e45-4876-bbb8-7f07466f52be}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\MML">
       <UniqueIdentifier>{509f9eea-9ae4-4006-8ef1-9d9729218ed4}</UniqueIdentifier>
     </Filter>
@@ -62,6 +65,9 @@
     </ClInclude>
     <ClInclude Include="..\Utility\Trie.h">
       <Filter>Header Files\Utility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Music\Track.h">
+      <Filter>Header Files\Music</Filter>
     </ClInclude>
     <ClInclude Include="..\MML\SourceFile.h">
       <Filter>Header Files\MML</Filter>
@@ -105,6 +111,9 @@
     <ClInclude Include="..\MML\Lexers\Core.h">
       <Filter>Header Files\MML\Lexers</Filter>
     </ClInclude>
+    <ClInclude Include="..\Music\TrackState.h">
+      <Filter>Header Files\Music</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp">
@@ -134,8 +143,14 @@
     <ClCompile Include="..\MML\Duration.cpp">
       <Filter>Source Files\MML</Filter>
     </ClCompile>
+    <ClCompile Include="..\Music\Track.cpp">
+      <Filter>Source Files\Music</Filter>
+    </ClCompile>
     <ClCompile Include="..\MML\Lexers\Core.cpp">
       <Filter>Source Files\MML\Lexers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Music\TrackState.cpp">
+      <Filter>Source Files\Music</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

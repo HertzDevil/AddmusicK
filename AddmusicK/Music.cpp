@@ -16,6 +16,8 @@
 #include "Utility/Exception.h"		// // //
 #include <functional>
 
+using Track = AMKd::Music::Track;		// // //
+
 
 
 // // //
@@ -54,6 +56,7 @@ static void downcase(std::string &str) {
 
 static int channel, prevChannel;
 static bool inNormalLoop;		// // //
+static bool inSubLoop;			// Whether or not we're in an $E6 loop.
 
 static uint16_t prevLoop;		// // //
 static bool doesntLoop;
@@ -81,7 +84,6 @@ static int transposeMap[256];
 //static int tempLoopLength;		// How long the current [ ] loop is.
 //static int e6LoopLength;		// How long the current $E6 loop is.
 //static int previousLoopLength;	// How long the last encountered loop was.
-static bool inE6Loop;			// Whether or not we're in an $E6 loop.
 /*
 static int loopNestLevel;		// How deep we're "loop nested".
 // If this is 0, then any type of loop is allowed.
@@ -107,49 +109,12 @@ static fs::path basepath;		// // //
 
 static bool usingSMWVTable;
 
-// // // vs2017 does not have fold-expressions
-#define SWALLOW(x) do { \
-		using _swallow = int[]; \
-		(void)_swallow {0, ((x), 0)...}; \
-	} while (false)
-
-
-
-// // //
-
-TrackState::TrackState(int val) : val_(val)
-{
-}
-
-int TrackState::Get() const {
-	return val_;
-}
-
-void TrackState::Update() {
-	update_ = true;
-}
-
-bool TrackState::NeedsUpdate() const {
-	return std::exchange(update_, false);
-}
-
-TrackState &TrackState::operator=(int val) {
-//	if (val != val_)
-		Update();
-	val_ = val;
-	return *this;
-}
-
 
 
 // // //
 template <typename... Args>
 void Music::append(Args&&... value) {
-#if 0
-	(tracks[::channel].data.push_back(static_cast<uint8_t>(value)), ...);
-#else
-	SWALLOW(tracks[::channel].data.push_back(static_cast<uint8_t>(value)));
-#endif
+	tracks[::channel].append(std::forward<Args>(value)...);
 }
 
 Music::Music() {
@@ -176,7 +141,7 @@ void Music::init() {
 	//remoteDefinitionArg = 0;
 	inRemoteDefinition = false;
 	inNormalLoop = false;		// // //
-	inE6Loop = false;
+	inSubLoop = false;
 
 	superLoopLength = normalLoopLength = 0;
 
@@ -264,6 +229,7 @@ void Music::compile() {
 		cmd.Insert(">", &Music::parseRaiseOctaveDirective);
 		cmd.Insert("?", &Music::parseQMarkDirective);
 		cmd.Insert("@", &Music::parseInstrumentCommand);
+		cmd.Insert("@@", &Music::parseDirectInstCommand);
 		cmd.Insert("a", &Music::parseNoteA);
 		cmd.Insert("b", &Music::parseNoteB);
 		cmd.Insert("c", &Music::parseNoteC);
@@ -371,7 +337,8 @@ void Music::parseQMarkDirective() {
 }
 
 void Music::parseExMarkDirective() {
-	mml_.Clear();
+	if (songTargetProgram != Target::AMK)
+		mml_.Clear();
 }
 
 void Music::parseChannelDirective() {
@@ -493,42 +460,18 @@ void Music::parseOctaveDirective() {
 
 void Music::parseInstrumentCommand() {
 	using namespace AMKd::MML::Lexer;
-	bool direct = mml_.Trim('@');		// // //
-
 	if (auto param = GetParameters<Int>(mml_)) {
 		int inst = requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("instrument", "@"));
-		if (inst < 0x13 || inst >= 30 || direct) {
-			if (convert)
-				if (inst >= 0x13 && inst < 30)	// Change it to an HFD custom instrument.
-					inst = inst - 0x13 + 30;
-
-			if (optimizeSampleUsage) {
-				if (inst < 30)
-					usedSamples[instrToSample[inst]] = true;
-				else if ((inst - 30) * 6 < static_cast<int>(instrumentData.size()))		// // //
-					usedSamples[instrumentData[(inst - 30) * 6]] = true;
-				else
-					error("This custom instrument has not been defined yet.");		// // //
-			}
-
-			if (songTargetProgram == Target::AM4)		// // //
-				tracks[channel].ignoreTuning = false;
-
-			append(AMKd::Binary::CmdType::Inst, inst);		// // //
-		}
-
-		if (inst < 30)
-			if (optimizeSampleUsage)
-				usedSamples[instrToSample[inst]] = true;
-
-		//hTranspose = 0;
-		//usingHTranspose = false;
-		tracks[channel].instrument = inst;		// // //
-		//if (htranspose[inst])
-		//	transposeMap[tracks[channe].instrument] = tmpTrans[tracks[channe].instrument];
-		return;
+		return doInstrument(inst, inst < 0x13 || inst >= 30);
 	}
+	error(CMD_ERROR("instrument", "@"));		// // //
+}
 
+// // //
+void Music::parseDirectInstCommand() {
+	using namespace AMKd::MML::Lexer;
+	if (auto param = GetParameters<Int>(mml_))
+		return doInstrument(requires(param.get<0>(), 0x00u, 0xFFu, CMD_ILLEGAL("instrument", "@")), true);
 	error(CMD_ERROR("instrument", "@"));		// // //
 }
 
@@ -1805,7 +1748,7 @@ void Music::addNoteLength(double ticks) {
 }
 
 // // //
-void Music::writeState(TrackState (Track::*state), int val) {
+void Music::writeState(AMKd::Music::TrackState (AMKd::Music::Track::*state), int val) {
 	tracks[inNormalLoop ? prevChannel : channel].*state = val;		// // //
 	tracks[CHANNELS].*state = val;
 }
@@ -1932,6 +1875,34 @@ void Music::doGlobalVolume(int vol) {
 	append(AMKd::Binary::CmdType::VolGlobal, vol);
 }
 
+void Music::doInstrument(int inst, bool add) {
+	if (add) {
+		if (convert && inst >= 0x13 && inst < 30)	// Change it to an HFD custom instrument.
+			inst = inst - 0x13 + 30;
+		if (optimizeSampleUsage) {
+			if (inst < 30)
+				usedSamples[instrToSample[inst]] = true;
+			else if ((inst - 30) * 6 < static_cast<int>(instrumentData.size()))		// // //
+				usedSamples[instrumentData[(inst - 30) * 6]] = true;
+			else
+				error("This custom instrument has not been defined yet.");		// // //
+		}
+		if (songTargetProgram == Target::AM4)		// // //
+			tracks[channel].ignoreTuning = false;
+		append(AMKd::Binary::CmdType::Inst, inst);		// // //
+	}
+	if (optimizeSampleUsage && inst < 30)
+		usedSamples[instrToSample[inst]] = true;
+
+	tracks[channel].instrument = inst;		// // //
+	/*
+	hTranspose = 0;
+	usingHTranspose = false;
+	if (htranspose[inst])
+		transposeMap[tracks[channe].instrument] = tmpTrans[tracks[channe].instrument];
+	*/
+}
+
 void Music::doVibrato(int delay, int rate, int depth) {
 	append(AMKd::Binary::CmdType::Vibrato,
 		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);		// // //
@@ -1954,7 +1925,7 @@ void Music::doTempo(int speed) {
 	tempo = requires(divideByTempoRatio(speed, false), 0x01, 0xFF, "Tempo has been zeroed out by #halvetempo");		// // //
 	append(AMKd::Binary::CmdType::Tempo, tempo);		// // //
 
-	if (inNormalLoop || inE6Loop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
+	if (inNormalLoop || inSubLoop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
 		guessLength = false;
 	else
 		tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
@@ -1973,7 +1944,7 @@ void Music::doLoopEnter() {
 
 	normalLoopLength = 0;
 
-	if (inE6Loop) {					// We're entering a normal loop that's nested in a subloop
+	if (inSubLoop) {					// We're entering a normal loop that's nested in a subloop
 		loopState1 = LoopType::sub;		// // //
 		loopState2 = LoopType::normal;
 	}
@@ -2027,7 +1998,7 @@ void Music::doLoopRemoteCall(int loopCount, uint16_t loopAdr) {
 
 void Music::doSubloopEnter() {
 	synchronizeStates();		// // //
-	if (std::exchange(inE6Loop, true))		// // //
+	if (std::exchange(inSubLoop, true))		// // //
 		error("You cannot nest a subloop within another subloop.");
 
 	superLoopLength = 0;
@@ -2046,7 +2017,7 @@ void Music::doSubloopEnter() {
 
 void Music::doSubloopExit(int loopCount) {
 	synchronizeStates();		// // //
-	if (!std::exchange(inE6Loop, false))		// // //
+	if (!std::exchange(inSubLoop, false))		// // //
 		error("A subloop end was found outside of a subloop.");
 
 	if (loopState2 == LoopType::sub) {				// We're leaving a subloop that's nested in a normal loop.
