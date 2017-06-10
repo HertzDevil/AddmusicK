@@ -114,13 +114,15 @@ static bool usingSMWVTable;
 // // //
 template <typename... Args>
 void Music::append(Args&&... value) {
-	tracks[::channel].append(std::forward<Args>(value)...);
+	getTrack(::channel).append(std::forward<Args>(value)...);
 }
 
 Music::Music() {
 	knowsLength = false;
 	totalSize = 0;
 	echoBufferSize = 0;
+	for (size_t i = 0; i < std::size(tracks); ++i)		// // //
+		tracks[i].index = i;
 }
 
 void Music::init() {
@@ -156,17 +158,12 @@ void Music::init() {
 	loopLabel = 0;
 	// // //
 
-	for (int z = 0; z < 256; z++) {
-		transposeMap[z] = 0;
-		usedSamples[z] = false;
-	}
-
-	for (int z = 0; z < 19; z++)
+	for (int z = 0; z < 19; z++)		// // //
 		transposeMap[z] = tmpTrans[z];
+	for (int z = 19; z < 256; z++)
+		transposeMap[z] = 0;
 
 	title = fs::path {name}.stem().string();		// // //
-
-	//std::string backup = text;
 
 	const auto stat = AMKd::MML::Preprocessor {openTextFile(fs::path {"music"} / name), name};		// // //
 	mml_ = AMKd::MML::SourceFile {stat.result};
@@ -179,8 +176,8 @@ void Music::init() {
 	case Target::AMM:
 		break;
 	case Target::AM4:
-		for (size_t i = 0; i < CHANNELS; ++i)		// // //
-			tracks[i].ignoreTuning = true; // AM4 fix for tuning[] related stuff.
+		for (Track &t : tracks)
+			t.ignoreTuning = true; // AM4 fix for tuning[] related stuff.
 		loopTrack.ignoreTuning = true;		// // //
 		break;
 	case Target::AMK:
@@ -282,8 +279,8 @@ void Music::compile() {
 // // //
 size_t Music::getDataSize() const {
 	size_t x = 0;
-	for (size_t i = 0; i < CHANNELS; ++i)
-		x += tracks[i].data.size();
+	for (const Track &t : tracks)
+		x += t.data.size();
 	return x;
 }
 
@@ -291,8 +288,8 @@ size_t Music::getDataSize() const {
 void Music::FlushSongData(std::vector<uint8_t> &buf) const {
 	buf.reserve(buf.size() + getDataSize() + loopTrack.data.size() + allPointersAndInstrs.size());
 	buf.insert(buf.end(), allPointersAndInstrs.cbegin(), allPointersAndInstrs.cend());
-	for (size_t i = 0; i < CHANNELS; ++i)
-		buf.insert(buf.cend(), tracks[i].data.cbegin(), tracks[i].data.cend());
+	for (const Track &t : tracks)
+		buf.insert(buf.cend(), t.data.cbegin(), t.data.cend());
 	buf.insert(buf.cend(), loopTrack.data.cbegin(), loopTrack.data.cend());
 }
 
@@ -323,8 +320,8 @@ void Music::parseQMarkDirective() {
 	if (auto param = GetParameters<Int>(mml_)) {
 		switch (param.get<0>()) {
 		case 0: doesntLoop = true; break;
-		case 1: tracks[channel].noMusic[0] = true; break;		// // //
-		case 2: tracks[channel].noMusic[1] = true; break;
+		case 1: getTrack(::channel).noMusic[0] = true; break;		// // //
+		case 2: getTrack(::channel).noMusic[1] = true; break;
 		default:
 			error(DIR_ERROR("\"?\""));
 		}
@@ -347,8 +344,8 @@ void Music::parseChannelDirective() {
 			if (param.get<0>()[i]) {
 				channel = i;
 				resetStates();		// // //
-				tracks[channel].lastDuration = 0;
-				tracks[channel].usingH = false;
+				getTrack(::channel).lastDuration = 0;
+				getTrack(::channel).usingH = false;
 				channelDefined = true;
 				/*
 				for (int u = 0; u < CHANNELS * 2; ++u)
@@ -412,16 +409,16 @@ void Music::parseIntroDirective() {
 		error("Intro directive found within a loop.");		// // //
 
 	if (!hasIntro)
-		tempoChanges.emplace_back(tracks[channel].channelLength, -static_cast<int>(tempo));		// // //
+		tempoChanges.emplace_back(getTrack(::channel).channelLength, -static_cast<int>(tempo));		// // //
 	else		// // //
 		for (auto &x : tempoChanges)
 			if (x.second < 0)
 				x.second = -static_cast<int>(tempo);
 
 	hasIntro = true;
-	tracks[channel].phrasePointers[1] = static_cast<uint16_t>(tracks[channel].data.size());		// // //
-	tracks[channel].lastDuration = 0;
-	introLength = static_cast<unsigned>(tracks[channel].channelLength);		// // //
+	getTrack(::channel).phrasePointers[1] = static_cast<uint16_t>(getTrack(::channel).data.size());		// // //
+	getTrack(::channel).lastDuration = 0;
+	introLength = static_cast<unsigned>(getTrack(::channel).channelLength);		// // //
 }
 
 void Music::parseTempoCommand() {
@@ -480,7 +477,7 @@ void Music::parseOpenParenCommand() {
 			error("Nested loops are not allowed.");		// // //
 		if (GetParameters<Sep<')', '['>>(mml_)) {		// If this is a loop definition...
 			loopLabel = label + 1;
-			tracks[channel].isDefiningLabelLoop = true;		// The rest of the code is handled in the respective function.
+			getTrack(::channel).isDefiningLabelLoop = true;		// The rest of the code is handled in the respective function.
 			return parseLoopCommand();
 		}
 		if (auto loop = GetParameters<Sep<')'>, Option<Int>>(mml_)) {		// Otherwise, if this is a loop call...
@@ -520,7 +517,7 @@ void Music::parseLabelLoopCommand() {
 			error("Nested loops are not allowed.");		// // //
 		if (GetParameters<Sep<')', '['>>(mml_)) {		// If this is a loop definition...
 			loopLabel = label + 1;
-			tracks[channel].isDefiningLabelLoop = true;		// The rest of the code is handled in the respective function.
+			getTrack(::channel).isDefiningLabelLoop = true;		// The rest of the code is handled in the respective function.
 			return parseLoopCommand();
 		}
 		if (auto loop = GetParameters<Sep<')'>, Option<Int>>(mml_)) {		// Otherwise, if this is a loop call...
@@ -569,7 +566,7 @@ void Music::parseRemoteCodeCommand() {
 		if (!GetParameters<Sep<')'>, Sep<'['>>(mml_))
 			error("Error parsing remote code setup.");
 
-		tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
+		getTrack(::channel).loopLocations.push_back(static_cast<uint16_t>(getTrack(::channel).data.size() + 1));		// // //
 		if (loopPointers.find(remoteID) == loopPointers.cend())		// // //
 			loopPointers.insert({remoteID, static_cast<uint16_t>(-1)});
 		append(AMKd::Binary::CmdType::Callback, loopPointers[remoteID] & 0xFF, loopPointers[remoteID] >> 8, remoteOpt, remoteLen);
@@ -600,7 +597,7 @@ void Music::parseLoopCommand() {
 
 // // //
 void Music::parseSubloopCommand() {
-	if (loopLabel > 0 && tracks[channel].isDefiningLabelLoop)		// // //
+	if (loopLabel > 0 && getTrack(::channel).isDefiningLabelLoop)		// // //
 		error("A label loop cannot define a subloop.  Use a standard or remote loop instead.");
 	return doSubloopEnter();
 }
@@ -662,12 +659,12 @@ void Music::parseVibratoCommand() {
 }
 
 void Music::parseTripletOpenDirective() {
-	if (std::exchange(tracks[channel].inTriplet, true))		// // //
+	if (std::exchange(getTrack(::channel).inTriplet, true))		// // //
 		error("Triplet on directive found within a triplet block.");
 }
 
 void Music::parseTripletCloseDirective() {
-	if (!std::exchange(tracks[channel].inTriplet, false))		// // //
+	if (!std::exchange(getTrack(::channel).inTriplet, false))		// // //
 		error("Triplet off directive found outside of a triplet block.");
 }
 
@@ -756,8 +753,8 @@ void Music::parseHFDHex() {
 
 // // //
 void Music::insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd) {
-	auto pos = static_cast<uint16_t>(tracks[channel].data.size() + 1);
-	tracks[channel].remoteGainInfo.emplace_back(pos, std::move(cmd));		// // //
+	auto pos = static_cast<uint16_t>(getTrack(::channel).data.size() + 1);
+	getTrack(::channel).remoteGainInfo.emplace_back(pos, std::move(cmd));		// // //
 	append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, cmdtype, param);		// // //
 }
 
@@ -1015,14 +1012,14 @@ void Music::parseHexCommand() {
 		// // // More code conversion.
 		if (targetAMKVersion == 1 && i == 0x05) {
 			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-			int channelToCheck = inNormalLoop ? prevChannel : channel;
+			auto &track = getBaseTrack();		// // //
 
 			getval();
-			tracks[channelToCheck].usingFA = (i != 0);		// // //
+			track.usingFA = (i != 0);		// // //
 
-			if (tracks[channelToCheck].usingFA)
-				if (tracks[channelToCheck].usingFC)
-					insertRemoteConversion(0x05, tracks[channelToCheck].lastFCDelayValue,
+			if (track.usingFA)
+				if (track.usingFC)
+					insertRemoteConversion(0x05, track.lastFCDelayValue,
 						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00});
 				else {
 					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
@@ -1063,27 +1060,27 @@ void Music::parseHexCommand() {
 	case AMKd::Binary::CmdType::Callback:
 		if (targetAMKVersion == 1) {
 			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-			int channelToCheck = inNormalLoop ? prevChannel : channel;		// // //
+			auto &track = getBaseTrack();		// // //
 
 			getval();
-			tracks[channelToCheck].usingFC = (i != 0);
-			if (tracks[channelToCheck].usingFC) {
-				tracks[channelToCheck].lastFCDelayValue = static_cast<uint8_t>(divideByTempoRatio(i, false));		// // //
+			track.usingFC = (i != 0);
+			if (track.usingFC) {
+				track.lastFCDelayValue = static_cast<uint8_t>(divideByTempoRatio(i, false));		// // //
 
 				getval();
-				if (tracks[channelToCheck].usingFA)
-					insertRemoteConversion(0x05, tracks[channelToCheck].lastFCDelayValue,
+				if (track.usingFA)
+					insertRemoteConversion(0x05, track.lastFCDelayValue,
 						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00});
 				else {
 					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
 						{AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00});
-					insertRemoteConversion(AMKd::Binary::CmdOptionFC::Release, tracks[channelToCheck].lastFCDelayValue,
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::Release, track.lastFCDelayValue,
 						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00});
 				}
 			}
 			else {
 				getval();
-				if (tracks[channelToCheck].usingFA)
+				if (track.usingFA)
 					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOff, 0x00,
 						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00}); // check this
 				else
@@ -1140,10 +1137,10 @@ void Music::parseNote(int note) {		// // //
 void Music::parseNoteCommon(int offset) {
 	//am4silence++;
 	int note = getPitch(offset);
-	if (tracks[channel].instrument >= 21 && tracks[channel].instrument < 30) {		// // //
-		note = 0xD0 + (tracks[channel].instrument - 21);
+	if (getTrack(::channel).instrument >= 21 && getTrack(::channel).instrument < 30) {		// // //
+		note = 0xD0 + (getTrack(::channel).instrument - 21);
 		if (!(channel == 6 || channel == 7 || (inNormalLoop && (prevChannel == 6 || prevChannel == 7))))	// If this is not a SFX channel,
-			tracks[channel].instrument = 0xFF;										// Then don't force the drum pitch on every note.
+			getTrack(::channel).instrument = 0xFF;										// Then don't force the drum pitch on every note.
 	}
 	return parseNote(note);
 }
@@ -1187,8 +1184,8 @@ void Music::parseRest() {
 void Music::parseHDirective() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<SInt>(mml_)) {
-		tracks[channel].usingH = true;		// // //
-		tracks[channel].h = static_cast<int8_t>(
+		getTrack(::channel).usingH = true;		// // //
+		getTrack(::channel).h = static_cast<int8_t>(
 			requires(param.get<0>(), -128, 127, DIR_ILLEGAL("transpose (\"h\")")));
 		return;
 	}
@@ -1414,15 +1411,28 @@ void Music::parsePath() {
 		fatalError("Unexpected symbol found in path command. Expected a quoted string.");
 }
 
+// // //
+Track &Music::getTrack(size_t id) {
+	return id == CHANNELS ? loopTrack : tracks[id];
+}
+
+const Track &Music::getTrack(size_t id) const {
+	return id == CHANNELS ? loopTrack : tracks[id];
+}
+
+Track &Music::getBaseTrack() {
+	return tracks[inNormalLoop ? prevChannel : channel];
+}
+
 int Music::getPitch(int i) {
-	i += (tracks[channel].o.Get() - 1) * 12 + 0x80;		// // //
+	i += (getTrack(::channel).o.Get() - 1) * 12 + 0x80;		// // //
 	using namespace AMKd::MML::Lexer;
 	i += GetParameters<Acc>(mml_)->offset;
 
-	if (tracks[channel].usingH)		// // //
-		i += tracks[channel].h;
-	else if (!tracks[channel].ignoreTuning)		// // // More AM4 tuning stuff
-		i -= transposeMap[tracks[channel].instrument];
+	if (getTrack(::channel).usingH)		// // //
+		i += getTrack(::channel).h;
+	else if (!getTrack(::channel).ignoreTuning)		// // // More AM4 tuning stuff
+		i -= transposeMap[getTrack(::channel).instrument];
 	
 	return requires(i, 0x80, static_cast<int>(AMKd::Binary::CmdType::Tie) - 1, "Note's pitch is out of range.");
 }
@@ -1433,11 +1443,11 @@ int Music::getRawTicks(const AMKd::MML::Duration &dur) const {
 }
 
 int Music::getFullTicks(const AMKd::MML::Duration &dur) const {
-	return checkTickFraction(dur.GetTicks(tracks[channel].l.Get()) / tempoRatio * (tracks[channel].inTriplet ? 2. / 3. : 1.));
+	return checkTickFraction(dur.GetTicks(getTrack(::channel).l.Get()) / tempoRatio * (getTrack(::channel).inTriplet ? 2. / 3. : 1.));
 }
 
 int Music::getLastTicks(const AMKd::MML::Duration &dur) const {
-	return checkTickFraction(dur.GetLastTicks(tracks[channel].l.Get()) / tempoRatio * (tracks[channel].inTriplet ? 2. / 3. : 1.));
+	return checkTickFraction(dur.GetLastTicks(getTrack(::channel).l.Get()) / tempoRatio * (getTrack(::channel).inTriplet ? 2. / 3. : 1.));
 }
 
 int Music::checkTickFraction(double ticks) const {
@@ -1457,18 +1467,18 @@ void Music::pointersFirstPass() {
 	if (errorCount)
 		fatalError("There were errors when compiling the music file.  Compilation aborted.  Your ROM has not been modified.");
 
-	if (std::all_of(tracks, tracks + CHANNELS, [] (const Track &t) { return t.data.empty(); }))		// // //
+	if (std::all_of(std::cbegin(tracks), std::cend(tracks), [] (const Track &t) { return t.data.empty(); }))		// // //
 		error("This song contained no musical data!");
 
 	if (targetAMKVersion == 1) {			// Handle more conversion of the old $FC command to remote call.
-		for (size_t i = 0; i < CHANNELS; ++i)
-			tracks[i].insertRemoteCalls(loopTrack);		// // //
+		for (Track &t : tracks)
+			t.insertRemoteCalls(loopTrack);		// // //
 		loopTrack.insertRemoteCalls(loopTrack);
 	}
 
-	for (size_t z = 0; z < CHANNELS; z++)		// // //
-		if (!tracks[z].data.empty())
-			tracks[z].data.push_back(AMKd::Binary::CmdType::End);
+	for (Track &t : tracks)		// // //
+		if (!t.data.empty())
+			t.data.push_back(AMKd::Binary::CmdType::End);
 
 	if (mySamples.empty())		// // // If no sample groups were provided...
 		addSampleGroup("default", this);		// // //
@@ -1494,11 +1504,11 @@ void Music::pointersFirstPass() {
 	};
 
 	int binpos = 0;		// // //
-	for (size_t i = 0; i < CHANNELS; ++i) {
-		if (!tracks[i].data.empty())
-			tracks[i].phrasePointers[0] = static_cast<uint16_t>(binpos);
-		tracks[i].phrasePointers[1] += tracks[i].phrasePointers[0];
-		binpos += tracks[i].data.size();
+	for (Track &t : tracks) {
+		if (!t.data.empty())
+			t.phrasePointers[0] = static_cast<uint16_t>(binpos);
+		t.phrasePointers[1] += t.phrasePointers[0];
+		binpos += t.data.size();
 	}
 
 	int headerSize = 20 + (hasIntro ? 18 : 0) + (doesntLoop ? 0 : 2) + instrumentData.size();		// // //
@@ -1514,19 +1524,19 @@ void Music::pointersFirstPass() {
 		insertPtr(hasIntro ? 0x0002 : 0x0000); // pointer to frame at loop point
 	}
 	allPointersAndInstrs.insert(allPointersAndInstrs.cend(), instrumentData.cbegin(), instrumentData.cend());
-	for (size_t i = 0; i < CHANNELS; ++i)		// // //
-		insertPtr(tracks[i].data.empty() ? 0xFFFF : (tracks[i].phrasePointers[0] + headerSize));
+	for (Track &t : tracks)		// // //
+		insertPtr(t.data.empty() ? 0xFFFF : (t.phrasePointers[0] + headerSize));
 	if (hasIntro)
-		for (size_t i = 0; i < CHANNELS; ++i)		// // //
-			insertPtr(tracks[i].data.empty() ? 0xFFFF : (tracks[i].phrasePointers[1] + headerSize));
+		for (Track &t : tracks)		// // //
+			insertPtr(t.data.empty() ? 0xFFFF : (t.phrasePointers[1] + headerSize));
 
 	totalSize = headerSize + loopTrack.data.size() + getDataSize();		// // //
 
 	//if (tempo == -1) tempo = 0x36;
 	mainLength = static_cast<unsigned>(-1);		// // //
-	for (size_t i = 0; i < CHANNELS; i++)
-		if (tracks[i].channelLength != 0)		// // //
-			mainLength = std::min(mainLength, (unsigned int)tracks[i].channelLength);
+	for (Track &t : tracks)
+		if (t.channelLength != 0)		// // //
+			mainLength = std::min(mainLength, (unsigned int)t.channelLength);
 	if (static_cast<int>(mainLength) == -1)
 		error("This song doesn't seem to have any data.");		// // //
 
@@ -1598,8 +1608,8 @@ void Music::pointersFirstPass() {
 
 	std::stringstream statStrStream;
 
-	for (size_t i = 0; i < CHANNELS; ++i)		// // //
-		statStrStream << "CHANNEL " << ('0' + i) << " SIZE:				0x" << hex4 << tracks[i].data.size() << "\n";
+	for (Track &t : tracks)		// // //
+		statStrStream << "CHANNEL " << ('0' + t.index) << " SIZE:				0x" << hex4 << t.data.size() << "\n";
 	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << loopTrack.data.size() << "\n";
 	statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << headerSize << "\n";
 	statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
@@ -1611,8 +1621,8 @@ void Music::pointersFirstPass() {
 	else
 		statStrStream << "FREE ARAM (APPROXIMATE):		UNKNOWN\n\n";
 
-	for (size_t i = 0; i < CHANNELS; ++i)		// // //
-		statStrStream << "CHANNEL " << ('0' + i) << " TICKS:			0x" << hex4 << tracks[i].channelLength << "\n";
+	for (Track &t : tracks)		// // //
+		statStrStream << "CHANNEL " << ('0' + t.index) << " TICKS:			0x" << hex4 << t.channelLength << "\n";
 	statStrStream << '\n';
 
 	if (knowsLength) {
@@ -1636,8 +1646,8 @@ void Music::pointersFirstPass() {
 // // //
 void Music::adjustLoopPointers() {
 	int offset = posInARAM + getDataSize() + allPointersAndInstrs.size();
-	for (size_t i = 0; i < CHANNELS; ++i)
-		tracks[i].shiftPointers(offset);
+	for (Track &t : tracks)
+		t.shiftPointers(offset);
 	loopTrack.shiftPointers(offset);
 }
 
@@ -1694,31 +1704,31 @@ void Music::addNoteLength(double ticks) {
 	else if (loopState1 != LoopType::none)
 		(loopState1 == LoopType::sub ? superLoopLength : normalLoopLength) += ticks;
 	else
-		tracks[channel].channelLength += ticks;		// // //
+		getTrack(::channel).channelLength += ticks;		// // //
 }
 
 // // //
 void Music::writeState(AMKd::Music::TrackState (AMKd::Music::Track::*state), int val) {
-	tracks[inNormalLoop ? prevChannel : channel].*state = val;		// // //
+	getBaseTrack().*state = val;		// // //
 	loopTrack.*state = val;
 }
 
 void Music::resetStates() {
-	loopTrack.q = tracks[channel].q;
-	loopTrack.o = tracks[channel].o;
-	loopTrack.l = tracks[channel].l;
+	loopTrack.q = getTrack(::channel).q;
+	loopTrack.o = getTrack(::channel).o;
+	loopTrack.l = getTrack(::channel).l;
 }
 
 void Music::synchronizeStates() {
 	if (!inNormalLoop) {		// // //
-		tracks[channel].q.Update();
-		tracks[channel].o.Update();
-		tracks[channel].l.Update();
+		getTrack(::channel).q.Update();
+		getTrack(::channel).o.Update();
+		getTrack(::channel).l.Update();
 	}
 	loopTrack.q.Update();
 	loopTrack.o.Update();
 	loopTrack.l.Update();
-	tracks[channel].lastDuration = 0;
+	getTrack(::channel).lastDuration = 0;
 }
 
 int Music::divideByTempoRatio(int value, bool /*fractionIsError*/) {
@@ -1768,12 +1778,12 @@ void Music::doNote(int note, int fullTicks, int bendTicks, bool nextPorta) {
 	}
 
 	const auto doSingleNote = [this] (int note, int len) {		// // //
-		if (tracks[channel].q.NeedsUpdate()) {
-			append(tracks[channel].lastDuration = static_cast<uint8_t>(len));
-			append(tracks[channel].q.Get());
+		if (getTrack(::channel).q.NeedsUpdate()) {
+			append(getTrack(::channel).lastDuration = static_cast<uint8_t>(len));
+			append(getTrack(::channel).q.Get());
 		}
-		if (tracks[channel].lastDuration != len)
-			append(tracks[channel].lastDuration = static_cast<uint8_t>(len));
+		if (getTrack(::channel).lastDuration != len)
+			append(getTrack(::channel).lastDuration = static_cast<uint8_t>(len));
 		append(note);
 	};
 
@@ -1792,9 +1802,9 @@ void Music::doNote(int note, int fullTicks, int bendTicks, bool nextPorta) {
 			}
 	};
 
-	if (tracks[channel].inPitchSlide)		// // //
-		append(AMKd::Binary::CmdType::Portamento, 0x00, tracks[channel].lastDuration, note);		// // //
-	tracks[channel].inPitchSlide = nextPorta;
+	if (getTrack(::channel).inPitchSlide)		// // //
+		append(AMKd::Binary::CmdType::Portamento, 0x00, getTrack(::channel).lastDuration, note);		// // //
+	getTrack(::channel).inPitchSlide = nextPorta;
 	flushNote(note, flatTicks);
 	flushNote(note, bendTicks);
 }
@@ -1804,14 +1814,14 @@ void Music::doOctave(int oct) {
 }
 
 void Music::doRaiseOctave() {
-	int oct = tracks[channel].o.Get();		// // //
+	int oct = getTrack(::channel).o.Get();		// // //
 	if (oct >= 6)
 		error("The octave has been raised too high.");
 	return writeState(&Track::o, ++oct);
 }
 
 void Music::doLowerOctave() {
-	int oct = tracks[channel].o.Get();		// // //
+	int oct = getTrack(::channel).o.Get();		// // //
 	if (oct <= 1)
 		error("The octave has been dropped too low.");
 	return writeState(&Track::o, --oct);
@@ -1838,13 +1848,13 @@ void Music::doInstrument(int inst, bool add) {
 				error("This custom instrument has not been defined yet.");		// // //
 		}
 		if (songTargetProgram == Target::AM4)		// // //
-			tracks[channel].ignoreTuning = false;
+			getTrack(::channel).ignoreTuning = false;
 		append(AMKd::Binary::CmdType::Inst, inst);		// // //
 	}
 	if (optimizeSampleUsage && inst < 30)
 		usedSamples[instrToSample[inst]] = true;
 
-	tracks[channel].instrument = inst;		// // //
+	getTrack(::channel).instrument = inst;		// // //
 	/*
 	hTranspose = 0;
 	usingHTranspose = false;
@@ -1878,7 +1888,7 @@ void Music::doTempo(int speed) {
 	if (inNormalLoop || inSubLoop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
 		guessLength = false;
 	else
-		tempoChanges.emplace_back(tracks[channel].channelLength, tempo);		// // //
+		tempoChanges.emplace_back(getTrack(::channel).channelLength, tempo);		// // //
 }
 
 void Music::doSampleLoad(int id, int mult) {
@@ -1904,9 +1914,9 @@ void Music::doLoopEnter() {
 	}
 
 	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
-	loopTrack.instrument = tracks[channel].instrument;		// // //
+	loopTrack.instrument = getTrack(::channel).instrument;		// // //
 	if (songTargetProgram == Target::AM4)
-		loopTrack.ignoreTuning = tracks[channel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
+		loopTrack.ignoreTuning = getTrack(::channel).ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
 	channel = CHANNELS;					// So we have to back up the current channel.
 }
 
@@ -1924,25 +1934,25 @@ void Music::doLoopExit(int loopCount) {
 	}
 	else if (loopState1 == LoopType::normal) {			// We're leaving a normal loop that's not nested.
 		loopState1 = LoopType::none;
-		tracks[channel].channelLength += normalLoopLength * loopCount;		// // //
+		getTrack(::channel).channelLength += normalLoopLength * loopCount;		// // //
 	}
 
 	if (loopLabel > 0)
 		loopLengths[loopLabel] = normalLoopLength;
 
 	if (!inRemoteDefinition) {
-		tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
+		getTrack(::channel).loopLocations.push_back(static_cast<uint16_t>(getTrack(::channel).data.size() + 1));		// // //
 		append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, loopCount);
 	}
 	inRemoteDefinition = false;
 	loopLabel = 0;
-	tracks[channel].isDefiningLabelLoop = false;		// // //
+	getTrack(::channel).isDefiningLabelLoop = false;		// // //
 }
 
 void Music::doLoopRemoteCall(int loopCount, uint16_t loopAdr) {
 	synchronizeStates();		// // //
 	addNoteLength((loopLabel ? loopLengths[loopLabel] : normalLoopLength) * loopCount);		// // //
-	tracks[channel].loopLocations.push_back(static_cast<uint16_t>(tracks[channel].data.size() + 1));		// // //
+	getTrack(::channel).loopLocations.push_back(static_cast<uint16_t>(getTrack(::channel).data.size() + 1));		// // //
 	append(AMKd::Binary::CmdType::Loop, loopAdr & 0xFF, loopAdr >> 8, loopCount);
 }
 
@@ -1976,7 +1986,7 @@ void Music::doSubloopExit(int loopCount) {
 	}
 	else if (loopState1 == LoopType::sub) {			// We're leaving a subloop that's not nested.
 		loopState1 = LoopType::none;
-		tracks[channel].channelLength += superLoopLength * loopCount;		// // //
+		getTrack(::channel).channelLength += superLoopLength * loopCount;		// // //
 	}
 
 	append(AMKd::Binary::CmdType::Subloop, loopCount - 1);		// // //

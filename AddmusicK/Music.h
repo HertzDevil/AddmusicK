@@ -138,6 +138,10 @@ private:
 	template <typename... Args>		// // //
 	void append(Args&&... value);
 
+	AMKd::Music::Track &getTrack(size_t id);		// // //
+	const AMKd::Music::Track &getTrack(size_t id) const;		// // //
+	AMKd::Music::Track &getBaseTrack();		// // //
+
 	int getPitch(int j);
 	int getRawTicks(const AMKd::MML::Duration &dur) const;		// // //
 	int getFullTicks(const AMKd::MML::Duration &dur) const;		// // //
@@ -189,8 +193,8 @@ private:
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
 	AMKd::MML::SourceFile mml_;		// // //
 
-	AMKd::Music::Track tracks[CHANNELS + 1];		// // //
-	AMKd::Music::Track &loopTrack = tracks[CHANNELS];		// // //
+	AMKd::Music::Track tracks[CHANNELS];		// // //
+	AMKd::Music::Track loopTrack;		// // //
 
 	unsigned int introLength;
 	unsigned int mainLength;
@@ -200,7 +204,7 @@ private:
 private:
 	std::string statStr;
 
-	bool usedSamples[256];		// Holds a record of which samples have been used for this song.
+	bool usedSamples[256] = { };		// // // Holds a record of which samples have been used for this song.
 
 	// // //
 	bool inRemoteDefinition;
