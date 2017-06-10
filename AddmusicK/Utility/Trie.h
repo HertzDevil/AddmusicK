@@ -4,6 +4,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <memory>
+#include <initializer_list>
 
 namespace AMKd::Utility {
 
@@ -23,6 +24,10 @@ private:
 
 public:
 	Trie() = default;
+	Trie(std::initializer_list<std::pair<std::basic_string_view<K>, V>> init) {
+		for (auto &&x : init)
+			Insert(x.first, x.second);
+	}
 
 	void Insert(std::basic_string_view<K> str, const V &data) {
 		GetNode(str)->val_ = data;

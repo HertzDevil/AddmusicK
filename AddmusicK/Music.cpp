@@ -213,55 +213,51 @@ void Music::init() {
 }
 
 void Music::compile() {
-	static const auto CMDS = [] {		// // //
-		AMKd::Utility::Trie<void (Music::*)()> cmd;
-
-		cmd.Insert("!", &Music::parseExMarkDirective);
-		cmd.Insert("\"", &Music::parseReplacementDirective);
-		cmd.Insert("#", &Music::parseChannelDirective);
-		cmd.Insert("$", &Music::parseHexCommand);
-		cmd.Insert("(", &Music::parseOpenParenCommand);
-		cmd.Insert("(!", &Music::parseRemoteCodeCommand);
-		cmd.Insert("*", &Music::parseStarLoopCommand);
-		cmd.Insert("/", &Music::parseIntroDirective);
-		cmd.Insert(";", &Music::parseComment);
-		cmd.Insert("<", &Music::parseLowerOctaveDirective);
-		cmd.Insert(">", &Music::parseRaiseOctaveDirective);
-		cmd.Insert("?", &Music::parseQMarkDirective);
-		cmd.Insert("@", &Music::parseInstrumentCommand);
-		cmd.Insert("@@", &Music::parseDirectInstCommand);
-		cmd.Insert("a", &Music::parseNoteA);
-		cmd.Insert("b", &Music::parseNoteB);
-		cmd.Insert("c", &Music::parseNoteC);
-		cmd.Insert("d", &Music::parseNoteD);
-		cmd.Insert("e", &Music::parseNoteE);
-		cmd.Insert("f", &Music::parseNoteF);
-		cmd.Insert("g", &Music::parseNoteG);
-		cmd.Insert("h", &Music::parseHDirective);
-		cmd.Insert("l", &Music::parseLDirective);
-		cmd.Insert("n", &Music::parseNCommand);
-		cmd.Insert("o", &Music::parseOctaveDirective);
-		cmd.Insert("p", &Music::parseVibratoCommand);
-		cmd.Insert("q", &Music::parseQuantizationCommand);
-		cmd.Insert("r", &Music::parseRest);
-		cmd.Insert("t", &Music::parseTempoCommand);
-		cmd.Insert("tuning", &Music::parseTransposeDirective);
-		cmd.Insert("v", &Music::parseVolumeCommand);
-		cmd.Insert("w", &Music::parseGlobalVolumeCommand);
-		cmd.Insert("y", &Music::parsePanCommand);
-		cmd.Insert("[", &Music::parseLoopCommand);
-		cmd.Insert("[[", &Music::parseSubloopCommand);
-		cmd.Insert("[[[", &Music::parseErrorLoopCommand);
-		cmd.Insert("]", &Music::parseLoopEndCommand);
-		cmd.Insert("]]", &Music::parseSubloopEndCommand);
-		cmd.Insert("]]]", &Music::parseErrorLoopEndCommand);
-		cmd.Insert("^", &Music::parseTie);
-		cmd.Insert("{", &Music::parseTripletOpenDirective);
-		cmd.Insert("|", &Music::parseBarDirective);
-		cmd.Insert("}", &Music::parseTripletCloseDirective);
-
-		return cmd;
-	}();
+	static const AMKd::Utility::Trie<void (Music::*)()> CMDS {		// // //
+		{"!", &Music::parseExMarkDirective},
+		{"\"", &Music::parseReplacementDirective},
+		{"#", &Music::parseChannelDirective},
+		{"$", &Music::parseHexCommand},
+		{"(", &Music::parseOpenParenCommand},
+		{"(!", &Music::parseRemoteCodeCommand},
+		{"*", &Music::parseStarLoopCommand},
+		{"/", &Music::parseIntroDirective},
+		{";", &Music::parseComment},
+		{"<", &Music::parseLowerOctaveDirective},
+		{">", &Music::parseRaiseOctaveDirective},
+		{"?", &Music::parseQMarkDirective},
+		{"@", &Music::parseInstrumentCommand},
+		{"@@", &Music::parseDirectInstCommand},
+		{"a", &Music::parseNoteA},
+		{"b", &Music::parseNoteB},
+		{"c", &Music::parseNoteC},
+		{"d", &Music::parseNoteD},
+		{"e", &Music::parseNoteE},
+		{"f", &Music::parseNoteF},
+		{"g", &Music::parseNoteG},
+		{"h", &Music::parseHDirective},
+		{"l", &Music::parseLDirective},
+		{"n", &Music::parseNCommand},
+		{"o", &Music::parseOctaveDirective},
+		{"p", &Music::parseVibratoCommand},
+		{"q", &Music::parseQuantizationCommand},
+		{"r", &Music::parseRest},
+		{"t", &Music::parseTempoCommand},
+		{"tuning", &Music::parseTransposeDirective},
+		{"v", &Music::parseVolumeCommand},
+		{"w", &Music::parseGlobalVolumeCommand},
+		{"y", &Music::parsePanCommand},
+		{"[", &Music::parseLoopCommand},
+		{"[[", &Music::parseSubloopCommand},
+		{"[[[", &Music::parseErrorLoopCommand},
+		{"]", &Music::parseLoopEndCommand},
+		{"]]", &Music::parseSubloopEndCommand},
+		{"]]]", &Music::parseErrorLoopEndCommand},
+		{"^", &Music::parseTie},
+		{"{", &Music::parseTripletOpenDirective},
+		{"|", &Music::parseBarDirective},
+		{"}", &Music::parseTripletCloseDirective},
+	};
 	AMKd::MML::Lexer::Tokenizer tok;
 
 	init();
@@ -1217,17 +1213,13 @@ void Music::parseOptionDirective() {
 	if (channelDefined)
 		error("#option directives must be used before any and all channels.");		// // //
 
-	static const auto CMDS = [] {		// // //
-		AMKd::Utility::Trie<void (Music::*)()> cmd;
-
-		cmd.Insert("smwvtable", &Music::parseSMWVTable);
-		cmd.Insert("nspcvtable", &Music::parseNSPCVTable);
-		cmd.Insert("tempoimmunity", &Music::parseTempoImmunity);
-		cmd.Insert("noloop", &Music::parseNoLoop);
-		cmd.Insert("dividetempo", &Music::parseDivideTempo);
-
-		return cmd;
-	}();
+	static const AMKd::Utility::Trie<void (Music::*)()> CMDS {		// // //
+		{"smwvtable", &Music::parseSMWVTable},
+		{"nspcvtable", &Music::parseNSPCVTable},
+		{"tempoimmunity", &Music::parseTempoImmunity},
+		{"noloop", &Music::parseNoLoop},
+		{"dividetempo", &Music::parseDivideTempo},
+	};
 
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Ident>(mml_)) {
@@ -1281,21 +1273,17 @@ void Music::parseHalveTempo() {
 }
 
 void Music::parseSpecialDirective() {
-	static const auto CMDS = [] {		// // //
-		AMKd::Utility::Trie<void (Music::*)()> cmd;
-
-		cmd.Insert("instruments", &Music::parseInstrumentDefinitions);
-		cmd.Insert("samples", &Music::parseSampleDefinitions);
-		cmd.Insert("pad", &Music::parsePadDefinition);
-		cmd.Insert("spc", &Music::parseSPCInfo);
-		cmd.Insert("louder", &Music::parseLouderCommand);
-		cmd.Insert("tempoimmunity", &Music::parseTempoImmunity);
-		cmd.Insert("path", &Music::parsePath);
-		cmd.Insert("halvetempo", &Music::parseHalveTempo);
-		cmd.Insert("option", &Music::parseOptionDirective);
-
-		return cmd;
-	}();
+	static const AMKd::Utility::Trie<void (Music::*)()> CMDS {		// // //
+		{"instruments", &Music::parseInstrumentDefinitions},
+		{"samples", &Music::parseSampleDefinitions},
+		{"pad", &Music::parsePadDefinition},
+		{"spc", &Music::parseSPCInfo},
+		{"louder", &Music::parseLouderCommand},
+		{"tempoimmunity", &Music::parseTempoImmunity},
+		{"path", &Music::parsePath},
+		{"halvetempo", &Music::parseHalveTempo},
+		{"option", &Music::parseOptionDirective},
+	};
 
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Ident>(mml_)) {
