@@ -180,6 +180,7 @@ public:		// // //
 	std::string author;
 	std::string game;
 	std::string comment;
+	std::string dumper;		// // //
 	unsigned int seconds;
 
 private:

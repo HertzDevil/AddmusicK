@@ -55,6 +55,7 @@ This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will no
 - `#if` produces false instead of failing if the preprocessor constant is not defined
 - `#else`, `#elseif`
 - `#error` (mentioned in the doc but never really worked)
+- `#dumper` field
 
 #### Things that already died
 

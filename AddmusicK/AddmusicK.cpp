@@ -1003,6 +1003,7 @@ void generateSPCs() {
 			std::copy_n(musics[i].game.cbegin(), std::min<unsigned>(32u, musics[i].game.size()), SPC.begin() + GAME);
 			std::copy_n(musics[i].comment.cbegin(), std::min<unsigned>(32u, musics[i].comment.size()), SPC.begin() + COMMENT);
 			std::copy_n(musics[i].author.cbegin(), std::min<unsigned>(32u, musics[i].author.size()), SPC.begin() + AUTHOR);
+			std::copy_n(musics[i].dumper.cbegin(), std::min<unsigned>(16u, musics[i].dumper.size()), SPC.begin() + DUMPER);		// // //
 		}
 
 		std::copy_n(programData.cbegin(), programSize, SPC.begin() + RAM + programPos);

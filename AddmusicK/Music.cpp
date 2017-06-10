@@ -164,6 +164,7 @@ void Music::init() {
 		transposeMap[z] = 0;
 
 	title = fs::path {name}.stem().string();		// // //
+	dumper = "AddmusicK " + std::to_string(AMKVERSION) + '.' + std::to_string(AMKMINOR) + '.' + std::to_string(AMKREVISION);		// // //
 
 	const auto stat = AMKd::MML::Preprocessor {openTextFile(fs::path {"music"} / name), name};		// // //
 	mml_ = AMKd::MML::SourceFile {stat.result};
@@ -1677,7 +1678,11 @@ void Music::parseSPCInfo() {
 			continue;
 		}
 
-		if (metaParam.size() > 32) {
+		if (metaName == "dumper" && metaParam.size() > 16) {		// // //
+			metaParam.erase(16);
+			printWarning("#dumper field was too long.  Truncating to \"" + metaParam + "\".");		// // //
+		}
+		else if (metaParam.size() > 32) {
 			metaParam.erase(32);
 			printWarning('#' + metaName + " field was too long.  Truncating to \"" + metaParam + "\".");		// // //
 		}
@@ -1690,6 +1695,8 @@ void Music::parseSPCInfo() {
 			title = metaParam;
 		else if (metaName == "game")
 			game = metaParam;
+		else if (metaName == "dumper")		// // //
+			dumper = metaParam;
 		else
 			error("Unexpected type name found in SPC info command.  Only \"author\", \"comment\", \"title\", \"game\", and \"length\" are allowed.");
 	}
