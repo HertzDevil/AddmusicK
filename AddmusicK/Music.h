@@ -138,8 +138,8 @@ private:
 	template <typename... Args>		// // //
 	void append(Args&&... value);
 
-	AMKd::Music::Track &getTrack(size_t id);		// // //
-	const AMKd::Music::Track &getTrack(size_t id) const;		// // //
+	AMKd::Music::Track &getActiveTrack();		// // //
+	const AMKd::Music::Track &getActiveTrack() const;		// // //
 	AMKd::Music::Track &getBaseTrack();		// // //
 
 	int getPitch(int j);

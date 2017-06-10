@@ -114,7 +114,7 @@ static bool usingSMWVTable;
 // // //
 template <typename... Args>
 void Music::append(Args&&... value) {
-	getTrack(::channel).append(std::forward<Args>(value)...);
+	getActiveTrack().append(std::forward<Args>(value)...);
 }
 
 Music::Music() {
@@ -320,8 +320,8 @@ void Music::parseQMarkDirective() {
 	if (auto param = GetParameters<Int>(mml_)) {
 		switch (param.get<0>()) {
 		case 0: doesntLoop = true; break;
-		case 1: getTrack(::channel).noMusic[0] = true; break;		// // //
-		case 2: getTrack(::channel).noMusic[1] = true; break;
+		case 1: getActiveTrack().noMusic[0] = true; break;		// // //
+		case 2: getActiveTrack().noMusic[1] = true; break;
 		default:
 			error(DIR_ERROR("\"?\""));
 		}
@@ -344,8 +344,8 @@ void Music::parseChannelDirective() {
 			if (param.get<0>()[i]) {
 				channel = i;
 				resetStates();		// // //
-				getTrack(::channel).lastDuration = 0;
-				getTrack(::channel).usingH = false;
+				getActiveTrack().lastDuration = 0;
+				getActiveTrack().usingH = false;
 				channelDefined = true;
 				/*
 				for (int u = 0; u < CHANNELS * 2; ++u)
@@ -409,16 +409,16 @@ void Music::parseIntroDirective() {
 		error("Intro directive found within a loop.");		// // //
 
 	if (!hasIntro)
-		tempoChanges.emplace_back(getTrack(::channel).channelLength, -static_cast<int>(tempo));		// // //
+		tempoChanges.emplace_back(getActiveTrack().channelLength, -static_cast<int>(tempo));		// // //
 	else		// // //
 		for (auto &x : tempoChanges)
 			if (x.second < 0)
 				x.second = -static_cast<int>(tempo);
 
 	hasIntro = true;
-	getTrack(::channel).phrasePointers[1] = static_cast<uint16_t>(getTrack(::channel).data.size());		// // //
-	getTrack(::channel).lastDuration = 0;
-	introLength = static_cast<unsigned>(getTrack(::channel).channelLength);		// // //
+	getActiveTrack().phrasePointers[1] = static_cast<uint16_t>(getActiveTrack().data.size());		// // //
+	getActiveTrack().lastDuration = 0;
+	introLength = static_cast<unsigned>(getActiveTrack().channelLength);		// // //
 }
 
 void Music::parseTempoCommand() {
@@ -477,7 +477,7 @@ void Music::parseOpenParenCommand() {
 			error("Nested loops are not allowed.");		// // //
 		if (GetParameters<Sep<')', '['>>(mml_)) {		// If this is a loop definition...
 			loopLabel = label + 1;
-			getTrack(::channel).isDefiningLabelLoop = true;		// The rest of the code is handled in the respective function.
+			getActiveTrack().isDefiningLabelLoop = true;		// The rest of the code is handled in the respective function.
 			return parseLoopCommand();
 		}
 		if (auto loop = GetParameters<Sep<')'>, Option<Int>>(mml_)) {		// Otherwise, if this is a loop call...
@@ -517,7 +517,7 @@ void Music::parseLabelLoopCommand() {
 			error("Nested loops are not allowed.");		// // //
 		if (GetParameters<Sep<')', '['>>(mml_)) {		// If this is a loop definition...
 			loopLabel = label + 1;
-			getTrack(::channel).isDefiningLabelLoop = true;		// The rest of the code is handled in the respective function.
+			getActiveTrack().isDefiningLabelLoop = true;		// The rest of the code is handled in the respective function.
 			return parseLoopCommand();
 		}
 		if (auto loop = GetParameters<Sep<')'>, Option<Int>>(mml_)) {		// Otherwise, if this is a loop call...
@@ -566,7 +566,7 @@ void Music::parseRemoteCodeCommand() {
 		if (!GetParameters<Sep<')'>, Sep<'['>>(mml_))
 			error("Error parsing remote code setup.");
 
-		getTrack(::channel).loopLocations.push_back(static_cast<uint16_t>(getTrack(::channel).data.size() + 1));		// // //
+		getActiveTrack().loopLocations.push_back(static_cast<uint16_t>(getActiveTrack().data.size() + 1));		// // //
 		if (loopPointers.find(remoteID) == loopPointers.cend())		// // //
 			loopPointers.insert({remoteID, static_cast<uint16_t>(-1)});
 		append(AMKd::Binary::CmdType::Callback, loopPointers[remoteID] & 0xFF, loopPointers[remoteID] >> 8, remoteOpt, remoteLen);
@@ -597,7 +597,7 @@ void Music::parseLoopCommand() {
 
 // // //
 void Music::parseSubloopCommand() {
-	if (loopLabel > 0 && getTrack(::channel).isDefiningLabelLoop)		// // //
+	if (loopLabel > 0 && getActiveTrack().isDefiningLabelLoop)		// // //
 		error("A label loop cannot define a subloop.  Use a standard or remote loop instead.");
 	return doSubloopEnter();
 }
@@ -659,12 +659,12 @@ void Music::parseVibratoCommand() {
 }
 
 void Music::parseTripletOpenDirective() {
-	if (std::exchange(getTrack(::channel).inTriplet, true))		// // //
+	if (std::exchange(getActiveTrack().inTriplet, true))		// // //
 		error("Triplet on directive found within a triplet block.");
 }
 
 void Music::parseTripletCloseDirective() {
-	if (!std::exchange(getTrack(::channel).inTriplet, false))		// // //
+	if (!std::exchange(getActiveTrack().inTriplet, false))		// // //
 		error("Triplet off directive found outside of a triplet block.");
 }
 
@@ -753,8 +753,8 @@ void Music::parseHFDHex() {
 
 // // //
 void Music::insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd) {
-	auto pos = static_cast<uint16_t>(getTrack(::channel).data.size() + 1);
-	getTrack(::channel).remoteGainInfo.emplace_back(pos, std::move(cmd));		// // //
+	auto pos = static_cast<uint16_t>(getActiveTrack().data.size() + 1);
+	getActiveTrack().remoteGainInfo.emplace_back(pos, std::move(cmd));		// // //
 	append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, cmdtype, param);		// // //
 }
 
@@ -1137,10 +1137,10 @@ void Music::parseNote(int note) {		// // //
 void Music::parseNoteCommon(int offset) {
 	//am4silence++;
 	int note = getPitch(offset);
-	if (getTrack(::channel).instrument >= 21 && getTrack(::channel).instrument < 30) {		// // //
-		note = 0xD0 + (getTrack(::channel).instrument - 21);
+	if (getActiveTrack().instrument >= 21 && getActiveTrack().instrument < 30) {		// // //
+		note = 0xD0 + (getActiveTrack().instrument - 21);
 		if (!(channel == 6 || channel == 7 || (inNormalLoop && (prevChannel == 6 || prevChannel == 7))))	// If this is not a SFX channel,
-			getTrack(::channel).instrument = 0xFF;										// Then don't force the drum pitch on every note.
+			getActiveTrack().instrument = 0xFF;										// Then don't force the drum pitch on every note.
 	}
 	return parseNote(note);
 }
@@ -1184,8 +1184,8 @@ void Music::parseRest() {
 void Music::parseHDirective() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<SInt>(mml_)) {
-		getTrack(::channel).usingH = true;		// // //
-		getTrack(::channel).h = static_cast<int8_t>(
+		getActiveTrack().usingH = true;		// // //
+		getActiveTrack().h = static_cast<int8_t>(
 			requires(param.get<0>(), -128, 127, DIR_ILLEGAL("transpose (\"h\")")));
 		return;
 	}
@@ -1412,12 +1412,12 @@ void Music::parsePath() {
 }
 
 // // //
-Track &Music::getTrack(size_t id) {
-	return id == CHANNELS ? loopTrack : tracks[id];
+Track &Music::getActiveTrack() {
+	return ::channel == CHANNELS ? loopTrack : tracks[::channel];
 }
 
-const Track &Music::getTrack(size_t id) const {
-	return id == CHANNELS ? loopTrack : tracks[id];
+const Track &Music::getActiveTrack() const {
+	return ::channel == CHANNELS ? loopTrack : tracks[::channel];
 }
 
 Track &Music::getBaseTrack() {
@@ -1425,14 +1425,14 @@ Track &Music::getBaseTrack() {
 }
 
 int Music::getPitch(int i) {
-	i += (getTrack(::channel).o.Get() - 1) * 12 + 0x80;		// // //
+	i += (getActiveTrack().o.Get() - 1) * 12 + 0x80;		// // //
 	using namespace AMKd::MML::Lexer;
 	i += GetParameters<Acc>(mml_)->offset;
 
-	if (getTrack(::channel).usingH)		// // //
-		i += getTrack(::channel).h;
-	else if (!getTrack(::channel).ignoreTuning)		// // // More AM4 tuning stuff
-		i -= transposeMap[getTrack(::channel).instrument];
+	if (getActiveTrack().usingH)		// // //
+		i += getActiveTrack().h;
+	else if (!getActiveTrack().ignoreTuning)		// // // More AM4 tuning stuff
+		i -= transposeMap[getActiveTrack().instrument];
 	
 	return requires(i, 0x80, static_cast<int>(AMKd::Binary::CmdType::Tie) - 1, "Note's pitch is out of range.");
 }
@@ -1443,11 +1443,11 @@ int Music::getRawTicks(const AMKd::MML::Duration &dur) const {
 }
 
 int Music::getFullTicks(const AMKd::MML::Duration &dur) const {
-	return checkTickFraction(dur.GetTicks(getTrack(::channel).l.Get()) / tempoRatio * (getTrack(::channel).inTriplet ? 2. / 3. : 1.));
+	return checkTickFraction(dur.GetTicks(getActiveTrack().l.Get()) / tempoRatio * (getActiveTrack().inTriplet ? 2. / 3. : 1.));
 }
 
 int Music::getLastTicks(const AMKd::MML::Duration &dur) const {
-	return checkTickFraction(dur.GetLastTicks(getTrack(::channel).l.Get()) / tempoRatio * (getTrack(::channel).inTriplet ? 2. / 3. : 1.));
+	return checkTickFraction(dur.GetLastTicks(getActiveTrack().l.Get()) / tempoRatio * (getActiveTrack().inTriplet ? 2. / 3. : 1.));
 }
 
 int Music::checkTickFraction(double ticks) const {
@@ -1704,7 +1704,7 @@ void Music::addNoteLength(double ticks) {
 	else if (loopState1 != LoopType::none)
 		(loopState1 == LoopType::sub ? superLoopLength : normalLoopLength) += ticks;
 	else
-		getTrack(::channel).channelLength += ticks;		// // //
+		getActiveTrack().channelLength += ticks;		// // //
 }
 
 // // //
@@ -1714,21 +1714,21 @@ void Music::writeState(AMKd::Music::TrackState (AMKd::Music::Track::*state), int
 }
 
 void Music::resetStates() {
-	loopTrack.q = getTrack(::channel).q;
-	loopTrack.o = getTrack(::channel).o;
-	loopTrack.l = getTrack(::channel).l;
+	loopTrack.q = getActiveTrack().q;
+	loopTrack.o = getActiveTrack().o;
+	loopTrack.l = getActiveTrack().l;
 }
 
 void Music::synchronizeStates() {
 	if (!inNormalLoop) {		// // //
-		getTrack(::channel).q.Update();
-		getTrack(::channel).o.Update();
-		getTrack(::channel).l.Update();
+		getActiveTrack().q.Update();
+		getActiveTrack().o.Update();
+		getActiveTrack().l.Update();
 	}
 	loopTrack.q.Update();
 	loopTrack.o.Update();
 	loopTrack.l.Update();
-	getTrack(::channel).lastDuration = 0;
+	getActiveTrack().lastDuration = 0;
 }
 
 int Music::divideByTempoRatio(int value, bool /*fractionIsError*/) {
@@ -1778,12 +1778,12 @@ void Music::doNote(int note, int fullTicks, int bendTicks, bool nextPorta) {
 	}
 
 	const auto doSingleNote = [this] (int note, int len) {		// // //
-		if (getTrack(::channel).q.NeedsUpdate()) {
-			append(getTrack(::channel).lastDuration = static_cast<uint8_t>(len));
-			append(getTrack(::channel).q.Get());
+		if (getActiveTrack().q.NeedsUpdate()) {
+			append(getActiveTrack().lastDuration = static_cast<uint8_t>(len));
+			append(getActiveTrack().q.Get());
 		}
-		if (getTrack(::channel).lastDuration != len)
-			append(getTrack(::channel).lastDuration = static_cast<uint8_t>(len));
+		if (getActiveTrack().lastDuration != len)
+			append(getActiveTrack().lastDuration = static_cast<uint8_t>(len));
 		append(note);
 	};
 
@@ -1802,9 +1802,9 @@ void Music::doNote(int note, int fullTicks, int bendTicks, bool nextPorta) {
 			}
 	};
 
-	if (getTrack(::channel).inPitchSlide)		// // //
-		append(AMKd::Binary::CmdType::Portamento, 0x00, getTrack(::channel).lastDuration, note);		// // //
-	getTrack(::channel).inPitchSlide = nextPorta;
+	if (getActiveTrack().inPitchSlide)		// // //
+		append(AMKd::Binary::CmdType::Portamento, 0x00, getActiveTrack().lastDuration, note);		// // //
+	getActiveTrack().inPitchSlide = nextPorta;
 	flushNote(note, flatTicks);
 	flushNote(note, bendTicks);
 }
@@ -1814,14 +1814,14 @@ void Music::doOctave(int oct) {
 }
 
 void Music::doRaiseOctave() {
-	int oct = getTrack(::channel).o.Get();		// // //
+	int oct = getActiveTrack().o.Get();		// // //
 	if (oct >= 6)
 		error("The octave has been raised too high.");
 	return writeState(&Track::o, ++oct);
 }
 
 void Music::doLowerOctave() {
-	int oct = getTrack(::channel).o.Get();		// // //
+	int oct = getActiveTrack().o.Get();		// // //
 	if (oct <= 1)
 		error("The octave has been dropped too low.");
 	return writeState(&Track::o, --oct);
@@ -1848,13 +1848,13 @@ void Music::doInstrument(int inst, bool add) {
 				error("This custom instrument has not been defined yet.");		// // //
 		}
 		if (songTargetProgram == Target::AM4)		// // //
-			getTrack(::channel).ignoreTuning = false;
+			getActiveTrack().ignoreTuning = false;
 		append(AMKd::Binary::CmdType::Inst, inst);		// // //
 	}
 	if (optimizeSampleUsage && inst < 30)
 		usedSamples[instrToSample[inst]] = true;
 
-	getTrack(::channel).instrument = inst;		// // //
+	getActiveTrack().instrument = inst;		// // //
 	/*
 	hTranspose = 0;
 	usingHTranspose = false;
@@ -1888,7 +1888,7 @@ void Music::doTempo(int speed) {
 	if (inNormalLoop || inSubLoop)		// // // Not even going to try to figure out tempo changes inside loops.  Maybe in the future.
 		guessLength = false;
 	else
-		tempoChanges.emplace_back(getTrack(::channel).channelLength, tempo);		// // //
+		tempoChanges.emplace_back(getActiveTrack().channelLength, tempo);		// // //
 }
 
 void Music::doSampleLoad(int id, int mult) {
@@ -1914,9 +1914,9 @@ void Music::doLoopEnter() {
 	}
 
 	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
-	loopTrack.instrument = getTrack(::channel).instrument;		// // //
+	loopTrack.instrument = getActiveTrack().instrument;		// // //
 	if (songTargetProgram == Target::AM4)
-		loopTrack.ignoreTuning = getTrack(::channel).ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
+		loopTrack.ignoreTuning = getActiveTrack().ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
 	channel = CHANNELS;					// So we have to back up the current channel.
 }
 
@@ -1934,25 +1934,25 @@ void Music::doLoopExit(int loopCount) {
 	}
 	else if (loopState1 == LoopType::normal) {			// We're leaving a normal loop that's not nested.
 		loopState1 = LoopType::none;
-		getTrack(::channel).channelLength += normalLoopLength * loopCount;		// // //
+		getActiveTrack().channelLength += normalLoopLength * loopCount;		// // //
 	}
 
 	if (loopLabel > 0)
 		loopLengths[loopLabel] = normalLoopLength;
 
 	if (!inRemoteDefinition) {
-		getTrack(::channel).loopLocations.push_back(static_cast<uint16_t>(getTrack(::channel).data.size() + 1));		// // //
+		getActiveTrack().loopLocations.push_back(static_cast<uint16_t>(getActiveTrack().data.size() + 1));		// // //
 		append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, loopCount);
 	}
 	inRemoteDefinition = false;
 	loopLabel = 0;
-	getTrack(::channel).isDefiningLabelLoop = false;		// // //
+	getActiveTrack().isDefiningLabelLoop = false;		// // //
 }
 
 void Music::doLoopRemoteCall(int loopCount, uint16_t loopAdr) {
 	synchronizeStates();		// // //
 	addNoteLength((loopLabel ? loopLengths[loopLabel] : normalLoopLength) * loopCount);		// // //
-	getTrack(::channel).loopLocations.push_back(static_cast<uint16_t>(getTrack(::channel).data.size() + 1));		// // //
+	getActiveTrack().loopLocations.push_back(static_cast<uint16_t>(getActiveTrack().data.size() + 1));		// // //
 	append(AMKd::Binary::CmdType::Loop, loopAdr & 0xFF, loopAdr >> 8, loopCount);
 }
 
@@ -1986,7 +1986,7 @@ void Music::doSubloopExit(int loopCount) {
 	}
 	else if (loopState1 == LoopType::sub) {			// We're leaving a subloop that's not nested.
 		loopState1 = LoopType::none;
-		getTrack(::channel).channelLength += superLoopLength * loopCount;		// // //
+		getActiveTrack().channelLength += superLoopLength * loopCount;		// // //
 	}
 
 	append(AMKd::Binary::CmdType::Subloop, loopCount - 1);		// // //
