@@ -179,8 +179,9 @@ void Music::init() {
 	case Target::AMM:
 		break;
 	case Target::AM4:
-		for (auto &t : tracks)		// // //
-			t.ignoreTuning = true; // AM4 fix for tuning[] related stuff.
+		for (size_t i = 0; i < CHANNELS; ++i)		// // //
+			tracks[i].ignoreTuning = true; // AM4 fix for tuning[] related stuff.
+		loopTrack.ignoreTuning = true;		// // //
 		break;
 	case Target::AMK:
 		/*
@@ -292,10 +293,11 @@ size_t Music::getDataSize() const {
 
 // // //
 void Music::FlushSongData(std::vector<uint8_t> &buf) const {
-	buf.reserve(buf.size() + getDataSize() + tracks[CHANNELS].data.size() + allPointersAndInstrs.size());
+	buf.reserve(buf.size() + getDataSize() + loopTrack.data.size() + allPointersAndInstrs.size());
 	buf.insert(buf.end(), allPointersAndInstrs.cbegin(), allPointersAndInstrs.cend());
-	for (const auto &x : tracks)
-		buf.insert(buf.cend(), x.data.cbegin(), x.data.cend());
+	for (size_t i = 0; i < CHANNELS; ++i)
+		buf.insert(buf.cend(), tracks[i].data.cbegin(), tracks[i].data.cend());
+	buf.insert(buf.cend(), loopTrack.data.cbegin(), loopTrack.data.cend());
 }
 
 void Music::parseComment() {
@@ -590,7 +592,7 @@ void Music::parseRemoteCodeCommand() {
 }
 
 void Music::parseLoopCommand() {
-	prevLoop = static_cast<uint16_t>(tracks[CHANNELS].data.size());		// // //
+	prevLoop = static_cast<uint16_t>(loopTrack.data.size());		// // //
 	if (loopLabel > 0) {
 		if (loopPointers.find(loopLabel) != loopPointers.cend())		// // //
 			error("Label redefinition.");
@@ -1470,13 +1472,11 @@ void Music::pointersFirstPass() {
 	if (std::all_of(tracks, tracks + CHANNELS, [] (const Track &t) { return t.data.empty(); }))		// // //
 		error("This song contained no musical data!");
 
-	if (targetAMKVersion == 1)			// Handle more conversion of the old $FC command to remote call.
-		for (auto &track : tracks) for (const auto &x : track.remoteGainInfo) {		// // //
-			uint16_t dataIndex = x.first;
-			track.loopLocations.push_back(dataIndex);
-			assign_short(track.data.begin() + dataIndex, tracks[CHANNELS].data.size());
-			tracks[CHANNELS].data.insert(tracks[CHANNELS].data.end(), x.second.cbegin(), x.second.cend());
-		}
+	if (targetAMKVersion == 1) {			// Handle more conversion of the old $FC command to remote call.
+		for (size_t i = 0; i < CHANNELS; ++i)
+			tracks[i].insertRemoteCalls(loopTrack);		// // //
+		loopTrack.insertRemoteCalls(loopTrack);
+	}
 
 	for (size_t z = 0; z < CHANNELS; z++)		// // //
 		if (!tracks[z].data.empty())
@@ -1532,7 +1532,7 @@ void Music::pointersFirstPass() {
 		for (size_t i = 0; i < CHANNELS; ++i)		// // //
 			insertPtr(tracks[i].data.empty() ? 0xFFFF : (tracks[i].phrasePointers[1] + headerSize));
 
-	totalSize = headerSize + tracks[CHANNELS].data.size() + getDataSize();		// // //
+	totalSize = headerSize + loopTrack.data.size() + getDataSize();		// // //
 
 	//if (tempo == -1) tempo = 0x36;
 	mainLength = static_cast<unsigned>(-1);		// // //
@@ -1589,8 +1589,6 @@ void Music::pointersFirstPass() {
 	else
 		printChannelDataNonVerbose(totalSize);
 
-	//for (int z = 0; z <= CHANNELS; z++)
-	//{
 	if (verbose) {
 		const hex_formatter hex3 {3};
 		std::cout << '\t';		// // //
@@ -1599,11 +1597,11 @@ void Music::pointersFirstPass() {
 		std::cout << "Ptrs+Instrs: 0x" << hex3 << headerSize << "\n\t";
 		for (size_t i = CHANNELS / 2; i < CHANNELS; ++i)
 			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].data.size() << ' ';
-		std::cout << "Loop:        0x" << hex3 << tracks[CHANNELS].data.size();
+		std::cout << "Loop:        0x" << hex3 << loopTrack.data.size();
 		std::cout << "\nSpace used by echo: 0x" << hex4 << (echoBufferSize << 11) <<
 			" bytes.  Space used by samples: 0x" << hex4 << spaceUsedBySamples << " bytes.\n\n";
 	}
-	//}
+
 	if (totalSize > minSize && minSize > 0) {
 		std::stringstream err;		// // //
 		err << "Song was larger than it could pad out by 0x" << hex4 << totalSize - minSize << " bytes.";
@@ -1614,7 +1612,7 @@ void Music::pointersFirstPass() {
 
 	for (size_t i = 0; i < CHANNELS; ++i)		// // //
 		statStrStream << "CHANNEL " << ('0' + i) << " SIZE:				0x" << hex4 << tracks[i].data.size() << "\n";
-	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << tracks[CHANNELS].data.size() << "\n";
+	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << loopTrack.data.size() << "\n";
 	statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << headerSize << "\n";
 	statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
 	statStrStream << "ECHO SIZE:				0x" << hex4 << (echoBufferSize << 11) << "\n";
@@ -1649,13 +1647,10 @@ void Music::pointersFirstPass() {
 
 // // //
 void Music::adjustLoopPointers() {
-	int normalChannelsSize = getDataSize();		// // //
-	for (Track &t : tracks) {		// // //
-		for (unsigned short x : t.loopLocations) {
-			int temp = (t.data[x] & 0xFF) | (t.data[x + 1] << 8);
-			assign_short(t.data.begin() + x, temp + posInARAM + normalChannelsSize + allPointersAndInstrs.size());		// // //
-		}
-	}
+	int offset = posInARAM + getDataSize() + allPointersAndInstrs.size();
+	for (size_t i = 0; i < CHANNELS; ++i)
+		tracks[i].shiftPointers(offset);
+	loopTrack.shiftPointers(offset);
 }
 
 // // //
@@ -1717,13 +1712,13 @@ void Music::addNoteLength(double ticks) {
 // // //
 void Music::writeState(AMKd::Music::TrackState (AMKd::Music::Track::*state), int val) {
 	tracks[inNormalLoop ? prevChannel : channel].*state = val;		// // //
-	tracks[CHANNELS].*state = val;
+	loopTrack.*state = val;
 }
 
 void Music::resetStates() {
-	tracks[CHANNELS].q = tracks[channel].q;
-	tracks[CHANNELS].o = tracks[channel].o;
-	tracks[CHANNELS].l = tracks[channel].l;
+	loopTrack.q = tracks[channel].q;
+	loopTrack.o = tracks[channel].o;
+	loopTrack.l = tracks[channel].l;
 }
 
 void Music::synchronizeStates() {
@@ -1732,9 +1727,9 @@ void Music::synchronizeStates() {
 		tracks[channel].o.Update();
 		tracks[channel].l.Update();
 	}
-	tracks[CHANNELS].q.Update();
-	tracks[CHANNELS].o.Update();
-	tracks[CHANNELS].l.Update();
+	loopTrack.q.Update();
+	loopTrack.o.Update();
+	loopTrack.l.Update();
 	tracks[channel].lastDuration = 0;
 }
 
@@ -1921,9 +1916,9 @@ void Music::doLoopEnter() {
 	}
 
 	prevChannel = channel;				// We're in a loop now, which is represented as channel 8.
-	tracks[CHANNELS].instrument = tracks[channel].instrument;		// // //
+	loopTrack.instrument = tracks[channel].instrument;		// // //
 	if (songTargetProgram == Target::AM4)
-		tracks[CHANNELS].ignoreTuning = tracks[channel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
+		loopTrack.ignoreTuning = tracks[channel].ignoreTuning; // More AM4 tuning stuff.  Related to the line above it.
 	channel = CHANNELS;					// So we have to back up the current channel.
 }
 

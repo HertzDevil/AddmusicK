@@ -20,6 +20,9 @@ class Track
 public:
 	friend class ::Music;
 
+	void shiftPointers(int offset);
+	void insertRemoteCalls(Track &loop);
+
 	template <typename... Args>
 	void append(Args&&... value) {
 #if __cplusplus > 201402L

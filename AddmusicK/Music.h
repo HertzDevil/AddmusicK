@@ -190,6 +190,7 @@ private:
 	AMKd::MML::SourceFile mml_;		// // //
 
 	AMKd::Music::Track tracks[CHANNELS + 1];		// // //
+	AMKd::Music::Track &loopTrack = tracks[CHANNELS];		// // //
 
 	unsigned int introLength;
 	unsigned int mainLength;
