@@ -645,19 +645,18 @@ void compileGlobalData() {
 	writeFile("asm/SFX1DFCTable.bin", sfxPointers[1]);
 	writeFile("asm/SFXData.bin", allSFXData);
 
-	std::string str = openTextFile("asm/main.asm");		// // //
-
-	size_t pos = str.find("SFXTable0:");
-	if (pos == std::string::npos)
-		fatalError("Error: SFXTable0 not found in main.asm.");
-	str.insert(pos + 10, "\r\nincbin \"SFX1DF9Table.bin\"\r\n");
-
-	pos = str.find("SFXTable1:");
-	if (pos == std::string::npos)
-		fatalError("Error: SFXTable1 not found in main.asm.");
-	str.insert(pos + 10, "\r\nincbin \"SFX1DFCTable.bin\"\r\nincbin \"SFXData.bin\"\r\n");
-
-	writeTextFile("asm/tempmain.asm", str);
+	writeTextFile("asm/tempmain.asm", [] {
+		std::string str = openTextFile("asm/main.asm");		// // //
+		size_t pos = str.find("SFXTable0:");
+		if (pos == std::string::npos)
+			fatalError("Error: SFXTable0 not found in main.asm.");
+		str.insert(pos + 10, "\r\nincbin \"SFX1DF9Table.bin\"\r\n");
+		pos = str.find("SFXTable1:");
+		if (pos == std::string::npos)
+			fatalError("Error: SFXTable1 not found in main.asm.");
+		str.insert(pos + 10, "\r\nincbin \"SFX1DFCTable.bin\"\r\nincbin \"SFXData.bin\"\r\n");
+		return str;
+	});
 
 	removeFile("asm/main.bin");		// // //
 
@@ -698,7 +697,6 @@ void compileMusic() {
 	//}
 
 	std::stringstream songSampleList;
-	std::string s;
 
 	songSampleListSize = 8;
 
@@ -740,14 +738,12 @@ void compileMusic() {
 	}
 
 	songSampleList << "\nSGEnd:";
-	s = songSampleList.str();
-	std::stringstream tempstream;
 
-	tempstream << "org $" << hex6 << PCToSNES(findFreeSpace(songSampleListSize, bankStart, rom)) << "\n\n\n";
-
-	s.insert(0, tempstream.str());
-
-	writeTextFile("asm/SNES/SongSampleList.asm", s);
+	writeTextFile("asm/SNES/SongSampleList.asm", [&] {
+		std::stringstream tempstream;
+		tempstream << "org $" << hex6 << PCToSNES(findFreeSpace(songSampleListSize, bankStart, rom)) << "\n\n\n";
+		return tempstream.str() + songSampleList.str();
+	});
 }
 
 void fixMusicPointers() {
@@ -886,14 +882,13 @@ void fixMusicPointers() {
 	}
 
 	if (recompileMain) {
-		std::string patch = openTextFile("asm/tempmain.asm");		// // //
-
-		patch += globalPointers.str() + "\n" + incbins.str();
-
-		writeTextFile("asm/tempmain.asm", patch);
-
 		if (verbose)
 			std::cout << "Compiling main SPC program, final pass.\n";
+
+		std::string old = openTextFile("asm/tempmain.asm");		// // //
+		writeTextFile("asm/tempmain.asm", [&] {
+			return old + globalPointers.str() + "\n" + incbins.str();
+		});
 
 		//removeFile("asm/SNES/bin/main.bin");
 
@@ -905,7 +900,7 @@ void fixMusicPointers() {
 	}
 
 	std::vector<uint8_t> temp = openFile("asm/SNES/bin/main.bin");		// // //
-	programSize = static_cast<unsigned>(fs::file_size("asm/SNES/bin/main.bin"));		// // //
+	programSize = temp.size();		// // //
 	std::vector<uint8_t> temp2(4);		// // //
 	assign_short(temp2.begin(), programSize);
 	assign_short(temp2.begin() + 2, programPos);
@@ -1135,6 +1130,12 @@ void assembleSNESDriver2() {
 
 	std::string patch = openTextFile("asm/SNES/patch.asm");		// // //
 
+	insertValue(reuploadPos, 4, "!ExpARAMRet = ", patch);
+	insertValue(SRCNTableCodePos, 4, "!TabARAMRet = ", patch);
+	insertValue(mainLoopPos, 4, "!DefARAMRet = ", patch);
+	insertValue(songCount, 2, "!SongCount = ", patch);
+	insertValue(highestGlobalSong, 2, "!GlobalMusicCount = #", patch);
+
 	//removeFile("asm/SNES/temppatch.sfc");
 
 	//writeTextFile("asm/SNES/temppatch.asm", patch);
@@ -1149,22 +1150,16 @@ void assembleSNESDriver2() {
 	//std::vector<uint8_t> patchBin;		// // //
 	//openFile("asm/SNES/temppatch.sfc", patchBin);
 
-	insertValue(reuploadPos, 4, "!ExpARAMRet = ", patch);
-	insertValue(SRCNTableCodePos, 4, "!TabARAMRet = ", patch);
-	insertValue(mainLoopPos, 4, "!DefARAMRet = ", patch);
-	insertValue(songCount, 2, "!SongCount = ", patch);
-
 	size_t pos = patch.find("MusicPtrs:");		// // //
 	if (pos == std::string::npos)
 		fatalError("Error: \"MusicPtrs:"" could not be found.");
-
 	patch = patch.substr(0, pos) + openTextFile("asm/SNES/patch2.asm");		// // //
 
-	std::stringstream musicPtrStr; musicPtrStr << "MusicPtrs: \ndl ";
-	std::stringstream samplePtrStr; samplePtrStr << "\n\nSamplePtrs:\ndl ";
-	std::stringstream sampleLoopPtrStr; sampleLoopPtrStr << "\n\nSampleLoopPtrs:\ndw ";
-	std::stringstream musicIncbins; musicIncbins << "\n\n";
-	std::stringstream sampleIncbins; sampleIncbins << "\n\n";
+	std::stringstream musicPtrStr {"MusicPtrs: \ndl "};		// // //
+	std::stringstream samplePtrStr {"\n\nSamplePtrs:\ndl "};
+	std::stringstream sampleLoopPtrStr {"\n\nSampleLoopPtrs:\ndw "};
+	std::stringstream musicIncbins {"\n\n"};
+	std::stringstream sampleIncbins {"\n\n"};
 
 	if (verbose)
 		std::cout << "Writing music files...\n";
@@ -1225,42 +1220,25 @@ void assembleSNESDriver2() {
 
 		sampleLoopPtrStr << "$" << hex4 << samples[i].loopPoint;
 
-		if ((i & 0xF) == 0xF && i != samples.size() - 1) {
+		if ((i & 0xF) == 0xF && i != n - 1) {
 			samplePtrStr << "\ndl ";
 			sampleLoopPtrStr << "\ndw ";
 		}
-		else if (i != samples.size() - 1) {
+		else if (i != n - 1) {
 			samplePtrStr << ", ";
 			sampleLoopPtrStr << ", ";
 		}
 	}
 
-	patch += "pullpc\n\n";
-
-	musicPtrStr << "\ndl $FFFFFF\n";
-	samplePtrStr << "\ndl $FFFFFF\n";
-
-	patch += musicPtrStr.str();
-	patch += samplePtrStr.str();
-	patch += sampleLoopPtrStr.str();
-
-	//patch += "";
-
-	patch += musicIncbins.str();
-	patch += sampleIncbins.str();
-
-	insertValue(highestGlobalSong, 2, "!GlobalMusicCount = #", patch);
-
-	std::stringstream ss;
-	ss << "\n\norg !SPCProgramLocation" << "\nincbin \"bin/main.bin\"";
-	patch += ss.str();
-
 	removeFile("asm/SNES/temppatch.sfc");		// // //
 
-	std::string undoPatch = openTextFile("asm/SNES/AMUndo.asm");		// // //
-	patch.insert(patch.cbegin(), undoPatch.cbegin(), undoPatch.cend());
-
-	writeTextFile("asm/SNES/temppatch.asm", patch);
+	writeTextFile("asm/SNES/temppatch.asm", [&] {
+		return openTextFile("asm/SNES/AMUndo.asm") + patch + "pullpc\n\n" +
+			musicPtrStr.str() + "\ndl $FFFFFF\n" +
+			samplePtrStr.str() + "\ndl $FFFFFF\n" +
+			sampleLoopPtrStr.str() + musicIncbins.str() + sampleIncbins.str() +
+			"\n\norg !SPCProgramLocation\nincbin \"bin/main.bin\"";		// // //
+	});
 
 	if (verbose)
 		std::cout << "Final compilation...\n";
@@ -1293,17 +1271,15 @@ void assembleSNESDriver2() {
 }
 
 void generateMSC() {
-	fs::path mscname = ROMName.replace_extension(".msc");		// // //
-
-	std::stringstream text;
-
-	for (int i = 0; i < 256; i++) {
-		if (musics[i].exists) {
-			text << hex2 << i << "\t" << 0 << "\t" << musics[i].title << "\n";
-			text << hex2 << i << "\t" << 1 << "\t" << musics[i].title << "\n";
-		}
-	}
-	writeTextFile(mscname, text.str());
+	writeTextFile(ROMName.replace_extension(".msc"), [] {		// // //
+		std::stringstream text;
+		for (const auto &x : musics)
+			if (x.exists) {
+				text << hex2 << x.index << "\t" << 0 << "\t" << x.title << "\n";		// // //
+				text << hex2 << x.index << "\t" << 1 << "\t" << x.title << "\n";
+			}
+		return text.str();
+	});
 }
 
 void cleanUpTempFiles() {

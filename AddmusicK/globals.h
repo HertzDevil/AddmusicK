@@ -96,7 +96,11 @@ void writeFile(const fs::path &fileName, const std::vector<T> &vector) {		// // 
 }
 
 std::string openTextFile(const fs::path &fileName);		// // //
-void writeTextFile(const fs::path &fileName, const std::string &string);
+template <typename F>
+void writeTextFile(const fs::path &fileName, F &&f) {		// // //
+	if (auto out = std::ofstream(fileName))
+		out << f();
+}
 
 void removeFile(const fs::path &fileName);
 

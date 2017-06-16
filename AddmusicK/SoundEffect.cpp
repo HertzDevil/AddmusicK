@@ -433,12 +433,14 @@ void SoundEffect::compileASM() {
 	for (const auto &inf : asmInfo) {
 		codePositions.insert(std::make_pair(&inf.first, code.size()));
 
-		std::stringstream asmCode;
 		removeFile("temp.bin");
 		removeFile("temp.asm");
-		asmCode << "arch spc700-raw\n\norg $000000\nincsrc \"" << "asm/main.asm" << "\"\nbase $" <<
-			hex4 << posInARAM + code.size() + data.size() << "\n\norg $008000\n\n" << inf.second;		// // //
-		writeTextFile("temp.asm", asmCode.str());
+		writeTextFile("temp.asm", [&] {
+			std::stringstream asmCode;
+			asmCode << "arch spc700-raw\n\norg $000000\nincsrc \"" << "asm/main.asm" << "\"\nbase $" <<
+				hex4 << posInARAM + code.size() + data.size() << "\n\norg $008000\n\n" << inf.second;		// // //
+			return asmCode.str();
+		});
 
 		if (!asarCompileToBIN("temp.asm", "temp.bin"))
 			error2("asar reported an error.  Refer to temp.log for details.");

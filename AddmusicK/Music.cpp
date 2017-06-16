@@ -1607,41 +1607,39 @@ void Music::pointersFirstPass() {
 		warn(err.str());		// // //
 	}
 
-	std::stringstream statStrStream;
+	writeTextFile("stats" / fs::path {name}.stem().replace_extension(".txt"), [&] {
+		std::stringstream statStrStream;
 
-	for (Track &t : tracks)		// // //
-		statStrStream << "CHANNEL " << ('0' + t.index) << " SIZE:				0x" << hex4 << t.data.size() << "\n";
-	statStrStream << "LOOP DATA SIZE:				0x" << hex4 << loopTrack.data.size() << "\n";
-	statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << headerSize << "\n";
-	statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
-	statStrStream << "ECHO SIZE:				0x" << hex4 << (echoBufferSize << 11) << "\n";
-	statStrStream << "SONG TOTAL DATA SIZE:			0x" << hex4 << totalSize << "\n";		// // //
+		for (Track &t : tracks)		// // //
+			statStrStream << "CHANNEL " << static_cast<int>('0' + t.index) << " SIZE:				0x" << hex4 << t.data.size() << "\n";
+		statStrStream << "LOOP DATA SIZE:				0x" << hex4 << loopTrack.data.size() << "\n";
+		statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << headerSize << "\n";
+		statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
+		statStrStream << "ECHO SIZE:				0x" << hex4 << (echoBufferSize << 11) << "\n";
+		statStrStream << "SONG TOTAL DATA SIZE:			0x" << hex4 << totalSize << "\n";		// // //
 
-	if (index > highestGlobalSong)
-		statStrStream << "FREE ARAM (APPROXIMATE):		0x" << hex4 << 0x10000 - (echoBufferSize << 11) - spaceUsedBySamples - totalSize - programUploadPos << "\n\n";
-	else
-		statStrStream << "FREE ARAM (APPROXIMATE):		UNKNOWN\n\n";
+		if (index > highestGlobalSong)
+			statStrStream << "FREE ARAM (APPROXIMATE):		0x" << hex4 << 0x10000 - (echoBufferSize << 11) - spaceUsedBySamples - totalSize - programUploadPos << "\n\n";
+		else
+			statStrStream << "FREE ARAM (APPROXIMATE):		UNKNOWN\n\n";
 
-	for (Track &t : tracks)		// // //
-		statStrStream << "CHANNEL " << ('0' + t.index) << " TICKS:			0x" << hex4 << t.channelLength << "\n";
-	statStrStream << '\n';
+		for (Track &t : tracks)		// // //
+			statStrStream << "CHANNEL " << static_cast<int>('0' + t.index) << " TICKS:			0x" << hex4 << static_cast<int>(t.channelLength) << "\n";
+		statStrStream << '\n';
 
-	if (knowsLength) {
-		statStrStream << "SONG INTRO LENGTH IN SECONDS:		" << std::dec << introSeconds << "\n";
-		statStrStream << "SONG MAIN LOOP LENGTH IN SECONDS:	" << mainSeconds << "\n";
-		statStrStream << "SONG TOTAL LENGTH IN SECONDS:		" << introSeconds + mainSeconds << "\n";
-	}
-	else {
-		statStrStream << "SONG INTRO LENGTH IN SECONDS:		UNKNOWN\n";
-		statStrStream << "SONG MAIN LOOP LENGTH IN SECONDS:	UNKNOWN\n";
-		statStrStream << "SONG TOTAL LENGTH IN SECONDS:		UNKNOWN\n";
-	}
+		if (knowsLength) {
+			statStrStream << "SONG INTRO LENGTH IN SECONDS:		" << std::dec << introSeconds << "\n";
+			statStrStream << "SONG MAIN LOOP LENGTH IN SECONDS:	" << mainSeconds << "\n";
+			statStrStream << "SONG TOTAL LENGTH IN SECONDS:		" << introSeconds + mainSeconds << "\n";
+		}
+		else {
+			statStrStream << "SONG INTRO LENGTH IN SECONDS:		UNKNOWN\n";
+			statStrStream << "SONG MAIN LOOP LENGTH IN SECONDS:	UNKNOWN\n";
+			statStrStream << "SONG TOTAL LENGTH IN SECONDS:		UNKNOWN\n";
+		}
 
-	statStr = statStrStream.str();
-
-	auto fname = "stats" / fs::path {name}.stem();		// // //
-	fname.replace_extension(".txt");
-	writeTextFile(fname, statStr);
+		return statStrStream.str();
+	});
 }
 
 // // //

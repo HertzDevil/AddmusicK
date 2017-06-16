@@ -125,27 +125,6 @@ void removeFile(const fs::path &fileName) {
 	}
 }
 
-void writeTextFile(const fs::path &fileName, const std::string &string) {
-	std::ofstream ofs;
-	ofs.open(fileName, std::ios::binary);
-
-	std::string n = string;
-
-#ifdef _WIN32
-	unsigned int i = 0;
-	while (i < n.length()) {
-		if (n[i] == '\n') {
-			n = n.insert(i, "\r");
-			i++;
-		}
-		i++;
-	}
-#endif
-	ofs.write(n.c_str(), n.size());
-
-	ofs.close();
-}
-
 void insertValue(int value, int length, const std::string &find, std::string &str) {
 	size_t pos = str.find(find);
 	if (pos == std::string::npos)		// // //
@@ -153,7 +132,7 @@ void insertValue(int value, int length, const std::string &find, std::string &st
 	pos += find.length();
 
 	std::stringstream ss;
-	ss << hex_formatter(length) << value << std::dec;		// // //
+	ss << hex_formatter(length) << value;		// // //
 	std::string tempStr = ss.str();
 	str.replace(pos + 1, length, tempStr);
 }
@@ -396,12 +375,14 @@ static void asarOutput(F f, G g, const fs::path &filename) {
 	const auto *msg = f(&count);
 	if (!count)
 		return;
-	std::string out;
-	for (int i = 0; i < count; ++i) {
-		out += g(msg[i]);
-		out += '\n';
-	}
-	writeTextFile(filename, out);
+	writeTextFile(filename, [&] {
+		std::string out;
+		for (int i = 0; i < count; ++i) {
+			out += g(msg[i]);
+			out += '\n';
+		}
+		return out;
+	});
 }
 
 // // //
