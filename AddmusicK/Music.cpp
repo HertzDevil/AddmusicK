@@ -1352,11 +1352,11 @@ void Music::parseInstrumentDefinitions() {
 			else if (auto inst = GetParameters<Sep<'@'>, Int>(mml_))
 				pushInst(instrToSample[requires(inst.get<0>(), 0u, 29u,
 												"Cannot use a custom instrument's sample as a base for another custom instrument.")]);
+			else if (GetParameters<Sep<'}'>>(mml_))
+				return;
 			else
-				break;
+				fatalError("Unexpected end of instrument definition.");
 		}
-		if (GetParameters<Sep<'}'>>(mml_))
-			return;
 	}
 	fatalError("Could not find opening curly brace in instrument definition.");
 }

@@ -142,8 +142,8 @@ LEXER_FUNC_START(Lexer::RestDur)
 LEXER_FUNC_START(Lexer::Acc)
 	Accidental s;
 	s.neutral = file.Trim('_');
-	for (char ch : *file.Trim("[+-]{0,3}"))
-//	for (char ch : *file.Trim("[+-]*"))
+	auto acc = *file.Trim("[+\\-]{0,3}");
+	for (char ch : acc)
 		s.offset += ch == '+' ? 1 : -1;
 	return s;
 }

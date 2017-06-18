@@ -2,7 +2,7 @@
 #define __STDC_WANT_LIB_EXT1__ 1
 #endif
 
-#include <cstdio>
+#include <stdio.h>
 
 class AddMusic
 {
