@@ -26,11 +26,6 @@ using Track = AMKd::Music::Track;		// // //
 #define DIR_ERROR(name) "Error parsing " name " directive."
 #define DIR_ILLEGAL(name) "Illegal value for " name " directive."
 
-template <typename T, typename U, typename V>
-decltype(auto) apply_this(T &&fn, U pObj, V &&tup) {
-	return std::apply(std::forward<T>(fn), std::tuple_cat(std::make_tuple(pObj), std::forward<V>(tup)));
-}
-
 template <typename T, typename U>
 T requires(T x, T min, T max, U&& err) {
 	return (x >= min && x <= max) ? x :
@@ -395,13 +390,10 @@ void Music::parsePanCommand() {
 	using namespace AMKd::MML::Lexer;
 	if (auto param = GetParameters<Int>(mml_)) {
 		unsigned pan = requires(param.get<0>(), 0u, 20u, CMD_ILLEGAL("pan", "y"));
-		if (auto panParam = GetParameters<Comma, Int, Comma, Int>(mml_)) {
-			if (requires(panParam.get<0>(), 0u, 1u, CMD_ILLEGAL("pan", "y")))
-				pan |= 1 << 7;
-			if (requires(panParam.get<1>(), 0u, 1u, CMD_ILLEGAL("pan", "y")))
-				pan |= 1 << 6;
-		}
-		return append(AMKd::Binary::CmdType::Pan, pan);		// // //
+		bool sLeft = false, sRight = false;
+		if (auto surround = GetParameters<Comma, Bool, Comma, Bool>(mml_))
+			std::tie(sLeft, sRight) = *surround;
+		return doPan(pan, sLeft, sRight);
 	}
 
 	error(CMD_ERROR("pan", "y"));		// // //
@@ -764,11 +756,7 @@ void Music::insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<u
 // // //
 
 void Music::parseHexCommand() {
-	auto hex = AMKd::MML::Lexer::Hex<2>()(mml_);		// // //
-	if (!hex)
-		error("Error parsing hex command.");
-	int i = *hex;
-
+	int i;
 	using namespace AMKd::MML::Lexer;
 	const auto getval = [&] {		// // // TODO: remove
 		auto param = GetParameters<Byte>(mml_);
@@ -776,6 +764,9 @@ void Music::parseHexCommand() {
 			error("Error parsing hex command.");
 		i = param.get<0>();
 	};
+
+	mml_.Unput();
+	getval();
 
 	if (!validateHex) {
 		append(i);
@@ -796,17 +787,13 @@ void Music::parseHexCommand() {
 		append(i);
 		return;
 	case AMKd::Binary::CmdType::Pan:
-		append(currentHex);
-		getval();
-		append(i);
-		return;
+		if (auto param = GetParameters<Byte>(mml_))
+			return doPan(param.get<0>() & 0x3F, param.get<0>() & 0x80, param.get<0>() & 0x40);
+		break;
 	case AMKd::Binary::CmdType::PanFade:
-		append(currentHex);
-		getval();
-		append(divideByTempoRatio(i, false));
-		getval();
-		append(i);
-		return;
+		if (auto param = GetParameters<Byte, Byte>(mml_))
+			return doPanFade(param.get<1>(), param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::Portamento:
 		append(currentHex);
 		getval();
@@ -818,41 +805,30 @@ void Music::parseHexCommand() {
 		return;
 	case AMKd::Binary::CmdType::Vibrato:
 		if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
-			return apply_this(&Music::doVibrato, this, *param);
-		error("Unknown hex command.");
+			return doVibrato(param.get<0>(), param.get<1>(), param.get<2>());
+		break;
 	case AMKd::Binary::CmdType::VibratoOff:
-		append(currentHex);
-		return;
+		return doVibratoOff();
 	case AMKd::Binary::CmdType::VolGlobal:
 		if (auto param = GetParameters<Byte>(mml_))
-			return apply_this(&Music::doGlobalVolume, this, *param);
-		error("Unknown hex command.");
+			return doGlobalVolume(param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::VolGlobalFade:
-		append(currentHex);
-		getval();
-		append(divideByTempoRatio(i, false));
-		getval();
-		append(i);
-		return;
+		if (auto param = GetParameters<Byte, Byte>(mml_))
+			return doGlobalVolume(param.get<1>(), param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::Tempo:
 		if (auto param = GetParameters<Byte>(mml_))
-			return apply_this(&Music::doTempo, this, *param);
-		error("Unknown hex command.");
+			return doTempo(param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::TempoFade:
-		guessLength = false; // NOPE.  Nope nope nope nope nope nope nope nope nope nope.
-		append(currentHex);
-		getval();
-		append(divideByTempoRatio(i, false));
-		getval();
-		append(i);
-		return;
+		if (auto param = GetParameters<Byte, Byte>(mml_))
+			return doTempo(param.get<1>(), param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::TrspGlobal:
-		append(currentHex);
-		getval();
-		if (songTargetProgram == Target::AM4)	// // // AM4 seems to do something strange with $E4?
-			++i &= 0xFF;
-		append(i);
-		return;
+		if (auto param = GetParameters<Byte>(mml_))
+			return doTransposeGlobal(param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::Tremolo:
 		if (auto first = GetParameters<Byte>(mml_)) {		// // //
 			if (songTargetProgram == Target::AM4 && first.get<0>() >= 0x80) {
@@ -862,9 +838,9 @@ void Music::parseHexCommand() {
 				return doSampleLoad(i - 0x80, param.get<0>());
 			}
 			if (auto remain = GetParameters<Byte, Byte>(mml_))
-				return apply_this(&Music::doTremolo, this, std::tuple_cat(*first, *remain));
+				return doTremolo(first.get<0>(), remain.get<0>(), remain.get<1>());
 		}
-		error("Unknown hex command.");
+		break;
 	case AMKd::Binary::CmdType::Subloop:
 		if (songTargetProgram == Target::AM4)		// // // N-SPC tremolo off
 			return doTremoloOff();		// // //
@@ -872,18 +848,15 @@ void Music::parseHexCommand() {
 			int repeats = param.get<0>();
 			return repeats ? doSubloopExit(repeats + 1) : doSubloopEnter();
 		}
-		error("Unknown hex command.");
+		break;
 	case AMKd::Binary::CmdType::Vol:
 		if (auto param = GetParameters<Byte>(mml_))
-			return apply_this(&Music::doVolume, this, *param);
-		error("Unknown hex command.");
+			return doVolume(param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::VolFade:
-		append(currentHex);
-		getval();
-		append(divideByTempoRatio(i, false));
-		getval();
-		append(i);
-		return;
+		if (auto param = GetParameters<Byte, Byte>(mml_))
+			return doVolume(param.get<1>(), param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::Loop:
 		append(currentHex);
 		getval();
@@ -894,10 +867,9 @@ void Music::parseHexCommand() {
 		append(i);
 		return;
 	case AMKd::Binary::CmdType::VibratoFade:
-		append(currentHex);
-		getval();
-		append(divideByTempoRatio(i, false));
-		return;
+		if (auto param = GetParameters<Byte>(mml_))
+			return doVibratoFade(param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::BendAway:
 	case AMKd::Binary::CmdType::BendTo:
 		append(currentHex);
@@ -916,58 +888,31 @@ void Music::parseHexCommand() {
 			return;
 		}
 		if (auto param = GetParameters<Byte, Byte>(mml_))
-			return apply_this(&Music::doEnvelope, this, *param);
-		error("Unknown hex command.");
+			return doEnvelope(param.get<0>(), param.get<1>());
+		break;
 	case AMKd::Binary::CmdType::Detune:
 		append(currentHex);
 		getval();
 		append(i);
 		return;
-	case AMKd::Binary::CmdType::Echo1:
-		append(currentHex);
-		getval();
-		append(i);
-		getval();
-		append(i);
-		getval();
-		append(i);
-		return;
+	case AMKd::Binary::CmdType::EchoVol:
+		if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
+			return doEchoVolume(param.get<0>(), param.get<1>(), param.get<2>());
+		break;
 	case AMKd::Binary::CmdType::EchoOff:
-		append(currentHex);
-		return;
-	case AMKd::Binary::CmdType::Echo2:
-		append(currentHex);
-		getval();
-		append(i);
-		echoBufferSize = std::max(echoBufferSize, i);
-		getval();
-		append(i);
-		getval();
-		// Print error for AM4 songs that attempt to use an invalid FIR filter. They both
-		// A) won't sound like their originals and
-		// B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
-		if (songTargetProgram == Target::AM4) {		// // //
-			if (i > 1) {
-				std::stringstream ss;		// // //
-				ss << '$' << hex2 << i;
-				error(ss.str() + " is not a valid FIR filter for the $F1 command. Must be either $00 or $01.");
-			}
-		}
-		append(i);
-		return;
+		return doEchoOff();
+	case AMKd::Binary::CmdType::EchoParams:
+		if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
+			return doEchoParams(param.get<0>(), param.get<1>(), param.get<2>());
+		break;
 	case AMKd::Binary::CmdType::EchoFade:
-		append(currentHex);
-		getval();
-		append(divideByTempoRatio(i, false));
-		getval();
-		append(i);
-		getval();
-		append(i);
-		return;
+		if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
+			return doEchoFade(param.get<1>(), param.get<2>(), param.get<0>());
+		break;
 	case AMKd::Binary::CmdType::SampleLoad:
 		if (auto param = GetParameters<Byte, Byte>(mml_))
-			return apply_this(&Music::doSampleLoad, this, *param);
-		error("Unknown hex command.");
+			return doSampleLoad(param.get<0>(), param.get<1>());
+		break;
 	case AMKd::Binary::CmdType::ExtF4:
 		append(currentHex);
 		getval();
@@ -1013,7 +958,7 @@ void Music::parseHexCommand() {
 	case AMKd::Binary::CmdType::ExtFA:
 		getval();
 		// // // More code conversion.
-		if (targetAMKVersion == 1 && i == 0x05) {
+		if (targetAMKVersion == 1 && i == AMKd::Binary::CmdOptionFA::GainOld) {
 			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 			auto &track = getBaseTrack();		// // //
 
@@ -1022,7 +967,7 @@ void Music::parseHexCommand() {
 
 			if (track.usingFA)
 				if (track.usingFC)
-					insertRemoteConversion(0x05, track.lastFCDelayValue,
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOffConv, track.lastFCDelayValue,
 						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00});
 				else {
 					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
@@ -1034,7 +979,7 @@ void Music::parseHexCommand() {
 				insertRemoteConversion(AMKd::Binary::CmdOptionFC::Disable, 0x00, {});
 			return;
 		}
-		if (targetAMKVersion > 1 && i == 0x05)
+		if (targetAMKVersion > 1 && i == AMKd::Binary::CmdOptionFA::GainOld)
 			error("$FA $05 in #amk 2 or above has been replaced with remote code.");		// // //
 		append(currentHex);
 		append(i);
@@ -1059,7 +1004,7 @@ void Music::parseHexCommand() {
 			}
 			return;
 		}
-		error("Unknown hex command.");
+		break;
 	case AMKd::Binary::CmdType::Callback:
 		if (targetAMKVersion == 1) {
 			//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
@@ -1072,7 +1017,7 @@ void Music::parseHexCommand() {
 
 				getval();
 				if (track.usingFA)
-					insertRemoteConversion(0x05, track.lastFCDelayValue,
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOffConv, track.lastFCDelayValue,
 						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, static_cast<uint8_t>(i), 0x00});
 				else {
 					insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
@@ -1105,20 +1050,16 @@ void Music::parseHexCommand() {
 		append(i);
 		return;
 	case 0xFD: case 0xFE: case 0xFF:
-		error("Unknown hex command.");
+		break;
 	default:
-		if (currentHex < AMKd::Binary::CmdType::Inst && manualNoteWarning) {
-			if (targetAMKVersion == 0) {
-				warn("Warning: A hex command was found that will act as a note instead of a special\n"
+		if (targetAMKVersion == 0 && i < AMKd::Binary::CmdType::Inst && std::exchange(manualNoteWarning, false))
+			return warn("Warning: A hex command was found that will act as a note instead of a special\n"
 						"effect. If this is a song you're using from someone else, you can most likely\n"
 						"ignore this message, though it may indicate that a necessary #amm or #am4 is\n"
 						"missing.");		// // //
-				manualNoteWarning = false;
-				return;
-			}
-			error("Unknown hex command.");
-		}
 	}
+
+	error("Unknown hex command.");		// // //
 }
 
 void Music::parseNote(int note) {		// // //
@@ -1139,7 +1080,8 @@ void Music::parseNote(int note) {		// // //
 // // //
 void Music::parseNoteCommon(int offset) {
 	//am4silence++;
-	int note = getPitch(offset);
+	using namespace AMKd::MML::Lexer;		// // //
+	int note = getPitch(offset + GetParameters<Acc>(mml_)->offset);
 	if (getActiveTrack().instrument >= 21 && getActiveTrack().instrument < 30) {		// // //
 		note = 0xD0 + (getActiveTrack().instrument - 21);
 		if (!(channel == 6 || channel == 7 || (inNormalLoop && (prevChannel == 6 || prevChannel == 7))))	// If this is not a SFX channel,
@@ -1429,14 +1371,10 @@ Track &Music::getBaseTrack() {
 
 int Music::getPitch(int i) {
 	i += (getActiveTrack().o.Get() - 1) * 12 + 0x80;		// // //
-	using namespace AMKd::MML::Lexer;
-	i += GetParameters<Acc>(mml_)->offset;
-
 	if (getActiveTrack().usingH)		// // //
 		i += getActiveTrack().h;
 	else if (!getActiveTrack().ignoreTuning)		// // // More AM4 tuning stuff
 		i -= transposeMap[getActiveTrack().instrument];
-	
 	return requires(i, 0x80, static_cast<int>(AMKd::Binary::CmdType::Tie) - 1, "Note's pitch is out of range.");
 }
 
@@ -1855,8 +1793,50 @@ void Music::doVolume(int vol) {
 	append(AMKd::Binary::CmdType::Vol, vol);
 }
 
+void Music::doVolume(int vol, int fadeLen) {
+	append(AMKd::Binary::CmdType::VolFade, divideByTempoRatio(fadeLen, false), vol);
+}
+
 void Music::doGlobalVolume(int vol) {
 	append(AMKd::Binary::CmdType::VolGlobal, vol);
+}
+
+void Music::doGlobalVolume(int vol, int fadeLen) {
+	append(AMKd::Binary::CmdType::VolGlobalFade, divideByTempoRatio(fadeLen, false), vol);
+}
+
+void Music::doPan(int pan, bool sLeft, bool sRight) {
+	append(AMKd::Binary::CmdType::Pan, pan | (sLeft << 7) | (sRight << 6));
+}
+
+void Music::doPanFade(int pan, int fadeLen) {
+	append(AMKd::Binary::CmdType::PanFade, divideByTempoRatio(fadeLen, false), pan);
+}
+
+void Music::doEchoVolume(int left, int right, int mask) {
+	append(AMKd::Binary::CmdType::EchoVol, mask, left, right);
+}
+
+void Music::doEchoParams(int delay, int reverb, int firIndex) {
+	// Print error for AM4 songs that attempt to use an invalid FIR filter. They both
+	// A) won't sound like their originals and
+	// B) may crash the DSP (or for whatever reason that causes SPCPlayer to go silent with them).
+	if (songTargetProgram == Target::AM4 && firIndex > 1)		// // //
+		error("Invalid FIR filter index for the $F1 command.");
+	echoBufferSize = std::max(echoBufferSize, delay);
+	append(AMKd::Binary::CmdType::EchoParams, delay, reverb, firIndex);
+}
+
+void Music::doEchoFade(int left, int right, int fadeLen) {
+	append(AMKd::Binary::CmdType::EchoFade, divideByTempoRatio(fadeLen, false), left, right);
+}
+
+void Music::doEchoOff() {
+	append(AMKd::Binary::CmdType::EchoOff);
+}
+
+void Music::doEchoToggle() {
+	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::EchoToggle);
 }
 
 void Music::doInstrument(int inst, bool add) {
@@ -1889,12 +1869,20 @@ void Music::doInstrument(int inst, bool add) {
 
 void Music::doVibrato(int delay, int rate, int depth) {
 	append(AMKd::Binary::CmdType::Vibrato,
-		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);		// // //
+		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);
+}
+
+void Music::doVibratoOff() {
+	append(AMKd::Binary::CmdType::VibratoOff);
+}
+
+void Music::doVibratoFade(int fadeLen) {
+	append(AMKd::Binary::CmdType::VibratoFade, divideByTempoRatio(fadeLen, false));
 }
 
 void Music::doTremolo(int delay, int rate, int depth) {
 	append(AMKd::Binary::CmdType::Tremolo,
-		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);		// // //
+		divideByTempoRatio(delay, false), multiplyByTempoRatio(rate), depth);
 }
 
 void Music::doTremoloOff() {
@@ -1913,6 +1901,22 @@ void Music::doTempo(int speed) {
 		guessLength = false;
 	else
 		tempoChanges.emplace_back(getActiveTrack().channelLength, tempo);		// // //
+}
+
+void Music::doTempo(int speed, int fadeLen) {
+	tempo = requires(divideByTempoRatio(speed, false), 0x01, 0xFF, "Tempo has been zeroed out by #halvetempo");		// // //
+	guessLength = false; // NOPE.  Nope nope nope nope nope nope nope nope nope nope.
+	append(AMKd::Binary::CmdType::TempoFade, divideByTempoRatio(fadeLen, false), tempo);
+}
+
+void Music::doTranspose(int offset) {
+	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Transpose, offset);
+}
+
+void Music::doTransposeGlobal(int offset) {
+	if (songTargetProgram == Target::AM4)	// // // AM4 seems to do something strange with $E4?
+		++offset;
+	append(AMKd::Binary::CmdType::TrspGlobal, offset);
 }
 
 void Music::doSampleLoad(int id, int mult) {

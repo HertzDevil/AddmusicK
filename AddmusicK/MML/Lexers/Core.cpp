@@ -5,6 +5,13 @@
 
 using namespace AMKd::MML;
 
+LEXER_FUNC_START(Lexer::Bool)
+	if (file.Trim('1'))
+		return true;
+	if (file.Trim('0'))
+		return false;
+LEXER_FUNC_END()
+
 LEXER_FUNC_START(Lexer::Int)
 //	if (file.Trim("\\$"))
 //		return Hex2()(file);

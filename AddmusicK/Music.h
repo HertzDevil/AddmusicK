@@ -119,19 +119,34 @@ private:
 
 	void parseSPCInfo();
 
+public:
 	// // // action methods, these will become objects later
 	void doNote(int note, int fullTicks, int bendTicks, bool nextPorta);
 	void doOctave(int oct);
 	void doRaiseOctave();
 	void doLowerOctave();
 	void doVolume(int vol);
+	void doVolume(int vol, int fadeLen);
 	void doGlobalVolume(int vol);
+	void doGlobalVolume(int vol, int fadeLen);
+	void doPan(int pan, bool sLeft, bool sRight);
+	void doPanFade(int pan, int fadeLen);
+	void doEchoVolume(int left, int right, int mask);
+	void doEchoParams(int delay, int reverb, int firIndex);
+	void doEchoFade(int left, int right, int fadeLen);
+	void doEchoOff();
+	void doEchoToggle();
 	void doInstrument(int inst, bool add);
 	void doVibrato(int delay, int rate, int depth);
+	void doVibratoOff();
+	void doVibratoFade(int fadeLen);
 	void doTremolo(int delay, int rate, int depth);
 	void doTremoloOff();
 	void doEnvelope(int ad, int sr);
 	void doTempo(int speed);
+	void doTempo(int speed, int fadeLen);
+	void doTranspose(int offset);
+	void doTransposeGlobal(int offset);
 	void doSampleLoad(int index, int mult);
 	void doLoopEnter();					// Call any time a definition of a loop is entered.
 	void doLoopExit(int loopCount);			// Call any time a definition of a loop is exited.
@@ -140,6 +155,7 @@ private:
 	void doSubloopExit(int loopCount);		// // // Call any time a definition of a super loop is exited.
 	void doVolumeTable(bool louder);
 
+private:
 	template <typename... Args>		// // //
 	void append(Args&&... value);
 

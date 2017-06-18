@@ -3,14 +3,12 @@
 #include <cstdint>
 
 #define SCOPED_ENUM_START(T, U) \
-	struct T \
-	{ \
-		T() = delete; \
+	namespace T { \
 		enum : U {
 
-#define SCOPED_ENUM_END(...) \
+#define SCOPED_ENUM_END() \
 		}; \
-	};
+	}
 
 namespace AMKd::Binary {
 
@@ -39,9 +37,9 @@ SCOPED_ENUM_START(CmdType, uint8_t)
 	BendTo        = 0xEC,
 	Envelope      = 0xED,
 	Detune        = 0xEE,
-	Echo1         = 0xEF,
+	EchoVol       = 0xEF,
 	EchoOff       = 0xF0,
-	Echo2         = 0xF1,
+	EchoParams    = 0xF1,
 	EchoFade      = 0xF2,
 	SampleLoad    = 0xF3,
 	ExtF4         = 0xF4,
@@ -73,16 +71,18 @@ SCOPED_ENUM_START(CmdOptionFA, uint8_t)
 	Transpose  = 0x02,
 	Amplify    = 0x03,
 	EchoBuffer = 0x04,
+	GainOld    = 0x05,
 	VolTable   = 0x06,		// // // not in manual
 SCOPED_ENUM_END()
 
 SCOPED_ENUM_START(CmdOptionFC, uint8_t)
-	Disable = 0x00,
-	Sustain = 0x01,
-	Release = 0x02,
-	KeyOff  = 0x03,
-	Once    = 0x04,
-	KeyOn   = 0xFF,
+	Disable    = 0x00,
+	Sustain    = 0x01,
+	Release    = 0x02,
+	KeyOff     = 0x03,
+	Once       = 0x04,
+	KeyOffConv = 0x05,
+	KeyOn      = 0xFF,
 SCOPED_ENUM_END()
 
 } // namespace AMKd::Binary

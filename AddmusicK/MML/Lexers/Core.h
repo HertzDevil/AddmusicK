@@ -178,6 +178,7 @@ GetParameters(SourceFile &file) {
 		return std::nullopt; \
 	}
 
+LEXER_DECL(Bool, bool)
 LEXER_DECL(Int, unsigned)
 LEXER_DECL(HexInt, unsigned)
 LEXER_DECL(SInt, int)
