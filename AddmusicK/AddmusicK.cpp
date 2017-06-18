@@ -760,124 +760,84 @@ void fixMusicPointers() {
 
 	bool addedLocalPtr = false;
 
-	for (int i = 0; i < 256; i++) {
-		if (musics[i].exists == false) continue;
+	for (auto &music : musics) if (music.exists) {		// // //
+		const bool isGlobal = (music.index <= highestGlobalSong);
 
-		musics[i].posInARAM = songDataARAMPos;
+		music.posInARAM = songDataARAMPos;
+		music.adjustHeaderPointers();		// // //
+		music.adjustLoopPointers();		// // //
 
-		if (i <= highestGlobalSong) {
-			globalPointers << "\ndw song" << hex2 << i;
-			incbins << "song" << hex2 << i << ": incbin \"" << "SNES/bin/" << "music" << hex2 << i << ".bin\"\n";
-		}
-		else if (addedLocalPtr == false) {
-			globalPointers << "\ndw localSong";
-			incbins << "localSong: ";
-			addedLocalPtr = true;
-		}
+		int sizeWithPadding = (music.minSize > 0) ? music.minSize : music.totalSize;
 
-		for (int j = 0, n = musics[i].allPointersAndInstrs.size(); j < n; j += 2) {		// // //
-			if (j == musics[i].instrumentPos)		// // //
-				j += musics[i].instrumentData.size();
+		auto finalData = music.getSongData();		// // //
+		if (isGlobal && music.minSize > 0 && finalData.size() < music.minSize)
+			finalData.resize(music.minSize);
 
-			auto it = musics[i].allPointersAndInstrs.begin() + j;		// // //
-			int temp = *it | (*(it + 1) << 8);
-
-			if (temp == 0xFFFF)		// 0xFFFF = swap with 0x0000.
-				assign_short(it, 0);		// // //
-			else if (temp == 0xFFFE)	// 0xFFFE = swap with 0x00FF.
-				assign_short(it, 0x00FF);		// // //
-			else
-				assign_short(it, temp + musics[i].posInARAM);		// // //
-		}
-
-		musics[i].adjustLoopPointers();		// // //
-
-		std::vector<uint8_t> final;		// // //
-
-		int sizeWithPadding = (musics[i].minSize > 0) ? musics[i].minSize : musics[i].totalSize;
-
-		if (i > highestGlobalSong) {
-			int RATSSize = musics[i].totalSize + 4 - 1;
-			final.resize(0x0C);		// // //
-			assign_val<4>(final.begin(), 0x52415453); // "STAR"
-			assign_short(final.begin() + 4, RATSSize);
-			assign_short(final.begin() + 6, ~RATSSize);
-			assign_short(final.begin() + 8, sizeWithPadding);
-			assign_short(final.begin() + 10, songDataARAMPos);
-		}
-
-		musics[i].FlushSongData(final);		// // //
-
-		if (musics[i].minSize > 0 && i <= highestGlobalSong)
-			while (final.size() < musics[i].minSize)
-				final.push_back(0);
-
-		if (i > highestGlobalSong) {
-			musics[i].finalData.resize(final.size() - 12);
-			musics[i].finalData.assign(final.begin() + 12, final.end());
+		if (!isGlobal) {
+			std::vector<uint8_t> header(0x0C);
+			int RATSSize = music.totalSize + 4 - 1;
+			assign_val<4>(header.begin(), 0x52415453); // "STAR"
+			assign_short(header.begin() + 4, RATSSize);
+			assign_short(header.begin() + 6, ~RATSSize);
+			assign_short(header.begin() + 8, sizeWithPadding);
+			assign_short(header.begin() + 10, songDataARAMPos);
+			music.finalData = finalData;
+			finalData.insert(finalData.cbegin(), header.cbegin(), header.cend());
 		}
 
 		std::stringstream fname;
-		fname << "asm/SNES/bin/music" << hex2 << i << ".bin";
-		writeFile(fname.str(), final);
+		fname << "asm/SNES/bin/music" << hex2 << music.index << ".bin";
+		writeFile(fname.str(), finalData);
 
-		if (i <= highestGlobalSong) {
+		if (isGlobal)
 			songDataARAMPos += static_cast<uint16_t>(sizeWithPadding);		// // //
-		}
-		else {
-			if (checkEcho) {
-				musics[i].spaceInfo.songStartPos = songDataARAMPos;
-				musics[i].spaceInfo.songEndPos = musics[i].spaceInfo.songStartPos + sizeWithPadding;
+		else if (checkEcho) {
+			auto &info = music.spaceInfo;		// // //
+			info.songStartPos = songDataARAMPos;
+			info.songEndPos = info.songStartPos + sizeWithPadding;
 
-				int checkPos = songDataARAMPos + sizeWithPadding;
-				if ((checkPos & 0xFF) != 0) checkPos = ((checkPos >> 8) + 1) << 8;
+			int checkPos = (songDataARAMPos + sizeWithPadding + 0xFF) / 0x100 * 0x100;		// // //
 
-				musics[i].spaceInfo.sampleTableStartPos = checkPos;
+			info.sampleTableStartPos = checkPos;
+			checkPos += music.mySamples.size() * 4;
+			info.sampleTableEndPos = checkPos;
 
-				checkPos += musics[i].mySamples.size() * 4;
-
-				musics[i].spaceInfo.sampleTableEndPos = checkPos;
-
-				int importantSampleCount = 0;
-				for (unsigned int j = 0; j < musics[i].mySamples.size(); j++) {
-					auto thisSample = musics[i].mySamples[j];
-					auto thisSampleSize = samples[thisSample].data.size();
-					bool sampleIsImportant = samples[thisSample].important;
-					if (sampleIsImportant) importantSampleCount++;
-
-					musics[i].spaceInfo.individualSampleStartPositions.push_back(checkPos);
-					musics[i].spaceInfo.individualSampleEndPositions.push_back(checkPos + thisSampleSize);
-					musics[i].spaceInfo.individialSampleIsImportant.push_back(sampleIsImportant);
-
-					checkPos += thisSampleSize;
-				}
-				musics[i].spaceInfo.importantSampleCount = importantSampleCount;
-
-				if ((checkPos & 0xFF) != 0) checkPos = ((checkPos >> 8) + 1) << 8;
-
-				//musics[i].spaceInfo.echoBufferStartPos = checkPos;
-
-				checkPos += musics[i].echoBufferSize << 11;
-
-				//musics[i].spaceInfo.echoBufferEndPos = checkPos;
-
-				musics[i].spaceInfo.echoBufferEndPos = 0x10000;
-				if (musics[i].echoBufferSize > 0) {
-					musics[i].spaceInfo.echoBufferStartPos = 0x10000 - (musics[i].echoBufferSize << 11);
-					musics[i].spaceInfo.echoBufferEndPos = 0x10000;
-				}
-				else {
-					musics[i].spaceInfo.echoBufferStartPos = 0xFF00;
-					musics[i].spaceInfo.echoBufferEndPos = 0xFF04;
-				}
-
-				if (checkPos > 0x10000) {
-					std::stringstream ss;		// // //
-					ss << musics[i].getFileName() << ":\nEcho buffer exceeded total space in ARAM by 0x" <<
-						hex4 << checkPos - 0x10000 << " bytes.";
-					fatalError(ss.str());
-				}
+			for (unsigned int j = 0; j < music.mySamples.size(); j++) {
+				auto thisSample = music.mySamples[j];
+				int thisSampleSize = samples[thisSample].data.size();
+				bool sampleIsImportant = samples[thisSample].important;
+				info.individualSamples.push_back({checkPos, checkPos + thisSampleSize, sampleIsImportant});		// // //
+				checkPos += thisSampleSize;
 			}
+
+			//info.echoBufferStartPos = checkPos;
+			checkPos = (checkPos + (music.echoBufferSize << 11) + 0xFF) / 0x100 * 0x100;		// // //
+			//info.echoBufferEndPos = checkPos;
+
+			if (music.echoBufferSize > 0) {
+				info.echoBufferStartPos = 0x10000 - (music.echoBufferSize << 11);
+				info.echoBufferEndPos = 0x10000;
+			}
+			else {
+				info.echoBufferStartPos = 0xFF00;
+				info.echoBufferEndPos = 0xFF04;
+			}
+
+			if (checkPos > 0x10000) {
+				std::stringstream ss;		// // //
+				ss << music.getFileName() << ":\nEcho buffer exceeded total space in ARAM by 0x" <<
+					hex4 << checkPos - 0x10000 << " bytes.";
+				fatalError(ss.str());
+			}
+		}
+
+		if (isGlobal) {
+			globalPointers << "\ndw song" << hex2 << music.index;
+			incbins << "song" << hex2 << music.index << ": incbin \"" << "SNES/bin/" << "music" << hex2 << music.index << ".bin\"\n";
+		}
+		else if (!std::exchange(addedLocalPtr, true)) {
+			globalPointers << "\ndw localSong";
+			incbins << "localSong: ";
 		}
 	}
 
@@ -1439,109 +1399,28 @@ std::time_t getLastModifiedTime() {
 
 void generatePNGs()
 {
-	for (auto &current : musics)
-	{
-		if (current.index <= highestGlobalSong) continue;
-		if (current.exists == false) continue;
+	const int width = 1024;
+	const int height = 64;
 
-		std::vector<unsigned char> bitmap;
-		// 1024 pixels wide, 64 pixels tall, 4 bytes per pixel
+	for (const auto &current : musics) if (current.index > highestGlobalSong && current.exists) {
+		const auto &info = current.spaceInfo;
 
-		const int width = 1024;
-		const int height = 64;
-
-		bitmap.resize(width * height * 4);
-
-		int x = 0;
-		int y = 0;
-
-
-		for (int i = 0; i < width * height; i++)
-		{
-			unsigned char r = 0;
-			unsigned char g = 0;
-			unsigned char b = 0;
-			unsigned char a = 255;
-
-			if (i >= 0 && i < programUploadPos)
-			{
-				r = 255;
-			}
-			else if (i >= programUploadPos && i < programPos + programSize)
-			{
-				r = 255;
-				g = 255;
-			}
-			else if (i >= current.spaceInfo.songStartPos && i < current.spaceInfo.songEndPos)
-			{
-				g = 128;
-			}
-			else if (i >= current.spaceInfo.sampleTableStartPos && i < current.spaceInfo.sampleTableEndPos)
-			{
-				g = 255;
-			}
-			else if (i >= current.spaceInfo.individualSampleStartPositions[0] && i < current.spaceInfo.individualSampleEndPositions[current.spaceInfo.individualSampleEndPositions.size() - 1])
-			{
-				int currentSampleIndex = 0;
-
-				for (auto currentSampleEndPos : current.spaceInfo.individualSampleEndPositions)
-				{
-					if (currentSampleEndPos > i) break;
-
-					currentSampleIndex++;
-				}
-
-				bool sampleIsImportant = current.spaceInfo.individialSampleIsImportant[currentSampleIndex];
-
-				int sampleCount = current.spaceInfo.individualSampleStartPositions.size();
-
-				b = static_cast<unsigned char>(static_cast<double>(currentSampleIndex) / static_cast<double>(sampleCount)* 127.0 + 128.0);
-
-
-				if (sampleIsImportant)
-				{
-					g = static_cast<unsigned char>(static_cast<double>(currentSampleIndex) / static_cast<double>(sampleCount)* 127.0 + 128.0);
-				}
-			}
-			else if (i >= current.spaceInfo.echoBufferStartPos && i < current.spaceInfo.echoBufferEndPos)
-			{
-				r = 160;
-				b = 160;
-			}
-			else if (i >= current.spaceInfo.echoBufferEndPos)
-			{
-				r = 63;
-				b = 63;
-				g = 63;
-			}
-
-			int bitmapIndex = y * width + x;
-
-
-			if ((bitmapIndex*4)+3 >= bitmap.size())
-				break;				// This should never happen, but let's be safe.
-
-			bitmap[(bitmapIndex*4)+0] = r;
-			bitmap[(bitmapIndex*4)+1] = g;
-			bitmap[(bitmapIndex*4)+2] = b;
-			bitmap[(bitmapIndex*4)+3] = a;
-
-			y++;
-			if (y >= height)
-			{
-				y = 0;
-				x++;
-			}
+		uint32_t bitmap[height * width];		// // //
+		std::fill(bitmap + info.echoBufferEndPos, std::end(bitmap), 0xFF3F3F3F); // grey
+		std::fill(bitmap + info.echoBufferStartPos, bitmap + info.echoBufferEndPos, 0xFFA000A0); // purple
+		int currentSampleIndex = 0;
+		int sampleCount = info.individualSamples.size();
+		for (const auto &samp : info.individualSamples) {
+			auto intensity = static_cast<uint8_t>(128. + 127. * currentSampleIndex / sampleCount);
+			std::fill(bitmap + samp.startPosition, bitmap + samp.endPosition,
+					  0xFF000000 | intensity * (samp.important ? 0x00010100 : 0x00010000); // cyan or blue
+			++currentSampleIndex;
 		}
+		std::fill(bitmap + info.sampleTableStartPos, bitmap + info.sampleTableEndPos, 0xFF00FF00); // lime
+		std::fill(bitmap + info.songStartPos, bitmap + info.songEndPos, 0xFF008000); // green
+		std::fill(bitmap + programUploadPos, bitmap + programPos + programSize, 0XFF00FFFF); // yellow
+		std::fill(bitmap, bitmap + programUploadPos, 0XFF0000FF); // red
 
-		auto path = current.pathlessSongName;
-		path = "Visualizations/" + path + ".png";
-		lodepng::encode(path, bitmap, width, height);
-
-
+		lodepng::encode("Visualizations" / fs::path {current.getFileName()}.stem().replace_extension(".png"), bitmap, width, height);
 	}
-
-
 }
-
-

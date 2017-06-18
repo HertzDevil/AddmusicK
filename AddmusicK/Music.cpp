@@ -286,12 +286,14 @@ size_t Music::getDataSize() const {
 }
 
 // // //
-void Music::FlushSongData(std::vector<uint8_t> &buf) const {
-	buf.reserve(buf.size() + getDataSize() + loopTrack.data.size() + allPointersAndInstrs.size());
+std::vector<uint8_t> Music::getSongData() const {
+	std::vector<uint8_t> buf;
+	buf.reserve(getDataSize() + loopTrack.data.size() + allPointersAndInstrs.size());
 	buf.insert(buf.end(), allPointersAndInstrs.cbegin(), allPointersAndInstrs.cend());
 	for (const Track &t : tracks)
 		buf.insert(buf.cend(), t.data.cbegin(), t.data.cend());
 	buf.insert(buf.cend(), loopTrack.data.cbegin(), loopTrack.data.cend());
+	return buf;
 }
 
 void Music::parseComment() {
@@ -1643,6 +1645,23 @@ void Music::pointersFirstPass() {
 }
 
 // // //
+void Music::adjustHeaderPointers() {
+	for (int j = 0, n = allPointersAndInstrs.size(); j < n; j += 2) {		// // //
+		if (j == instrumentPos)		// // //
+			j += instrumentData.size();
+
+		auto it = allPointersAndInstrs.begin() + j;		// // //
+		int temp = *it | (*(it + 1) << 8);
+
+		if (temp == 0xFFFF)		// 0xFFFF = swap with 0x0000.
+			assign_short(it, 0);		// // //
+		else if (temp == 0xFFFE)	// 0xFFFE = swap with 0x00FF.
+			assign_short(it, 0x00FF);		// // //
+		else
+			assign_short(it, temp + posInARAM);		// // //
+	}
+}
+
 void Music::adjustLoopPointers() {
 	int offset = posInARAM + getDataSize() + allPointersAndInstrs.size();
 	for (Track &t : tracks)

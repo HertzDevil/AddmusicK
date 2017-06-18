@@ -16,12 +16,16 @@ struct SpaceInfo {
 	int songEndPos;
 	int sampleTableStartPos;
 	int sampleTableEndPos;
-	std::vector<int> individualSampleStartPositions;
-	std::vector<int> individualSampleEndPositions;
-	std::vector<bool> individialSampleIsImportant;
+	struct SampleInfo		// // //
+	{
+		int startPosition;
+		int endPosition;
+		bool important;
+	};
+	std::vector<SampleInfo> individualSamples;
 	int importantSampleCount;
-	int echoBufferEndPos;
 	int echoBufferStartPos;
+	int echoBufferEndPos;
 
 };
 
@@ -33,7 +37,8 @@ public:
 	const std::string &getFileName() const;		// // //
 
 	size_t getDataSize() const;		// // //
-	void FlushSongData(std::vector<uint8_t> &buf) const;		// // //
+	std::vector<uint8_t> getSongData() const;		// // //
+	void adjustHeaderPointers();		// // //
 	void adjustLoopPointers();		// // //
 
 	void compile();
