@@ -34,6 +34,11 @@ SourceFile::SourceFile(std::string_view data) :
 {
 }
 
+SourceFile::SourceFile(std::string &&data) :
+	mml_(std::move(data)), sv_(mml_), prev_(sv_), repl_(replComp)
+{
+}
+
 SourceFile::SourceFile(const SourceFile &other) :
 	mml_(other.mml_), repl_(replComp)
 {

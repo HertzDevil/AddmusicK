@@ -64,7 +64,6 @@ private:
 	void parseInstrumentCommand();
 	void parseDirectInstCommand();		// // //
 	void parseOpenParenCommand();
-	void parseLabelLoopCommand();
 	void parseRemoteCodeCommand();		// // //
 	void parseLoopCommand();
 	void parseSubloopCommand();		// // //
@@ -142,7 +141,12 @@ public:
 	void doVibratoFade(int fadeLen);
 	void doTremolo(int delay, int rate, int depth);
 	void doTremoloOff();
+	void doPortamento(int delay, int len, int target);
+	void doPitchBend(int delay, int len, int target, bool bendAway);
+	void doDetune(int offset);
 	void doEnvelope(int ad, int sr);
+	void doFIRFilter(int f0, int f1, int f2, int f3, int f4, int f5, int f6, int f7);
+	void doNoise(int pitch);
 	void doTempo(int speed);
 	void doTempo(int speed, int fadeLen);
 	void doTranspose(int offset);
@@ -154,6 +158,9 @@ public:
 	void doSubloopEnter();		// // // Call any time a definition of a super loop is entered.
 	void doSubloopExit(int loopCount);		// // // Call any time a definition of a super loop is exited.
 	void doVolumeTable(bool louder);
+	void doDSPWrite(int adr, int val);
+	void doARAMWrite(int adr, int val);
+	void doDataSend(int val1, int val2);
 
 private:
 	template <typename... Args>		// // //
@@ -169,7 +176,8 @@ private:
 	int getLastTicks(const AMKd::MML::Duration &dur) const;		// // //
 	int checkTickFraction(double ticks) const;		// // //
 
-	[[noreturn]] void fatalError(const std::string &str);		// // //
+	[[noreturn]] void fatalError(const std::string &str) const;		// // //
+	void warn(const std::string &str) const;		// // //
 
 	void printChannelDataNonVerbose(int size);
 	void parseHFDHex();

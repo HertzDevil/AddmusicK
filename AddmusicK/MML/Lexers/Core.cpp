@@ -48,6 +48,12 @@ LEXER_FUNC_START(Lexer::Ident)
 		return *x;
 LEXER_FUNC_END()
 
+LEXER_FUNC_START(Lexer::Row)
+	auto x = *file.Trim("[^\\n]*");
+	if (file.Trim('\n') || !x.empty())
+		return x;
+LEXER_FUNC_END()
+
 LEXER_FUNC_START(Lexer::String)
 	if (auto x = file.Trim("\\S+"))
 		return *x;

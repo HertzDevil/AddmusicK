@@ -24,6 +24,7 @@ class SourceFile
 public:
 	SourceFile();
 	explicit SourceFile(std::string_view data);
+	explicit SourceFile(std::string &&data);
 	~SourceFile() = default;
 	SourceFile(const SourceFile &);
 	SourceFile(SourceFile &&) noexcept;
