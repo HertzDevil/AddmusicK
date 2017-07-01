@@ -176,7 +176,6 @@ private:
 	int getLastTicks(const AMKd::MML::Duration &dur) const;		// // //
 	int checkTickFraction(double ticks) const;		// // //
 
-	[[noreturn]] void fatalError(const std::string &str) const;		// // //
 	void warn(const std::string &str) const;		// // //
 
 	void parseHFDHex();

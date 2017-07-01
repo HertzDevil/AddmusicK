@@ -60,7 +60,7 @@ time_t mostRecentMainModification = 0;		// The most recent modification to any s
 bool justSPCsPlease = false;
 std::vector<std::string> textFilesToCompile;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char **argv) try {		// // //
 /*
 	const std::locale loc {"en_US.UTF8"};		// // //
 	std::locale::global(loc);
@@ -254,6 +254,10 @@ int main(int argc, char* argv[]) {
 	if (waitAtEnd)
 		quit(0);
 	return 0;
+}
+catch (std::exception &e) {		// // //
+	std::cerr << "Unexpected error: \n" << e.what() << '\n';
+	return 1;
 }
 
 void displayNewUserMessage() {
