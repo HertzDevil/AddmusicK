@@ -179,11 +179,12 @@ private:
 	[[noreturn]] void fatalError(const std::string &str) const;		// // //
 	void warn(const std::string &str) const;		// // //
 
-	void printChannelDataNonVerbose(int size);
 	void parseHFDHex();
 	void parseHFDInstrumentHack(int addr, int bytes);
 	void insertedZippedSamples(const std::string &path);
 	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd);		// // //
+
+	void displaySongData() const;
 
 	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
 	void writeState(AMKd::Music::TrackState (AMKd::Music::Track::*state), int val);		// // //
@@ -199,7 +200,8 @@ public:		// // //
 	std::vector<uint8_t> finalData;
 	std::vector<uint8_t> allPointersAndInstrs;		// // //
 	std::vector<unsigned short> mySamples;
-	size_t totalSize;		// // //
+	size_t headerSize = 0;		// // //
+	size_t totalSize = 0;		// // //
 	size_t minSize;		// // //
 	int instrumentPos;		// // //
 	int echoBufferSize;

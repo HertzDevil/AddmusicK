@@ -1,8 +1,15 @@
 #pragma once		// // //
 
+#include <string>
+#include <vector>
+
 struct BankDefine
 {
-	std::string name;
-	std::vector<std::string> samples;		// // //
-	std::vector<bool> importants;
+	std::string bankName;		// // //
+	struct Sample
+	{
+		std::string name;
+		bool important;
+	};
+	std::vector<Sample> samples;		// // //
 };

@@ -117,7 +117,6 @@ void Music::append(Args&&... value) {
 
 Music::Music() {
 	knowsLength = false;
-	totalSize = 0;
 	echoBufferSize = 0;
 	for (size_t i = 0; i < std::size(tracks); ++i)		// // //
 		tracks[i].index = i;
@@ -299,22 +298,6 @@ void Music::parseComment() {
 //		error("Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2.");		// // //
 	using namespace AMKd::MML::Lexer;		// // //
 	GetParameters<Row>(mml_);
-}
-
-void Music::printChannelDataNonVerbose(int size) {
-	std::cout << name << ": ";		// // //
-	for (int i = 0, n = 58 - name.size(); i < n; ++i)
-		std::cout.put('.');
-	std::cout.put(' ');
-
-	if (knowsLength) {
-		// int s = static_cast<int>((mainLength + introLength) / (2.0 * tempo) + 0.5);
-		auto sec = static_cast<int>((introSeconds + mainSeconds + 0.5) / 60);		// // //
-		std::cout << sec / 60 << ':' << std::setfill('0') << std::setw(2) << sec % 60;
-	}
-	else
-		std::cout << "?:??";
-	std::cout << ", 0x" << hex4 << size << std::dec << " bytes\n";
 }
 
 void Music::parseQMarkDirective() {
@@ -663,10 +646,9 @@ void Music::parseHFDHex() {
 	auto kind = GetParameters<Byte>(mml_);
 	if (!kind)
 		error("Unknown HFD hex command.");
-	auto i = kind.get<0>();
 
 	if (convert) {
-		switch (i) {
+		switch (kind.get<0>()) {
 		case 0x80:
 			if (auto param = GetParameters<Byte, Byte>(mml_)) {		// // //
 				unsigned reg, val;
@@ -690,22 +672,21 @@ void Music::parseHFDHex() {
 				int bytes = (param.get<2>() << 8) | param.get<3>();
 				if (addr == 0x6136)
 					return parseHFDInstrumentHack(addr, bytes);
-				while (bytes-- >= 0) {		// // //
-					if (!GetParameters<Byte>(mml_))
+				while (bytes-- >= 0)		// // //
+					if (auto val = GetParameters<Byte>(mml_))
+						doARAMWrite(addr++, val.get<0>());
+					else
 						error("Error while parsing HFD hex command.");
-					// Don't do this stuff; we won't know what we're overwriting.
-					// append(AMKd::Binary::CmdType::ARAM, i, addr >> 8, addr & 0xFF);		// // //
-					++addr;
-				}
 				return;
 			}
 			break;
+		default:
+			if (kind.get<0>() >= 0x80)		// // //
+				error("Error while parsing HFD hex command.");
 		}
-		if (i >= 0x80)		// // //
-			error("Error while parsing HFD hex command.");
 	}
 
-	append(AMKd::Binary::CmdType::Envelope, i);		// // //
+	append(AMKd::Binary::CmdType::Envelope, kind.get<0>());		// // //
 }
 
 // // //
@@ -723,7 +704,7 @@ void Music::parseHexCommand() {
 	mml_.Unput();
 	const uint8_t currentHex = [&] {
 		auto param = GetParameters<Byte>(mml_);
-		return param ? param.get<0>() : throw AMKd::Utility::Exception {"Error parsing hex command."};
+		return param ? param.get<0>() : throw AMKd::Utility::SyntaxException {"Error parsing hex command."};
 	}();
 
 	if (!validateHex) {
@@ -1389,7 +1370,7 @@ void Music::pointersFirstPass() {
 		binpos += t.data.size();
 	}
 
-	int headerSize = 20 + (hasIntro ? 18 : 0) + (doesntLoop ? 0 : 2) + instrumentData.size();		// // //
+	headerSize = 20 + (hasIntro ? 18 : 0) + (doesntLoop ? 0 : 2) + instrumentData.size();		// // //
 	instrumentPos = (hasIntro ? 4 : 2) + (doesntLoop ? 2 : 4);		// // //
 
 	insertPtr(instrumentPos + instrumentData.size());		// // //
@@ -1456,16 +1437,16 @@ void Music::pointersFirstPass() {
 		knowsLength = true;
 	}
 
+	displaySongData();		// // //
+}
+
+void Music::displaySongData() const {
 	int spaceUsedBySamples = 0;
 	for (const uint16_t x : mySamples)		// // //
 		spaceUsedBySamples += 4 + samples[x].data.size();	// The 4 accounts for the space used by the SRCN table.
 
-	if (verbose)
-		std::cout << name << " total size: 0x" << hex4 << totalSize << std::dec << " bytes\n";
-	else
-		printChannelDataNonVerbose(totalSize);
-
 	if (verbose) {
+		std::cout << name << " total size: 0x" << hex4 << totalSize << std::dec << " bytes\n";		// // //
 		const hex_formatter hex3 {3};
 		std::cout << '\t';		// // //
 		for (size_t i = 0; i < CHANNELS / 2; ++i)
@@ -1477,6 +1458,21 @@ void Music::pointersFirstPass() {
 		std::cout << "\nSpace used by echo: 0x" << hex4 << (echoBufferSize << 11) <<
 			" bytes.  Space used by samples: 0x" << hex4 << spaceUsedBySamples << " bytes.\n\n";
 	}
+	else {
+		std::cout << name << ": ";		// // //
+		for (int i = 0, n = 58 - name.size(); i < n; ++i)
+			std::cout.put('.');
+		std::cout.put(' ');
+
+		if (knowsLength) {
+			// int s = static_cast<int>((mainLength + introLength) / (2.0 * tempo) + 0.5);
+			auto sec = static_cast<int>((introSeconds + mainSeconds + 0.5) / 60);		// // //
+			std::cout << sec / 60 << ':' << std::setfill('0') << std::setw(2) << sec % 60;
+		}
+		else
+			std::cout << "?:??";
+		std::cout << ", 0x" << hex4 << totalSize << std::dec << " bytes\n";
+	}
 
 	if (totalSize > minSize && minSize > 0) {
 		std::stringstream err;		// // //
@@ -1487,8 +1483,8 @@ void Music::pointersFirstPass() {
 	writeTextFile("stats" / fs::path {name}.stem().replace_extension(".txt"), [&] {
 		std::stringstream statStrStream;
 
-		for (Track &t : tracks)		// // //
-			statStrStream << "CHANNEL " << static_cast<int>('0' + t.index) << " SIZE:				0x" << hex4 << t.data.size() << "\n";
+		for (const Track &t : tracks)		// // //
+			statStrStream << "CHANNEL " << static_cast<int>(t.index) << " SIZE:				0x" << hex4 << t.data.size() << "\n";
 		statStrStream << "LOOP DATA SIZE:				0x" << hex4 << loopTrack.data.size() << "\n";
 		statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << headerSize << "\n";
 		statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
@@ -1500,8 +1496,8 @@ void Music::pointersFirstPass() {
 		else
 			statStrStream << "FREE ARAM (APPROXIMATE):		UNKNOWN\n\n";
 
-		for (Track &t : tracks)		// // //
-			statStrStream << "CHANNEL " << static_cast<int>('0' + t.index) << " TICKS:			0x" << hex4 << static_cast<int>(t.channelLength) << "\n";
+		for (const Track &t : tracks)		// // //
+			statStrStream << "CHANNEL " << static_cast<int>(t.index) << " TICKS:			0x" << hex4 << static_cast<int>(t.channelLength) << "\n";
 		statStrStream << '\n';
 
 		if (knowsLength) {
@@ -2005,7 +2001,7 @@ void Music::doDSPWrite(int adr, int val) {
 	append(AMKd::Binary::CmdType::DSP, adr, val);
 }
 
-void Music::doARAMWrite(int adr, int val) {
+void Music::doARAMWrite(int /*adr*/, int /*val*/) {
 	error("ARAM writes are disabled by default.");
 //	append(AMKd::Binary::CmdType::ARAM, val, adr >> 8, adr);
 }

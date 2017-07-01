@@ -76,7 +76,7 @@ void printError(const std::string &error, const std::string &fileName, int line)
 	printWarning(error, fileName, line);		// // //
 	++errorCount;
 #ifdef _DEBUG
-	_CrtDbgBreak();
+	__debugbreak();
 #endif
 }
 
@@ -95,7 +95,7 @@ void fatalError(const std::string &error, const std::string &fileName, int line)
 void quit(int code) {
 #ifdef _DEBUG		// // //
 	if (code != 0)
-		_CrtDbgBreak();
+		__debugbreak();
 #else
 	if (forceNoContinuePrompt == false) {
 		puts("Press ENTER to continue...\n");
@@ -116,6 +116,18 @@ int execute(const std::string &command, bool prepend) {
 }
 
 // // //
+bool YesNo() {
+	while (true) {
+		std::cout << "(Y or N)\n";
+		switch (std::cin.get()) {
+		case 'Y': case 'y':
+			return true;
+		case 'N': case 'n':
+			return false;
+		}
+	}
+	return false;
+}
 
 void removeFile(const fs::path &fileName) {
 	if (fs::exists(fileName)) {		// // //
@@ -246,24 +258,6 @@ int clearRATS(std::vector<uint8_t> &ROM, int offset) {		// // //
 static void addSample(const std::vector<uint8_t> &sample, const std::string &name, Music *music, bool important, bool noLoopHeader, uint16_t loopPoint) {
 	Sample newSample;
 	newSample.important = important;		// // //
-
-	if (sample.size() != 0) {
-		if (!noLoopHeader) {
-			if ((sample.size() - 2) % 9 != 0) {
-				std::stringstream errstream;
-
-				errstream << "The sample \"" + name + "\" was of an invalid length (the filesize - 2 should be a multiple of 9).  Did you forget the loop header?\n";
-				fatalError(errstream.str());		// // //
-			}
-
-			newSample.loopPoint = static_cast<uint16_t>((sample[1] << 8) | sample[0]);
-			newSample.data.assign(sample.begin() + 2, sample.end());
-		}
-		else {
-			newSample.data.assign(sample.begin(), sample.end());
-			newSample.loopPoint = loopPoint;
-		}
-	}
 	newSample.exists = true;
 	newSample.name = name;
 
@@ -281,9 +275,28 @@ static void addSample(const std::vector<uint8_t> &sample, const std::string &nam
 				return;
 			}
 	}
+
+	if (!sample.empty()) {		// // //
+		if (!noLoopHeader) {
+			if ((sample.size() - 2) % 9 != 0) {
+				std::stringstream errstream;
+
+				errstream << "The sample \"" + name + "\" was of an invalid length (the filesize - 2 should be a multiple of 9).  Did you forget the loop header?\n";
+				fatalError(errstream.str());		// // //
+			}
+
+			newSample.loopPoint = static_cast<uint16_t>((sample[1] << 8) | sample[0]);
+			newSample.data.assign(sample.begin() + 2, sample.end());
+		}
+		else {
+			newSample.data.assign(sample.begin(), sample.end());
+			newSample.loopPoint = loopPoint;
+		}
+	}
+
 	sampleToIndex[newSample.name] = samples.size();
 	music->mySamples.push_back(static_cast<uint16_t>(samples.size()));		// // //
-	samples.push_back(newSample);					// This is a sample we haven't encountered before.  Add it.
+	samples.push_back(std::move(newSample));		// // // This is a sample we haven't encountered before.  Add it.
 }
 
 void addSample(const fs::path &fileName, Music *music, bool important) {
@@ -292,21 +305,13 @@ void addSample(const fs::path &fileName, Music *music, bool important) {
 }
 
 void addSampleGroup(const fs::path &groupName, Music *music) {
-	for (const auto &bank : bankDefines) {		// // //
-		if (groupName == bank.name) {		// // //
-			for (size_t j = 0, n = bank.samples.size(); j < n; ++j) {
-				std::string temp;
-				//temp += "samples/";
-				temp += bank.samples[j];		// // //
-				addSample(temp, music, bank.importants[j]);
-			}
-			return;
-		}
-	}
-	
-	std::stringstream ss;		// // //
-	ss << music->name << ":\nThe specified sample group, \"" << groupName << "\", could not be found.";
-	fatalError(ss.str());
+	auto it = std::find_if(bankDefines.cbegin(), bankDefines.cend(),
+						   [&] (const BankDefine &bank) { return groupName == bank.bankName; });		// // //
+	if (it != bankDefines.cend())
+		for (const auto &x : it->samples)
+			addSample(/*"samples/" + */ x.name, music, x.important);		// // //
+	else
+		fatalError(music->name + ":\nThe specified sample group, \"" + groupName.string() + "\", could not be found.");		// // //
 }
 
 void addSampleBank(const fs::path &fileName, Music *music) {

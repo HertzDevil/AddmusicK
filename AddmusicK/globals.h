@@ -106,6 +106,8 @@ void removeFile(const fs::path &fileName);
 
 int execute(const std::string &command, bool prepentDotSlash = true);
 
+bool YesNo();		// // //
+
 void printError(const std::string &error, const std::string &fileName = "", int line = -1);		// // //
 void printWarning(const std::string &error, const std::string &fileName = "", int line = -1);
 [[noreturn]] void fatalError(const std::string &error, const std::string &fileName = "", int line = -1);		// // //
@@ -147,5 +149,5 @@ void assign_val(ForwardIt it, T x) {
 
 template <typename ForwardIt, typename T>
 void assign_short(ForwardIt it, T x) {
-	assign_val<sizeof(short), ForwardIt, T>(it, x);
+	assign_val<sizeof(short)>(it, x);
 }

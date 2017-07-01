@@ -76,21 +76,12 @@ int main(int argc, char* argv[]) {
 	std::vector<std::string> arguments;
 
 	if (fs::exists("Addmusic_options.txt")) {		// // //
-		std::string optionsString = openTextFile("Addmusic_options.txt");		// // //
-		unsigned int osPos = 0;
-		while (osPos < optionsString.size()) {
-			// This is probably a catastrophicly bad idea on several levels, but I don't have the time do redo this entire section of code.
-			// AddmusicK 2.0: Now with actually good programming habits! (probably not)
-
-			std::string opsubstr;
-			if (optionsString.find('\n', osPos) == std::string::npos)		// // //
-				opsubstr = optionsString.substr(osPos);
-			else
-				opsubstr = optionsString.substr(osPos, optionsString.find('\n', osPos) - osPos);
-
-			arguments.push_back(opsubstr);
-			osPos += opsubstr.size() + 1;
-		}
+		// This is probably a catastrophicly bad idea on several levels, but I don't have the time do redo this entire section of code.
+		// AddmusicK 2.0: Now with actually good programming habits! (probably not)
+		AMKd::MML::SourceFile options {openTextFile("Addmusic_options.txt")};		// // //
+		using namespace AMKd::MML::Lexer;
+		while (auto line = GetParameters<Row>(options))
+			arguments.push_back(std::move(line.get<0>()));
 	}
 	else
 		for (int i = 1; i < argc; i++)
@@ -205,10 +196,7 @@ int main(int argc, char* argv[]) {
 			fatalError("Error: Your ROM is too small. Save a level in Lunar Magic or expand it with\n"
 					   "Lunar Expand, then try again.");		// // //
 
-		if (rom[SNESToPC(0xFFD5)] == 0x23 && allowSA1)
-			usingSA1 = true;
-		else
-			usingSA1 = false;
+		usingSA1 = (rom[SNESToPC(0xFFD5)] == 0x23 && allowSA1);		// // //
 		cleanROM();
 	}
 
@@ -333,17 +321,10 @@ void cleanROM() {
 		romprogramname += (char)*(rom.data() + SNESToPC(0x0E8003));
 
 		if (romprogramname != "@AMK") {
-			std::stringstream s;
-			s << "Error: The identifier for this ROM, \"" << romprogramname << "\", could not be identified. It should\n"
+			std::cout << "Error: The identifier for this ROM, \"" << romprogramname << "\", could not be identified. It should\n"
 				 "be \"@AMK\". This either means that some other program has modified this area of\n"
-				 "your ROM, or your ROM is corrupted. Continue? (Y or N)\n";
-			std::cout << s.str();
-
-			int c = '\0';
-			while (c != 'y' && c != 'Y' && c != 'n' && c != 'N')
-				c = getchar();
-
-			if (c == 'n' || c == 'N')
+				 "your ROM, or your ROM is corrupted. Continue?\n";
+			if (!YesNo())		// // //
 				quit(1);
 		}
 
@@ -352,13 +333,8 @@ void cleanROM() {
 		if (romversion > DATA_VERSION) {
 			std::cout << "WARNING: This ROM was modified using a newer version of AddmusicK.\n";
 			std::cout << "You can continue, but it is HIGHLY recommended that you upgrade AMK first.\n";
-			std::cout << "Continue anyway? (Y or N)\n";
-
-			int c = '\0';
-			while (c != 'y' && c != 'Y' && c != 'n' && c != 'N')
-				c = getchar();
-
-			if (c == 'n' || c == 'N')
+			std::cout << "Continue anyway?\n";
+			if (!YesNo())		// // //
 				quit(1);
 		}
 
@@ -366,15 +342,12 @@ void cleanROM() {
 		clearRATS(rom, address - 8);		// // // So erase it all.
 
 		int baseAddress = SNESToPC(*(unsigned int *)(rom.data() + 0x70008));		// Address is now the address of the pointers to the songs and samples.
-		bool erasingSamples = false;
 
-		int i = 0;
+		bool erasingSamples = false;
 		while (true) {
-			address = *(unsigned int *)(rom.data() + baseAddress + i * 3) & 0xFFFFFF;
+			address = *(unsigned int *)(rom.data() + baseAddress) & 0xFFFFFF;
 			if (address == 0xFFFFFF) {						// 0xFFFFFF indicates an end of pointers.
-				if (erasingSamples == false)
-					erasingSamples = true;
-				else
+				if (std::exchange(erasingSamples, true))		// // //
 					break;
 			}
 			else {
@@ -382,7 +355,7 @@ void cleanROM() {
 					clearRATS(rom, SNESToPC(address - 8));		// // //
 			}
 
-			i++;
+			baseAddress += 3;
 		}
 	}
 
@@ -497,12 +470,10 @@ void loadSampleList() {
 		if (!nameParam)
 			fatalError("Error: Could not find sample group name.", SAMPGROUP_NAME, list.GetLineNumber());
 		BankDefine sg;		// // //
-		sg.name = nameParam.get<0>();
+		sg.bankName = nameParam.get<0>();		// // //
 
-		while (auto item = GetParameters<QString, Option<Sep<'!'>>>(list)) {
-			sg.samples.push_back(item.get<0>());
-			sg.importants.push_back(item.get<1>().has_value());
-		}
+		while (auto item = GetParameters<QString, Option<Sep<'!'>>>(list))
+			sg.samples.push_back({item.get<0>(), item.get<1>().has_value()});
 
 		if (!GetParameters<Sep<'}'>>(list))
 			fatalError("Error: Unexpected character in sample group definition.", SAMPGROUP_NAME, list.GetLineNumber());
@@ -802,8 +773,7 @@ void fixMusicPointers() {
 			checkPos += music.mySamples.size() * 4;
 			info.sampleTableEndPos = checkPos;
 
-			for (unsigned int j = 0; j < music.mySamples.size(); j++) {
-				auto thisSample = music.mySamples[j];
+			for (auto thisSample : music.mySamples) {		// // //
 				int thisSampleSize = samples[thisSample].data.size();
 				bool sampleIsImportant = samples[thisSample].important;
 				info.individualSamples.push_back({checkPos, checkPos + thisSampleSize, sampleIsImportant});		// // //
