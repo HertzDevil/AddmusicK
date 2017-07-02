@@ -12,7 +12,7 @@ private:
 	using info = details::lexer_info<0, void, Args...>;
 public:
 	using arg_type = std::vector<typename info::result_type::tuple_type>;
-	std::optional<arg_type> operator()(SourceFile &file) {
+	std::optional<arg_type> operator()(SourceView &file) {
 		arg_type ret;
 		while (auto &&param = GetParameters<Args...>(file))
 			ret.push_back(*param);

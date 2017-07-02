@@ -4,7 +4,7 @@
 #include <string>
 #include <map>
 #include <cstdint>		// // //
-#include "MML/SourceFile.h"		// // //
+#include "MML/SourceView.h"		// // //
 #include "Music/SongBase.h"		// // //
 #include "MML/Duration.h"		// // //
 #include "Music/Track.h"		// // //
@@ -222,7 +222,9 @@ private:
 	bool hasIntro;
 	std::map<int, uint16_t> loopPointers;		// // //
 	//unsigned int loopLengths[0x10000];		// How long, in ticks, each loop is.
-	AMKd::MML::SourceFile mml_;		// // //
+
+	std::string mmlText_;		// // //
+	AMKd::MML::SourceView mml_;		// // //
 
 	AMKd::Music::Track tracks[CHANNELS];		// // //
 	AMKd::Music::Track loopTrack;		// // //

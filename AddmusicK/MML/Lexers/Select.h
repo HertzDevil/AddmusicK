@@ -18,7 +18,7 @@ template <std::size_t I, std::size_t... Js, typename T, typename... Us, typename
 struct SelectImpl<std::index_sequence<I, Js...>, select_tag_t<Vs...>, T, Us...>
 {
 	using arg_type = std::variant<typename Vs::arg_type...>;
-	std::optional<arg_type> operator()(SourceFile &file) {
+	std::optional<arg_type> operator()(SourceView &file) {
 		if (auto param = T()(file))
 			return arg_type {std::in_place_index_t<I>(), std::move(*param)};
 		return SelectImpl<std::index_sequence<Js...>, select_tag_t<Vs...>, Us...>()(file);
@@ -29,7 +29,7 @@ template <typename... Args>
 struct SelectImpl<std::index_sequence<>, select_tag_t<Args...>>
 {
 	using arg_type = std::variant<typename Args::arg_type...>;
-	std::optional<arg_type> operator()(SourceFile &) {
+	std::optional<arg_type> operator()(SourceView &) {
 		return std::nullopt;
 	}
 };
@@ -44,7 +44,7 @@ private:
 		details::select_tag_t<Args...>, Args...>;
 public:
 	using arg_type = typename impl_t::arg_type;
-	std::optional<arg_type> operator()(SourceFile &file) {
+	std::optional<arg_type> operator()(SourceView &file) {
 		return impl_t()(file);
 	}
 };

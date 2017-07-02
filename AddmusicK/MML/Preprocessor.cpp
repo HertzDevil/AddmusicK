@@ -28,7 +28,7 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 	target(Target::Unknown), version(0), firstChannel(CHANNELS)
 {
 	// Handles #ifdefs.  Maybe more later?
-	SourceFile text {str};
+	SourceView text {str};
 
 	okayStatus.push(true);
 
@@ -36,7 +36,7 @@ Preprocessor::Preprocessor(const std::string &str, const std::string &filename) 
 		while (text) {
 			// don't use GetParameters because all whitespaces are to be kept verbatim
 			std::string row_ = *text.Trim("[^\\r\\n]*");
-			SourceFile row {row_};
+			SourceView row {row_};
 			text.Trim('\r');
 
 			std::string add = *row.Trim("\\s*");
@@ -200,7 +200,7 @@ void Preprocessor::doVersion(int ver) {
 	version = ver;
 }
 
-bool Preprocessor::parsePredicate(SourceFile &row) {
+bool Preprocessor::parsePredicate(SourceView &row) {
 	auto param = Lexer::GetParameters<Lexer::Ident, Comp, Lexer::SInt>(row);
 	if (!param)
 		throw AMKd::Utility::SyntaxException {"Missing argument for #if directive."};

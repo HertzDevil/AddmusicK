@@ -1,4 +1,4 @@
-#include "SourceFile.h"
+#include "SourceView.h"
 #include "../Utility/Exception.h"
 #include <regex>
 #include <unordered_map>
@@ -20,51 +20,23 @@ namespace {
 		auto result = regex_cache.insert(std::make_pair(re, cache));
 		return result.first->second;
 	}
+
+	const std::string EMPTY;
 }
 
 using namespace AMKd::MML;
 
-SourceFile::SourceFile() : sv_(mml_), prev_(sv_), repl_(replComp)
+SourceView::SourceView() : mml_(EMPTY), sv_(mml_), prev_(sv_), repl_(replComp)
+{
+}
+
+SourceView::SourceView(std::string_view data) :
+	mml_(data), sv_(mml_), prev_(sv_), repl_(replComp)
 {
 	Trim("\xEF\xBB\xBF"); // utf-8 bom
 }
 
-SourceFile::SourceFile(std::string_view data) :
-	mml_(data), sv_(mml_), prev_(sv_), repl_(replComp)
-{
-}
-
-SourceFile::SourceFile(std::string &&data) :
-	mml_(std::move(data)), sv_(mml_), prev_(sv_), repl_(replComp)
-{
-}
-
-SourceFile::SourceFile(const SourceFile &other) :
-	mml_(other.mml_), repl_(replComp)
-{
-	SetInitReadCount(other.GetReadCount());
-}
-
-SourceFile::SourceFile(SourceFile &&other) noexcept :
-	mml_(std::move(other.mml_)), repl_(replComp)
-{
-	SetInitReadCount(mml_.size() - other.sv_.size());
-}
-
-SourceFile &SourceFile::operator=(const SourceFile &other) {
-	mml_ = other.mml_;
-	SetInitReadCount(other.GetReadCount());
-	return *this;
-}
-
-SourceFile &SourceFile::operator=(SourceFile &&other) {
-	size_t len = other.GetReadCount();
-	mml_.swap(other.mml_);
-	SetInitReadCount(len);
-	return *this;
-}
-
-std::optional<std::string> SourceFile::Trim(std::string_view re, bool ignoreCase) {
+std::optional<std::string> SourceView::Trim(std::string_view re, bool ignoreCase) {
 	std::cmatch match;
 	std::optional<std::string> z;
 
@@ -79,7 +51,7 @@ std::optional<std::string> SourceFile::Trim(std::string_view re, bool ignoreCase
 	return z;
 }
 
-bool SourceFile::Trim(char re) {
+bool SourceView::Trim(char re) {
 	prev_ = sv_;
 	if (!sv_.empty() && sv_.front() == re) {
 		sv_.remove_prefix(1);
@@ -89,13 +61,7 @@ bool SourceFile::Trim(char re) {
 	return false;
 }
 
-int SourceFile::Peek() const {
-	if (sv_.empty())
-		return -1;
-	return sv_.front();
-}
-
-bool SourceFile::SkipSpaces() {
+bool SourceView::SkipSpaces() {
 	bool ret = false;
 	do {
 		ret = ret || !Trim(R"(\s*)")->empty();
@@ -103,45 +69,45 @@ bool SourceFile::SkipSpaces() {
 	return ret;
 }
 
-void SourceFile::Clear() {
+void SourceView::Clear() {
 	if (!macros_.empty())
-		mml_ = std::move(macros_.front().mml);
+		mml_ = macros_.front().mml;
 	macros_.clear();
 	SetInitReadCount(mml_.size());
 }
 
-bool SourceFile::IsEmpty() const {
+bool SourceView::IsEmpty() const {
 	return sv_.empty();
 }
 
-void SourceFile::Unput() {
+void SourceView::Unput() {
 	sv_ = prev_;
 }
 
-void SourceFile::AddMacro(const std::string &key, const std::string &repl) {
+void SourceView::AddMacro(const std::string &key, const std::string &repl) {
 	repl_[key] = repl;
 }
 
-bool SourceFile::PushMacro(std::string_view key, std::string_view repl) {
+bool SourceView::PushMacro(std::string_view key, std::string_view repl) {
 	for (const auto &x : macros_)
 		if (x.key == key)
 			return false;
 	std::size_t len = GetReadCount() + key.size();
-	macros_.push_back(MacroState {key, std::move(mml_), len});
+	macros_.push_back(MacroState {key, mml_, len});
 	prev_ = sv_ = mml_ = repl;
 	return true;
 }
 
-bool SourceFile::PopMacro() {
+bool SourceView::PopMacro() {
 	if (macros_.empty())
 		return false;
-	mml_ = std::move(macros_.back().mml);
+	mml_ = macros_.back().mml;
 	SetInitReadCount(macros_.back().charCount);
 	macros_.pop_back();
 	return true;
 }
 
-bool SourceFile::HasNextToken() {
+bool SourceView::HasNextToken() {
 	SkipSpaces();
 	if (!DoReplacement())		// // //
 		throw AMKd::Utility::SyntaxException {"Infinite replacement macro substitution."};
@@ -149,7 +115,7 @@ bool SourceFile::HasNextToken() {
 	return !IsEmpty();
 }
 
-bool SourceFile::DoReplacement() {
+bool SourceView::DoReplacement() {
 	while (true) {
 		auto it = std::find_if(repl_.cbegin(), repl_.cend(), [&] (const auto &x) {
 			const std::string &rhs = x.first;
@@ -163,27 +129,27 @@ bool SourceFile::DoReplacement() {
 	return true;
 }
 
-std::size_t SourceFile::GetLineNumber() const {
+std::size_t SourceView::GetLineNumber() const {
 	return std::count(mml_.cbegin(), mml_.cend(), '\n') -
 		std::count(sv_.cbegin(), sv_.cend(), '\n') + 1;
 }
 
-std::size_t SourceFile::GetReadCount() const {
+std::size_t SourceView::GetReadCount() const {
 	return mml_.size() - sv_.size();
 }
 
-void SourceFile::SetReadCount(std::size_t count) {
+void SourceView::SetReadCount(std::size_t count) {
 	prev_ = sv_;
 	sv_ = mml_;
 	sv_.remove_prefix(count);
 }
 
-void SourceFile::SetInitReadCount(std::size_t count) {
+void SourceView::SetInitReadCount(std::size_t count) {
 	sv_ = mml_;
 	sv_.remove_prefix(count);
 	prev_ = sv_;
 }
 
-SourceFile::operator bool() const {
+SourceView::operator bool() const {
 	return !IsEmpty();
 }

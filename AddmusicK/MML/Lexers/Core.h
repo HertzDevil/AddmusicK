@@ -5,12 +5,12 @@
 #include <utility>
 #include <initializer_list>
 #include <cstdlib>
-#include "../SourceFile.h"
+#include "../SourceView.h"
 #include "../Duration.h"
 #include "../Accidental.h"
 
 namespace AMKd::MML {
-class SourceFile;
+class SourceView;
 } // namespace AMKd::MML
 
 namespace AMKd::MML::Lexer {
@@ -107,7 +107,7 @@ public:
 template <typename T, typename U, std::size_t I>
 struct tup_assigner
 {
-	bool operator()(SourceFile &file, U &tup) const {
+	bool operator()(SourceView &file, U &tup) const {
 		file.SkipSpaces();
 		std::optional<typename T::arg_type> ret = T()(file);
 		if (ret.has_value())
@@ -118,7 +118,7 @@ struct tup_assigner
 template <typename T, typename U>
 struct tup_assigner<T, U, -1>
 {
-	bool operator()(SourceFile &file, U &) const {
+	bool operator()(SourceView &file, U &) const {
 		file.SkipSpaces();
 		return T()(file).has_value();
 	}
@@ -126,17 +126,17 @@ struct tup_assigner<T, U, -1>
 
 #if 0
 template <typename T, typename... L, std::size_t... I>
-bool get_impl(SourceFile &file, T &tup, std::index_sequence<I...>) {
+bool get_impl(SourceView &file, T &tup, std::index_sequence<I...>) {
 	return (... && tup_assigner<L, T, I>()(file, tup));
 }
 #else
 template <typename T, typename... L>
-bool get_impl(SourceFile &, T &, std::index_sequence<>) {
+bool get_impl(SourceView &, T &, std::index_sequence<>) {
 	return true;
 }
 
 template <typename T, typename L, typename... Ls, std::size_t I, std::size_t... Is>
-bool get_impl(SourceFile &file, T &tup, std::index_sequence<I, Is...>) {
+bool get_impl(SourceView &file, T &tup, std::index_sequence<I, Is...>) {
 	return tup_assigner<L, T, I>()(file, tup) &&
 		get_impl<T, Ls...>(file, tup, std::index_sequence<Is...>());
 }
@@ -147,7 +147,7 @@ bool get_impl(SourceFile &file, T &tup, std::index_sequence<I, Is...>) {
 // skips spaces before each token
 template <typename... Arg>
 typename details::lexer_info<0, void, Arg...>::result_type
-GetParameters(SourceFile &file) {
+GetParameters(SourceView &file) {
 	using info = details::lexer_info<0, void, Arg...>;
 	typename info::result_type::tuple_type out;
 	typename info::index_type indices;
@@ -168,11 +168,11 @@ GetParameters(SourceFile &file) {
 	struct T \
 	{ \
 		using arg_type = U; \
-		std::optional<arg_type> operator()(AMKd::MML::SourceFile &file); \
+		std::optional<arg_type> operator()(AMKd::MML::SourceView &file); \
 	};
 
 #define LEXER_FUNC_START(T) \
-	typename std::optional<typename T::arg_type> T::operator()(AMKd::MML::SourceFile &file) {
+	typename std::optional<typename T::arg_type> T::operator()(AMKd::MML::SourceView &file) {
 
 #define LEXER_FUNC_END() \
 		return std::nullopt; \
@@ -199,20 +199,20 @@ struct Sep
 	using arg_type = char; // bool;
 
 private:
-	std::optional<arg_type> call_impl(SourceFile &file, std::index_sequence<>) = delete;
+	std::optional<arg_type> call_impl(SourceView &file, std::index_sequence<>) = delete;
 	template <char C, std::size_t I>
-	std::optional<arg_type> call_impl(SourceFile &file, std::index_sequence<I>) {
+	std::optional<arg_type> call_impl(SourceView &file, std::index_sequence<I>) {
 		if (file.Trim(C))
 			return C;
 		return std::nullopt;
 	}
 	template <char C, char... Cs_, std::size_t I, std::size_t... Is>
-	std::optional<arg_type> call_impl(SourceFile &file, std::index_sequence<I, Is...>) {
+	std::optional<arg_type> call_impl(SourceView &file, std::index_sequence<I, Is...>) {
 		return !file.Trim(C) ? std::nullopt : call_impl<Cs_...>(file, std::index_sequence<Is...> { });
 	}
 
 public:
-	std::optional<arg_type> operator()(SourceFile &file) {
+	std::optional<arg_type> operator()(SourceView &file) {
 		return call_impl<Cs...>(file, std::make_index_sequence<sizeof...(Cs)> { });
 	}
 };
@@ -229,7 +229,7 @@ struct Hex
 		'[', '[', ':', 'x', 'd', 'i', 'g', 'i', 't', ':', ']', ']', '{', '0' + N, '}', '\0',
 	}; // "[[:xdigit:]]{N}"
 	using arg_type = unsigned;
-	std::optional<arg_type> operator()(SourceFile &file) {
+	std::optional<arg_type> operator()(SourceView &file) {
 		if (auto x = file.Trim(fmt))
 			return static_cast<arg_type>(std::strtol(x->c_str(), nullptr, 16));
 		return std::nullopt;

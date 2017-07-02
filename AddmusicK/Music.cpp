@@ -153,8 +153,9 @@ void Music::init() {
 	title = fs::path {name}.stem().string();		// // //
 	dumper = "AddmusicK " + std::to_string(AMKVERSION) + '.' + std::to_string(AMKMINOR) + '.' + std::to_string(AMKREVISION);		// // //
 
-	const auto stat = AMKd::MML::Preprocessor {openTextFile(fs::path {"music"} / name), name};		// // //
-	mml_ = AMKd::MML::SourceFile {stat.result};
+	const auto stat = AMKd::MML::Preprocessor {openTextFile(fs::path {"music"} / name), name};
+	mmlText_ = std::move(stat.result);		// // //
+	mml_ = AMKd::MML::SourceView {mmlText_};
 	songTargetProgram = stat.target;		// // //
 	targetAMKVersion = stat.version;
 	if (!stat.title.empty())
@@ -171,11 +172,7 @@ void Music::init() {
 	case Target::AMK:
 		/*
 		targetAMKVersion = 0;
-		if (backup.find('\r') != -1)
-			backup = backup.insert(backup.length(), "\r\n\r\n#amk=1\r\n");		// Automatically assume that this is a song written for AMK.
-		else
-			backup = backup.insert(backup.length(), "\n\n#amk=1\n");
-		writeTextFile(fs::path {"music"} / name, backup);
+		writeTextFile(fs::path {"music"} / name, [&] { return mmltext + "\n\n#amk=1\n"; });
 		*/
 		if (targetAMKVersion > PARSER_VERSION)
 			throw AMKd::Utility::MMLException {"This song was made for a newer version of AddmusicK.  You must update to use\nthis song."};
@@ -1531,7 +1528,7 @@ void Music::parseSPCInfo() {
 		if (metaName == "length") {
 			guessLength = (metaParam == "auto");
 			if (!guessLength) {
-				AMKd::MML::SourceFile field {metaParam};		// // //
+				AMKd::MML::SourceView field {metaParam};		// // //
 				auto param = AMKd::MML::Lexer::Time()(field);
 				if (param && !field)
 					seconds = requires(*param, 0u, 999u, "Songs longer than 16:39 are not allowed by the SPC format.");		// // //

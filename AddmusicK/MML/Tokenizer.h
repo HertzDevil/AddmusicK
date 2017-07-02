@@ -1,6 +1,6 @@
 #pragma once
 
-#include "SourceFile.h"
+#include "SourceView.h"
 #include "../Utility/Trie.h"
 #include <optional>
 
@@ -9,7 +9,7 @@ namespace AMKd::MML::Lexer {
 struct Tokenizer
 {
 	template <typename T>
-	std::optional<T> operator()(SourceFile &file, const AMKd::Utility::Trie<T> &cmds) const {
+	std::optional<T> operator()(SourceView &file, const AMKd::Utility::Trie<T> &cmds) const {
 		file.prev_ = file.sv_;
 		if (std::optional<T> result = cmds.SearchValue(file.sv_))
 			return result;

@@ -11,29 +11,23 @@ namespace Lexer {
 struct Tokenizer;
 }
 
-// A SourceFile wraps around an MML string with methods for tokenization. It
+// A SourceView wraps around an MML string with methods for tokenization. It
 // also handles replacement macros.
-class SourceFile
+class SourceView
 {
 	struct MacroState
 	{
 		std::string_view key;
-		std::string mml;
+		std::string_view mml;
 		std::size_t charCount;
 	};
 public:
-	SourceFile();
-	explicit SourceFile(std::string_view data);
-	explicit SourceFile(std::string &&data);
-	~SourceFile() = default;
-	SourceFile(const SourceFile &);
-	SourceFile(SourceFile &&) noexcept;
-	SourceFile &operator=(const SourceFile &other);
-	SourceFile &operator=(SourceFile &&other);
+	SourceView();
+	explicit SourceView(std::string_view data);
+	SourceView(std::string &&data) = delete;
 
 	std::optional<std::string> Trim(std::string_view re, bool ignoreCase = false);
 	bool Trim(char re);
-	int Peek() const;		// // //
 	bool SkipSpaces(); // true if at least one character is skipped
 
 	void Clear();
@@ -57,7 +51,7 @@ private:
 	void SetInitReadCount(std::size_t count);
 
 //	std::string filename_;
-	std::string mml_;
+	std::string_view mml_;
 	std::string_view sv_;
 	std::string_view prev_;
 	std::vector<MacroState> macros_;

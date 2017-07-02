@@ -157,7 +157,7 @@
     <ClInclude Include="..\MML\Lexers\Option.h" />
     <ClInclude Include="..\MML\Lexers\Select.h" />
     <ClInclude Include="..\MML\Preprocessor.h" />
-    <ClInclude Include="..\MML\SourceFile.h" />
+    <ClInclude Include="..\MML\SourceView.h" />
     <ClInclude Include="..\MML\Tokenizer.h" />
     <ClInclude Include="..\Music.h" />
     <ClInclude Include="..\Music\SongBase.h" />

@@ -11,7 +11,7 @@ enum class Target		// // //
 	Unknown, AMK, AM4, AMM,
 };
 
-class SourceFile;
+class SourceView;
 
 class Preprocessor
 {
@@ -37,7 +37,7 @@ private:
 	void doTarget(Target t);		// // //
 	void doVersion(int ver);		// // //
 
-	bool parsePredicate(SourceFile &row);		// // //
+	bool parsePredicate(SourceView &row);		// // //
 
 	std::map<std::string, int> defines;
 	std::stack<bool> okayStatus;

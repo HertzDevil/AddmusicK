@@ -78,7 +78,8 @@ int main(int argc, char **argv) try {		// // //
 	if (fs::exists("Addmusic_options.txt")) {		// // //
 		// This is probably a catastrophicly bad idea on several levels, but I don't have the time do redo this entire section of code.
 		// AddmusicK 2.0: Now with actually good programming habits! (probably not)
-		AMKd::MML::SourceFile options {openTextFile("Addmusic_options.txt")};		// // //
+		auto optionStr = openTextFile("Addmusic_options.txt");		// // //
+		AMKd::MML::SourceView options {optionStr};
 		using namespace AMKd::MML::Lexer;
 		while (auto line = GetParameters<Row>(options))
 			arguments.push_back(std::move(line.get<0>()));
@@ -409,7 +410,8 @@ void assembleSPCDriver() {
 
 void loadMusicList() {
 	const std::string SONG_LIST {"Addmusic_list.txt"};
-	AMKd::MML::SourceFile list {openTextFile(SONG_LIST)};		// // //
+	auto listStr = openTextFile(SONG_LIST);		// // //
+	AMKd::MML::SourceView list {listStr};
 	using namespace AMKd::MML::Lexer;
 
 	bool inGlobals = false;
@@ -466,7 +468,8 @@ void loadMusicList() {
 
 void loadSampleList() {
 	const std::string SAMPGROUP_NAME {"Addmusic_sample groups.txt"};
-	AMKd::MML::SourceFile list {openTextFile(SAMPGROUP_NAME)};		// // //
+	auto listStr = openTextFile(SAMPGROUP_NAME);		// // //
+	AMKd::MML::SourceView list {listStr};
 	using namespace AMKd::MML::Lexer;
 
 	while (list.HasNextToken()) {		// // //
@@ -498,7 +501,8 @@ void loadSampleList() {
 
 void loadSFXList() {		// Very similar to loadMusicList, but with a few differences.
 	const std::string SFX_LIST {"Addmusic_sound effects.txt"};
-	AMKd::MML::SourceFile list {openTextFile(SFX_LIST)};		// // //
+	auto listStr = openTextFile(SFX_LIST);		// // //
+	AMKd::MML::SourceView list {listStr};
 	using namespace AMKd::MML::Lexer;
 
 	int bank = -1;		// // //
