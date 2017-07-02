@@ -157,7 +157,17 @@ public:
 	void doLoopRemoteCall(int loopCount, uint16_t loopAdr);		// // // Call any time a normal loop is called remotely.
 	void doSubloopEnter();		// // // Call any time a definition of a super loop is entered.
 	void doSubloopExit(int loopCount);		// // // Call any time a definition of a super loop is exited.
+	void doYoshiDrums(bool ch5only);
+	void doLegato();
+	void doLightStaccato();
+	void doSync();
+	void doTempoImmunity();
 	void doVolumeTable(bool louder);
+	void doRestoreInst();
+	void doPitchMod(int flag);
+	void doGain(int gain);
+	void doAmplify(int mult);
+	void doEchoBuffer(int size);
 	void doDSPWrite(int adr, int val);
 	void doARAMWrite(int adr, int val);
 	void doDataSend(int val1, int val2);

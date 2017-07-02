@@ -641,11 +641,11 @@ void Music::parseHFDHex() {
 					reg == 0x6C ? doNoise(val) : // Noise command gets special treatment.
 					doDSPWrite(reg, val);		// // //
 			}
-			break;
+			throw AMKd::Utility::SyntaxException {"Error while parsing HFD hex command."};
 		case 0x81:
 			if (auto param = GetParameters<Byte, Byte>(mml_))		// // //
 				return doTranspose(param.get<0>());
-			break;
+			throw AMKd::Utility::SyntaxException {"Error while parsing HFD hex command."};
 		case 0x82:
 			if (auto param = GetParameters<Byte, Byte, Byte, Byte>(mml_)) {		// // //
 				int addr = (param.get<0>() << 8) | param.get<1>();
@@ -659,14 +659,16 @@ void Music::parseHFDHex() {
 						throw AMKd::Utility::SyntaxException {"Error while parsing HFD hex command."};
 				return;
 			}
-			break;
+			throw AMKd::Utility::SyntaxException {"Error while parsing HFD hex command."};
 		default:
 			if (kind.get<0>() >= 0x80)		// // //
 				throw AMKd::Utility::ParamException {"Unknown HFD hex command type."};
 		}
 	}
 
-	append(AMKd::Binary::CmdType::Envelope, kind.get<0>());		// // //
+	if (auto param = GetParameters<Byte>(mml_))		// // //
+		return doEnvelope(kind.get<0>(), param.get<0>());
+	throw AMKd::Utility::ParamException {"Unknown hex command type."};
 }
 
 // // //
@@ -692,19 +694,10 @@ void Music::parseHexCommand() {
 		return;
 	}
 
-	using namespace AMKd::MML::Lexer;		// // //
 	switch (currentHex) {		// // //
 	case AMKd::Binary::CmdType::Inst:
-		if (auto param = GetParameters<Byte>(mml_)) {
-			auto inst = param.get<0>();
-			if (songTargetProgram == Target::AM4) {		// // // If this was the instrument command
-				if (inst >= 0x13)					// And it was >= 0x13
-					inst = inst - 0x13 + 30;		// Then change it to a custom instrument.
-				usedSamples[instrumentData[(inst - 30) * 5]] = true;
-			}
-			append(AMKd::Binary::CmdType::Inst, inst);
-			return;
-		}
+		if (auto param = GetParameters<Byte>(mml_))
+			return doInstrument(param.get<0>(), true);
 		break;
 	case AMKd::Binary::CmdType::Pan:
 		if (auto param = GetParameters<Byte>(mml_))
@@ -792,14 +785,8 @@ void Music::parseHexCommand() {
 			return doPitchBend(param.get<0>(), param.get<1>(), param.get<2>(), false);
 		break;
 	case AMKd::Binary::CmdType::Envelope:
-		if (songTargetProgram == Target::AM4) {
-			parseHFDHex();
-			if (auto param = GetParameters<Byte>(mml_)) {
-				append(param.get<0>());
-				return;
-			}
-			break;
-		}
+		if (songTargetProgram == Target::AM4)
+			return parseHFDHex();
 		if (auto param = GetParameters<Byte, Byte>(mml_))
 			return doEnvelope(param.get<0>(), param.get<1>());
 		break;
@@ -829,12 +816,17 @@ void Music::parseHexCommand() {
 		if (auto param = GetParameters<Byte>(mml_)) {
 			auto cmdType = param.get<0>();
 			switch (cmdType) {
-			case AMKd::Binary::CmdOptionF4::YoshiCh5:
-			case AMKd::Binary::CmdOptionF4::Yoshi:
-				hasYoshiDrums = true; break;
+			case AMKd::Binary::CmdOptionF4::YoshiCh5:      return doYoshiDrums(true);
+			case AMKd::Binary::CmdOptionF4::Legato:        return doLegato();
+			case AMKd::Binary::CmdOptionF4::LightStaccato: return doLightStaccato();
+			case AMKd::Binary::CmdOptionF4::EchoToggle:    return doEchoToggle();
+			case AMKd::Binary::CmdOptionF4::Sync:          return doSync();
+			case AMKd::Binary::CmdOptionF4::Yoshi:         return doYoshiDrums(false);
+			case AMKd::Binary::CmdOptionF4::TempoImmunity: return doTempoImmunity();
+			case AMKd::Binary::CmdOptionF4::VelocityTable: return doVolumeTable(true);
+			case AMKd::Binary::CmdOptionF4::RestoreInst:   return doRestoreInst();
 			}
-			append(AMKd::Binary::CmdType::ExtF4, cmdType);
-			return;
+			throw AMKd::Utility::ParamException {"Unknown $F4 hex command type."};
 		}
 		break;
 	case AMKd::Binary::CmdType::FIR:
@@ -861,31 +853,37 @@ void Music::parseHexCommand() {
 		if (auto param = GetParameters<Byte, Byte>(mml_)) {
 			uint8_t cmdType, cmdVal;
 			std::tie(cmdType, cmdVal) = *param;
-			if (cmdType == AMKd::Binary::CmdOptionFA::GainOld) {
-				if (targetAMKVersion < 2) {
-					//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
-					auto &track = getBaseTrack();		// // //
+			switch (cmdType) {
+			case AMKd::Binary::CmdOptionFA::PitchMod:   return doPitchMod(cmdVal);
+			case AMKd::Binary::CmdOptionFA::Gain:       return doGain(cmdVal);
+			case AMKd::Binary::CmdOptionFA::Transpose:  return doTranspose(cmdVal);
+			case AMKd::Binary::CmdOptionFA::Amplify:    return doAmplify(cmdVal);
+			case AMKd::Binary::CmdOptionFA::EchoBuffer: return doEchoBuffer(cmdVal);
+			case AMKd::Binary::CmdOptionFA::GainOld:
+				if (targetAMKVersion >= 2)		// // //
+					throw AMKd::Utility::ParamException {"$FA $05 in #amk 2 or above has been replaced with remote code."};
+				//if (tempoRatio != 1)
+				//	throw AMKd::Utility::ParamException {"#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command."};
 
-					track.usingFA = (cmdVal != 0);		// // //
-
-					if (track.usingFA)
-						if (track.usingFC)
-							insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOffConv, track.lastFCDelayValue,
+				auto &track = getBaseTrack();		// // //
+				track.usingFA = (cmdVal != 0);		// // //
+				if (track.usingFA)
+					if (track.usingFC)
+						insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOffConv, track.lastFCDelayValue,
 							{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, cmdVal, 0x00});
-						else {
-							insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
+					else {
+						insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
 							{AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00});
-							insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOff, 0x00,
+						insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOff, 0x00,
 							{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, cmdVal, 0x00});
-						}
-					else
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::Disable, 0x00, {});
-					return;
-				}
-				throw AMKd::Utility::ParamException {"$FA $05 in #amk 2 or above has been replaced with remote code."};		// // //
+					}
+				else
+					insertRemoteConversion(AMKd::Binary::CmdOptionFC::Disable, 0x00, {});
+				return;
+			case AMKd::Binary::CmdOptionFA::VolTable:
+				return doVolumeTable(requires(static_cast<unsigned>(cmdVal), 0u, 1u, "Invalid volume table index."));
 			}
-			append(AMKd::Binary::CmdType::ExtFA, cmdType, cmdVal);
-			return;
+			throw AMKd::Utility::ParamException {"Unknown $FA hex command type."};
 		}
 		break;
 	case AMKd::Binary::CmdType::Arpeggio:
@@ -1084,7 +1082,7 @@ void Music::parseNSPCVTable() {
 }
 
 void Music::parseTempoImmunity() {
-	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::TempoImmunity);		// // //
+	return doTempoImmunity();		// // //
 }
 
 void Music::parseNoLoop() {
@@ -1961,11 +1959,53 @@ void Music::doSubloopExit(int loopCount) {
 	append(AMKd::Binary::CmdType::Subloop, loopCount - 1);		// // //
 }
 
+void Music::doYoshiDrums(bool ch5only) {
+	append(AMKd::Binary::CmdType::ExtF4, ch5only ? AMKd::Binary::CmdOptionF4::YoshiCh5 : AMKd::Binary::CmdOptionF4::Yoshi);
+	hasYoshiDrums = true;
+}
+
+void Music::doLegato() {
+	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::Legato);
+}
+
+void Music::doLightStaccato() {
+	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::LightStaccato);
+}
+
+void Music::doSync() {
+	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::Sync);
+}
+
+void Music::doTempoImmunity() {
+	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::TempoImmunity);
+}
+
 void Music::doVolumeTable(bool louder) {
 	if (louder)
 		append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::VelocityTable);
 	else
 		append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, /*louder ? 0x01 :*/ 0x00);
+}
+
+void Music::doRestoreInst() {
+	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst);
+}
+
+void Music::doPitchMod(int flag) {
+	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::PitchMod, flag);
+}
+
+void Music::doGain(int gain) {
+	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, gain);
+}
+
+void Music::doAmplify(int mult) {
+	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Amplify, mult);
+}
+
+void Music::doEchoBuffer(int size) {
+	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::EchoBuffer, size);
+	echoBufferSize = std::max(echoBufferSize, size);
 }
 
 void Music::doDSPWrite(int adr, int val) {
