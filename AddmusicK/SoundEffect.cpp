@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iomanip>
 #include <algorithm>		// // //
+#include "Utility/Swallow.h"		// // //
 
 static unsigned int pos;
 static int line;
@@ -14,12 +15,6 @@ static int defaultNoteValue;
 #define error2(str) do { \
 		printError(str, name, line); \
 		return; \
-	} while (false)
-
-// // // vs2017 does not have fold-expressions
-#define SWALLOW(x) do { \
-		using _swallow = int[]; \
-		(void)_swallow {0, ((x), 0)...}; \
 	} while (false)
 
 // // //

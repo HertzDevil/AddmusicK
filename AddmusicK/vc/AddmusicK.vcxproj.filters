@@ -69,9 +69,6 @@
     <ClInclude Include="..\Music\Track.h">
       <Filter>Header Files\Music</Filter>
     </ClInclude>
-    <ClInclude Include="..\MML\SourceFile.h">
-      <Filter>Header Files\MML</Filter>
-    </ClInclude>
     <ClInclude Include="..\Utility\Exception.h">
       <Filter>Header Files\Utility</Filter>
     </ClInclude>
@@ -114,6 +111,9 @@
     <ClInclude Include="..\Music\TrackState.h">
       <Filter>Header Files\Music</Filter>
     </ClInclude>
+    <ClInclude Include="..\MML\SourceView.h">
+      <Filter>Header Files\MML</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp">
@@ -134,9 +134,6 @@
     <ClCompile Include="..\asardll.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\MML\SourceFile.cpp">
-      <Filter>Source Files\MML</Filter>
-    </ClCompile>
     <ClCompile Include="..\MML\Preprocessor.cpp">
       <Filter>Source Files\MML</Filter>
     </ClCompile>
@@ -151,6 +148,9 @@
     </ClCompile>
     <ClCompile Include="..\Music\TrackState.cpp">
       <Filter>Source Files\Music</Filter>
+    </ClCompile>
+    <ClCompile Include="..\MML\SourceView.cpp">
+      <Filter>Source Files\MML</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
