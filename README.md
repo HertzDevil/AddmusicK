@@ -10,6 +10,8 @@ This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will no
     - `Lexer`: Classes that extract tokens.
   - `Music`: Classes that deal with compile-time music data representation.
   - `Binary`: Classes related to outputting music data, and things exclusive to SMW.
+    - `ChunkNSPC`: Binary command representations from the original N-SPC sound engine.
+    - `ChunkAMK`: Binary command representations added in Addmusic.
   - `Utility`: Other things.
 
 #### Programming stuffs
