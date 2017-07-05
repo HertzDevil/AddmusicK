@@ -6,8 +6,14 @@
 #include <cstdint>		// // //
 #include "MML/SourceView.h"		// // //
 #include "Music/SongBase.h"		// // //
-#include "MML/Duration.h"		// // //
 #include "Music/Track.h"		// // //
+
+namespace AMKd::MML {
+struct Duration;
+}
+namespace AMKd::Binary {
+class Stream;
+}
 
 const size_t CHANNELS = 8;		// // //
 
@@ -193,7 +199,8 @@ private:
 	void parseHFDHex();
 	void parseHFDInstrumentHack(int addr, int bytes);
 	void insertedZippedSamples(const std::string &path);
-	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd);		// // //
+	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, const AMKd::Binary::Stream &cmd);		// // //
+	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, AMKd::Binary::Stream &&cmd);		// // //
 
 	void displaySongData() const;
 

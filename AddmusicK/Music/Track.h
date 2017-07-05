@@ -5,6 +5,7 @@
 #include <utility>
 #include "TrackState.h"
 #include "../Utility/Swallow.h"
+#include "../Binary/Stream.h"
 
 class Music;
 
@@ -18,7 +19,8 @@ public:
 	void FlushData(std::vector<uint8_t> &bin) const;
 
 	void AddLoopPosition(size_t offset);
-	void AddRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd);
+	void AddRemoteConversion(uint8_t cmdtype, uint8_t param, const AMKd::Binary::Stream &cmd);
+	void AddRemoteConversion(uint8_t cmdtype, uint8_t param, AMKd::Binary::Stream &&cmd);
 
 	void ShiftPointers(int offset);
 	void InsertRemoteCalls(Track &loop);
@@ -28,14 +30,14 @@ public:
 #if __cplusplus > 201402L
 		(data.push_back(static_cast<uint8_t>(value)), ...);
 #else
-		SWALLOW(data.push_back(static_cast<uint8_t>(value)));
+		SWALLOW(streamData_ << static_cast<uint8_t>(value));
 #endif
 	}
 
 private:
-	std::vector<uint8_t> data;		// // //
+	AMKd::Binary::Stream streamData_;		// // //
 	std::vector<uint16_t> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
-	std::vector<std::pair<uint16_t, std::vector<uint8_t>>> remoteGainInfo;		// // // holds position and remote call data for gain command conversions
+	std::vector<std::pair<uint16_t, AMKd::Binary::Stream>> remoteGainInfo;		// // // holds position and remote call data for gain command conversions
 
 public:
 	int index = 0;

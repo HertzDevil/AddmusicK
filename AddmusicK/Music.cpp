@@ -9,7 +9,8 @@
 #include <locale>		// // //
 
 #include "globals.h"		// // //
-#include "Binary/Defines.h"		// // //
+#include "Binary/ChunkAMK.h"		// // //
+#include "Binary/Stream.h"		// // //
 #include "MML/Lexer.h"		// // //
 #include "MML/Preprocessor.h"		// // //
 #include "MML/Tokenizer.h"		// // //
@@ -673,7 +674,11 @@ void Music::parseHFDHex() {
 }
 
 // // //
-void Music::insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd) {
+void Music::insertRemoteConversion(uint8_t cmdtype, uint8_t param, const AMKd::Binary::Stream &cmd) {
+	getActiveTrack().AddRemoteConversion(cmdtype, param, cmd);
+}
+
+void Music::insertRemoteConversion(uint8_t cmdtype, uint8_t param, AMKd::Binary::Stream &&cmd) {
 	getActiveTrack().AddRemoteConversion(cmdtype, param, std::move(cmd));
 }
 
@@ -793,7 +798,7 @@ void Music::parseHexCommand() {
 		break;
 	case AMKd::Binary::CmdType::EchoVol:
 		if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
-			return doEchoVolume(param.get<0>(), param.get<1>(), param.get<2>());
+			return doEchoVolume(param.get<2>(), param.get<0>(), param.get<1>());
 		break;
 	case AMKd::Binary::CmdType::EchoOff:
 		return doEchoOff();
@@ -848,36 +853,36 @@ void Music::parseHexCommand() {
 		break;
 	case AMKd::Binary::CmdType::ExtFA:
 		if (auto param = GetParameters<Byte, Byte>(mml_)) {
+			using namespace AMKd::Binary;
 			uint8_t cmdType, cmdVal;
 			std::tie(cmdType, cmdVal) = *param;
 			switch (cmdType) {
-			case AMKd::Binary::CmdOptionFA::PitchMod:   return doPitchMod(cmdVal);
-			case AMKd::Binary::CmdOptionFA::Gain:       return doGain(cmdVal);
-			case AMKd::Binary::CmdOptionFA::Transpose:  return doTranspose(cmdVal);
-			case AMKd::Binary::CmdOptionFA::Amplify:    return doAmplify(cmdVal);
-			case AMKd::Binary::CmdOptionFA::EchoBuffer: return doEchoBuffer(cmdVal);
-			case AMKd::Binary::CmdOptionFA::GainOld:
+			case CmdOptionFA::PitchMod:   return doPitchMod(cmdVal);
+			case CmdOptionFA::Gain:       return doGain(cmdVal);
+			case CmdOptionFA::Transpose:  return doTranspose(cmdVal);
+			case CmdOptionFA::Amplify:    return doAmplify(cmdVal);
+			case CmdOptionFA::EchoBuffer: return doEchoBuffer(cmdVal);
+			case CmdOptionFA::GainOld:
 				if (targetAMKVersion < 2) {		// // //
 					//if (tempoRatio != 1)
 					//	throw AMKd::Utility::ParamException {"#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command."};
 					auto &track = getBaseTrack();		// // //
 					track.usingFA = (cmdVal != 0);		// // //
-					if (track.usingFA)
+					if (track.usingFA) {
+						auto gain = Stream() << ChunkAMK::Gain(cmdVal) << ChunkNSPC::End();
 						if (track.usingFC)
-							insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOffConv, track.lastFCDelayValue,
-							{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, cmdVal, 0x00});
+							insertRemoteConversion(CmdOptionFC::KeyOffConv, track.lastFCDelayValue, gain);
 						else {
-							insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
-							{AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00});
-							insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOff, 0x00,
-							{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, cmdVal, 0x00});
+							insertRemoteConversion(CmdOptionFC::KeyOn, 0x00, Stream() << ChunkAMK::RestoreInst() << ChunkNSPC::End());
+							insertRemoteConversion(CmdOptionFC::KeyOff, 0x00, gain);
 						}
+					}
 					else
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::Disable, 0x00, {});
+						insertRemoteConversion(CmdOptionFC::Disable, 0x00, Stream());
 					return;
 				}
 				throw AMKd::Utility::ParamException {"$FA $05 in #amk 2 or above has been replaced with remote code."};
-			case AMKd::Binary::CmdOptionFA::VolTable:
+			case CmdOptionFA::VolTable:
 				return doVolumeTable(requires(static_cast<unsigned>(cmdVal), 0u, 1u, "Invalid volume table index."));
 			}
 			throw AMKd::Utility::ParamException {"Unknown $FA hex command type."};
@@ -900,31 +905,28 @@ void Music::parseHexCommand() {
 	case AMKd::Binary::CmdType::Callback:
 		if (targetAMKVersion < 2) {		// // //
 			if (auto param = GetParameters<Byte, Byte>(mml_)) {
+				using namespace AMKd::Binary;
 				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 				auto &track = getBaseTrack();		// // //
 				uint8_t delay, gain;
 				std::tie(delay, gain) = *param;
 
+				auto s = Stream() << ChunkAMK::Gain(gain) << ChunkNSPC::End();
 				track.usingFC = (delay != 0);
 				if (track.usingFC) {
 					track.lastFCDelayValue = static_cast<uint8_t>(divideByTempoRatio(delay, false));		// // //
-
 					if (track.usingFA)
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOffConv, track.lastFCDelayValue,
-						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, gain, 0x00});
+						insertRemoteConversion(CmdOptionFC::KeyOffConv, track.lastFCDelayValue, s);
 					else {
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
-						{AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00});
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::Release, track.lastFCDelayValue,
-						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, gain, 0x00});
+						insertRemoteConversion(CmdOptionFC::KeyOn, 0x00, Stream() << ChunkAMK::RestoreInst() << ChunkNSPC::End());
+						insertRemoteConversion(CmdOptionFC::Release, track.lastFCDelayValue, s);
 					}
 				}
 				else {
 					if (track.usingFA)
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOff, 0x00,
-						{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, gain, 0x00}); // check this
+						insertRemoteConversion(CmdOptionFC::KeyOff, 0x00, s); // check this
 					else
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::Disable, 0x00, {});
+						insertRemoteConversion(CmdOptionFC::Disable, 0x00, Stream());
 				}
 				return;
 			}

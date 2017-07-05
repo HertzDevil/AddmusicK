@@ -25,6 +25,9 @@
     <Filter Include="Header Files\Binary">
       <UniqueIdentifier>{7648e274-1a2c-4e2b-a8fc-d7bb2a038859}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Binary">
+      <UniqueIdentifier>{086e8736-19ea-41f3-9806-ba0da78f5b8e}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source Files\Music">
       <UniqueIdentifier>{17415cdb-9e45-4876-bbb8-7f07466f52be}</UniqueIdentifier>
     </Filter>
@@ -114,6 +117,18 @@
     <ClInclude Include="..\MML\SourceView.h">
       <Filter>Header Files\MML</Filter>
     </ClInclude>
+    <ClInclude Include="..\Binary\Stream.h">
+      <Filter>Header Files\Binary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Binary\Chunk.h">
+      <Filter>Header Files\Binary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Binary\ChunkAMK.h">
+      <Filter>Header Files\Binary</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Utility\Swallow.h">
+      <Filter>Header Files\Utility</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="D:\C++\lodepng\lodepng.cpp">
@@ -151,6 +166,9 @@
     </ClCompile>
     <ClCompile Include="..\MML\SourceView.cpp">
       <Filter>Source Files\MML</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Binary\Stream.cpp">
+      <Filter>Source Files\Binary</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
