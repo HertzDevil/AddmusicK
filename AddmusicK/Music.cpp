@@ -511,8 +511,7 @@ void Music::parseRemoteCodeCommand() {
 		getActiveTrack().loopLocations.push_back(static_cast<uint16_t>(getActiveTrack().data.size() + 1));		// // //
 		if (loopPointers.find(remoteID) == loopPointers.cend())		// // //
 			loopPointers.insert({remoteID, static_cast<uint16_t>(-1)});
-		append(AMKd::Binary::CmdType::Callback, loopPointers[remoteID] & 0xFF, loopPointers[remoteID] >> 8, remoteOpt, remoteLen);
-		return;
+		return doRemoteCallNative(loopPointers[remoteID], remoteOpt, remoteLen);		// // //
 	}
 
 	if (auto param = GetParameters<Int, Sep<')'>, Sep<'['>>(mml_)) {		// // // We're outside of a channel, this is a remote call definition.
@@ -767,10 +766,8 @@ void Music::parseHexCommand() {
 			return doVolume(param.get<1>(), param.get<0>());
 		break;
 	case AMKd::Binary::CmdType::Loop:
-		if (auto param = GetParameters<Byte, Byte, Byte>(mml_)) {
-			append(AMKd::Binary::CmdType::Loop, param.get<0>(), param.get<1>(), param.get<2>());
-			return;
-		}
+		if (auto param = GetParameters<Byte, Byte, Byte>(mml_))
+			return doLoopNative(param.get<0>() | (param.get<1>() << 8), param.get<2>());		// // //
 		break;
 	case AMKd::Binary::CmdType::VibratoFade:
 		if (auto param = GetParameters<Byte>(mml_))
@@ -934,10 +931,8 @@ void Music::parseHexCommand() {
 			break;
 		}
 
-		if (auto param = GetParameters<Byte, Byte, Byte, Byte>(mml_)) {
-			append(AMKd::Binary::CmdType::Callback, param.get<0>(), param.get<1>(), param.get<2>(), param.get<3>());
-			return;
-		}
+		if (auto param = GetParameters<Byte, Byte, Byte, Byte>(mml_))
+			return doRemoteCallNative(param.get<0>() | (param.get<1>() << 8), param.get<2>(), param.get<3>());		// // //
 		break;
 	case 0xFD: case 0xFE: case 0xFF:
 		break;
@@ -1903,7 +1898,7 @@ void Music::doLoopExit(int loopCount) {
 
 	if (!inRemoteDefinition) {
 		getActiveTrack().loopLocations.push_back(static_cast<uint16_t>(getActiveTrack().data.size() + 1));		// // //
-		append(AMKd::Binary::CmdType::Loop, prevLoop & 0xFF, prevLoop >> 8, loopCount);
+		doLoopNative(prevLoop, loopCount);
 	}
 	inRemoteDefinition = false;
 	loopLabel = 0;
@@ -1917,7 +1912,11 @@ void Music::doLoopRemoteCall(int loopCount, uint16_t loopAdr) {
 	synchronizeStates();		// // //
 	addNoteLength((loopLabel ? loopLengths[loopLabel] : normalLoopLength) * loopCount);		// // //
 	getActiveTrack().loopLocations.push_back(static_cast<uint16_t>(getActiveTrack().data.size() + 1));		// // //
-	append(AMKd::Binary::CmdType::Loop, loopAdr & 0xFF, loopAdr >> 8, loopCount);
+	return doLoopNative(loopAdr, loopCount);
+}
+
+void Music::doLoopNative(int addr, int loopCount) {
+	append(AMKd::Binary::CmdType::Loop, addr & 0xFF, addr >> 8, loopCount);
 }
 
 void Music::doSubloopEnter() {
@@ -1957,6 +1956,10 @@ void Music::doSubloopExit(int loopCount) {
 	}
 
 	append(AMKd::Binary::CmdType::Subloop, loopCount - 1);		// // //
+}
+
+void Music::doRemoteCallNative(int addr, int type, int delay) {
+	append(AMKd::Binary::CmdType::Callback, addr & 0xFF, addr >> 8, type, delay);
 }
 
 void Music::doYoshiDrums(bool ch5only) {

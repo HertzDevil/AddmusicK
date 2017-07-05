@@ -155,8 +155,10 @@ public:
 	void doLoopEnter();					// Call any time a definition of a loop is entered.
 	void doLoopExit(int loopCount);			// Call any time a definition of a loop is exited.
 	void doLoopRemoteCall(int loopCount, uint16_t loopAdr);		// // // Call any time a normal loop is called remotely.
+	void doLoopNative(int addr, int loopCount);
 	void doSubloopEnter();		// // // Call any time a definition of a super loop is entered.
 	void doSubloopExit(int loopCount);		// // // Call any time a definition of a super loop is exited.
+	void doRemoteCallNative(int addr, int type, int delay = 0);
 	void doYoshiDrums(bool ch5only);
 	void doLegato();
 	void doLightStaccato();
