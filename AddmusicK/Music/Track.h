@@ -13,10 +13,15 @@ namespace AMKd::Music {
 class Track
 {
 public:
-	friend class ::Music;
+	size_t GetStreamSize() const;
+	bool HasData() const;
+	void FlushData(std::vector<uint8_t> &bin) const;
 
-	void shiftPointers(int offset);
-	void insertRemoteCalls(Track &loop);
+	void AddLoopPosition(size_t offset);
+	void AddRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd);
+
+	void ShiftPointers(int offset);
+	void InsertRemoteCalls(Track &loop);
 
 	template <typename... Args>
 	void append(Args&&... value) {
@@ -28,11 +33,12 @@ public:
 	}
 
 private:
-	int index = 0;
-
 	std::vector<uint8_t> data;		// // //
 	std::vector<uint16_t> loopLocations; // With remote loops, we can have remote loops in standard loops, so we need that ninth channel.
 	std::vector<std::pair<uint16_t, std::vector<uint8_t>>> remoteGainInfo;		// // // holds position and remote call data for gain command conversions
+
+public:
+	int index = 0;
 
 	double channelLength = 0.; // How many ticks are in each channel.
 	TrackState q {0x7F};		// // //

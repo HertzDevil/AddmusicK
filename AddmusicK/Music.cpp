@@ -150,16 +150,18 @@ void Music::init() {
 	for (int z = 19; z < 256; z++)
 		transposeMap[z] = 0;
 
-	title = fs::path {name}.stem().string();		// // //
-	dumper = "AddmusicK " + std::to_string(AMKVERSION) + '.' + std::to_string(AMKMINOR) + '.' + std::to_string(AMKREVISION);		// // //
-
 	const auto stat = AMKd::MML::Preprocessor {openTextFile(fs::path {"music"} / name), name};
 	mmlText_ = std::move(stat.result);		// // //
 	mml_ = AMKd::MML::SourceView {mmlText_};
 	songTargetProgram = stat.target;		// // //
 	targetAMKVersion = stat.version;
+
 	if (!stat.title.empty())
 		title = stat.title;
+	else
+		title = fs::path {name}.stem().string();		// // //
+	game = "Super Mario World (custom)";		// // //
+	dumper = "AddmusicK " + std::to_string(AMKVERSION) + '.' + std::to_string(AMKMINOR) + '.' + std::to_string(AMKREVISION);		// // //
 
 	switch (stat.target) {		// // //
 	case Target::AMM:
@@ -266,18 +268,18 @@ void Music::compile() {
 size_t Music::getDataSize() const {
 	size_t x = 0;
 	for (const Track &t : tracks)
-		x += t.data.size();
+		x += t.GetStreamSize();
 	return x;
 }
 
 // // //
 std::vector<uint8_t> Music::getSongData() const {
 	std::vector<uint8_t> buf;
-	buf.reserve(getDataSize() + loopTrack.data.size() + allPointersAndInstrs.size());
+	buf.reserve(getDataSize() + loopTrack.GetStreamSize() + allPointersAndInstrs.size());
 	buf.insert(buf.end(), allPointersAndInstrs.cbegin(), allPointersAndInstrs.cend());
 	for (const Track &t : tracks)
-		buf.insert(buf.cend(), t.data.cbegin(), t.data.cend());
-	buf.insert(buf.cend(), loopTrack.data.cbegin(), loopTrack.data.cend());
+		t.FlushData(buf);
+	loopTrack.FlushData(buf);
 	return buf;
 }
 
@@ -296,7 +298,7 @@ void Music::parseQMarkDirective() {
 		case 1: getActiveTrack().noMusic[0] = true; break;		// // //
 		case 2: getActiveTrack().noMusic[1] = true; break;
 		default:
-			throw AMKd::Utility::ParamException(DIR_ILLEGAL("\"?\""));
+			throw AMKd::Utility::ParamException {DIR_ILLEGAL("\"?\"")};
 		}
 	}
 	else
@@ -386,7 +388,7 @@ void Music::parseIntroDirective() {
 				x.second = -static_cast<int>(tempo);
 
 	hasIntro = true;
-	getActiveTrack().phrasePointers[1] = static_cast<uint16_t>(getActiveTrack().data.size());		// // //
+	getActiveTrack().phrasePointers[1] = static_cast<uint16_t>(getActiveTrack().GetStreamSize());		// // //
 	getActiveTrack().lastDuration = 0;
 	introLength = static_cast<unsigned>(getActiveTrack().channelLength);		// // //
 }
@@ -508,9 +510,9 @@ void Music::parseRemoteCodeCommand() {
 		if (!GetParameters<Sep<')'>, Sep<'['>>(mml_))
 			throw AMKd::Utility::SyntaxException {"Error parsing remote code setup."};
 
-		getActiveTrack().loopLocations.push_back(static_cast<uint16_t>(getActiveTrack().data.size() + 1));		// // //
 		if (loopPointers.find(remoteID) == loopPointers.cend())		// // //
 			loopPointers.insert({remoteID, static_cast<uint16_t>(-1)});
+		getActiveTrack().AddLoopPosition(1);
 		return doRemoteCallNative(loopPointers[remoteID], remoteOpt, remoteLen);		// // //
 	}
 
@@ -672,9 +674,7 @@ void Music::parseHFDHex() {
 
 // // //
 void Music::insertRemoteConversion(uint8_t cmdtype, uint8_t param, std::vector<uint8_t> &&cmd) {
-	auto pos = static_cast<uint16_t>(getActiveTrack().data.size() + 1);
-	getActiveTrack().remoteGainInfo.emplace_back(pos, std::move(cmd));		// // //
-	append(AMKd::Binary::CmdType::Callback, 0x00, 0x00, cmdtype, param);		// // //
+	getActiveTrack().AddRemoteConversion(cmdtype, param, std::move(cmd));
 }
 
 // // //
@@ -857,26 +857,26 @@ void Music::parseHexCommand() {
 			case AMKd::Binary::CmdOptionFA::Amplify:    return doAmplify(cmdVal);
 			case AMKd::Binary::CmdOptionFA::EchoBuffer: return doEchoBuffer(cmdVal);
 			case AMKd::Binary::CmdOptionFA::GainOld:
-				if (targetAMKVersion >= 2)		// // //
-					throw AMKd::Utility::ParamException {"$FA $05 in #amk 2 or above has been replaced with remote code."};
-				//if (tempoRatio != 1)
-				//	throw AMKd::Utility::ParamException {"#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command."};
-
-				auto &track = getBaseTrack();		// // //
-				track.usingFA = (cmdVal != 0);		// // //
-				if (track.usingFA)
-					if (track.usingFC)
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOffConv, track.lastFCDelayValue,
+				if (targetAMKVersion < 2) {		// // //
+					//if (tempoRatio != 1)
+					//	throw AMKd::Utility::ParamException {"#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command."};
+					auto &track = getBaseTrack();		// // //
+					track.usingFA = (cmdVal != 0);		// // //
+					if (track.usingFA)
+						if (track.usingFC)
+							insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOffConv, track.lastFCDelayValue,
 							{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, cmdVal, 0x00});
-					else {
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
+						else {
+							insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOn, 0x00,
 							{AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst, 0x00});
-						insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOff, 0x00,
+							insertRemoteConversion(AMKd::Binary::CmdOptionFC::KeyOff, 0x00,
 							{AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, cmdVal, 0x00});
-					}
-				else
-					insertRemoteConversion(AMKd::Binary::CmdOptionFC::Disable, 0x00, {});
-				return;
+						}
+					else
+						insertRemoteConversion(AMKd::Binary::CmdOptionFC::Disable, 0x00, {});
+					return;
+				}
+				throw AMKd::Utility::ParamException {"$FA $05 in #amk 2 or above has been replaced with remote code."};
 			case AMKd::Binary::CmdOptionFA::VolTable:
 				return doVolumeTable(requires(static_cast<unsigned>(cmdVal), 0u, 1u, "Invalid volume table index."));
 			}
@@ -1292,24 +1292,21 @@ int Music::checkTickFraction(double ticks) const {
 // // //
 
 void Music::pointersFirstPass() {
-	if (std::all_of(std::cbegin(tracks), std::cend(tracks), [] (const Track &t) { return t.data.empty(); }))		// // //
+	if (std::all_of(std::cbegin(tracks), std::cend(tracks), [] (const Track &t) { return !t.HasData(); }))		// // //
 		throw AMKd::Utility::InsertException {"This song contained no musical data!"};
 
 	if (targetAMKVersion == 1) {			// Handle more conversion of the old $FC command to remote call.
 		for (Track &t : tracks)
-			t.insertRemoteCalls(loopTrack);		// // //
-		loopTrack.insertRemoteCalls(loopTrack);
+			t.InsertRemoteCalls(loopTrack);		// // //
+		loopTrack.InsertRemoteCalls(loopTrack);
 	}
 
 	for (Track &t : tracks)		// // //
-		if (!t.data.empty())
-			t.data.push_back(AMKd::Binary::CmdType::End);
+		if (t.HasData())
+			t.append(AMKd::Binary::CmdType::End);
 
 	if (mySamples.empty())		// // // If no sample groups were provided...
 		addSampleGroup("default", this);		// // //
-
-	if (game.empty())
-		game = "Super Mario World (custom)";
 
 	if (optimizeSampleUsage) {
 		int emptySampleIndex = ::getSample("EMPTY.brr", this);
@@ -1330,10 +1327,10 @@ void Music::pointersFirstPass() {
 
 	int binpos = 0;		// // //
 	for (Track &t : tracks) {
-		if (!t.data.empty())
+		if (t.HasData())
 			t.phrasePointers[0] = static_cast<uint16_t>(binpos);
 		t.phrasePointers[1] += t.phrasePointers[0];
-		binpos += t.data.size();
+		binpos += t.GetStreamSize();
 	}
 
 	headerSize = 20 + (hasIntro ? 18 : 0) + (doesntLoop ? 0 : 2) + instrumentData.size();		// // //
@@ -1350,12 +1347,12 @@ void Music::pointersFirstPass() {
 	}
 	allPointersAndInstrs.insert(allPointersAndInstrs.cend(), instrumentData.cbegin(), instrumentData.cend());
 	for (Track &t : tracks)		// // //
-		insertPtr(t.data.empty() ? 0xFFFF : (t.phrasePointers[0] + headerSize));
+		insertPtr(t.HasData() ? (t.phrasePointers[0] + headerSize) : 0xFFFF);
 	if (hasIntro)
 		for (Track &t : tracks)		// // //
-			insertPtr(t.data.empty() ? 0xFFFF : (t.phrasePointers[1] + headerSize));
+			insertPtr(t.HasData() ? (t.phrasePointers[1] + headerSize) : 0xFFFF);
 
-	totalSize = headerSize + loopTrack.data.size() + getDataSize();		// // //
+	totalSize = headerSize + loopTrack.GetStreamSize() + getDataSize();		// // //
 
 	//if (tempo == -1) tempo = 0x36;
 	mainLength = static_cast<unsigned>(-1);		// // //
@@ -1416,11 +1413,11 @@ void Music::displaySongData() const {
 		const hex_formatter hex3 {3};
 		std::cout << '\t';		// // //
 		for (size_t i = 0; i < CHANNELS / 2; ++i)
-			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].data.size() << ' ';
+			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].GetStreamSize() << ' ';
 		std::cout << "Ptrs+Instrs: 0x" << hex3 << headerSize << "\n\t";
 		for (size_t i = CHANNELS / 2; i < CHANNELS; ++i)
-			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].data.size() << ' ';
-		std::cout << "Loop:        0x" << hex3 << loopTrack.data.size();
+			std::cout << "#" << i << ": 0x" << hex3 << tracks[i].GetStreamSize() << ' ';
+		std::cout << "Loop:        0x" << hex3 << loopTrack.GetStreamSize();
 		std::cout << "\nSpace used by echo: 0x" << hex4 << (echoBufferSize << 11) <<
 			" bytes.  Space used by samples: 0x" << hex4 << spaceUsedBySamples << " bytes.\n\n";
 	}
@@ -1450,8 +1447,8 @@ void Music::displaySongData() const {
 		std::stringstream statStrStream;
 
 		for (const Track &t : tracks)		// // //
-			statStrStream << "CHANNEL " << static_cast<int>(t.index) << " SIZE:				0x" << hex4 << t.data.size() << "\n";
-		statStrStream << "LOOP DATA SIZE:				0x" << hex4 << loopTrack.data.size() << "\n";
+			statStrStream << "CHANNEL " << static_cast<int>(t.index) << " SIZE:				0x" << hex4 << t.GetStreamSize() << "\n";
+		statStrStream << "LOOP DATA SIZE:				0x" << hex4 << loopTrack.GetStreamSize() << "\n";
 		statStrStream << "POINTERS AND INSTRUMENTS SIZE:		0x" << hex4 << headerSize << "\n";
 		statStrStream << "SAMPLES SIZE:				0x" << hex4 << spaceUsedBySamples << "\n";
 		statStrStream << "ECHO SIZE:				0x" << hex4 << (echoBufferSize << 11) << "\n";
@@ -1502,8 +1499,8 @@ void Music::adjustHeaderPointers() {
 void Music::adjustLoopPointers() {
 	int offset = posInARAM + getDataSize() + allPointersAndInstrs.size();
 	for (Track &t : tracks)
-		t.shiftPointers(offset);
-	loopTrack.shiftPointers(offset);
+		t.ShiftPointers(offset);
+	loopTrack.ShiftPointers(offset);
 }
 
 // // //
@@ -1844,7 +1841,7 @@ void Music::doSampleLoad(int id, int mult) {
 }
 
 void Music::doLoopEnter() {
-	prevLoop = static_cast<uint16_t>(loopTrack.data.size());		// // //
+	prevLoop = static_cast<uint16_t>(loopTrack.GetStreamSize());		// // //
 	if (loopLabel > 0) {
 		if (loopPointers.find(loopLabel) != loopPointers.cend())		// // //
 			throw AMKd::Utility::ParamException {"Label redefinition."};
@@ -1897,7 +1894,7 @@ void Music::doLoopExit(int loopCount) {
 		loopLengths[loopLabel] = normalLoopLength;
 
 	if (!inRemoteDefinition) {
-		getActiveTrack().loopLocations.push_back(static_cast<uint16_t>(getActiveTrack().data.size() + 1));		// // //
+		getActiveTrack().AddLoopPosition(1);		// // //
 		doLoopNative(prevLoop, loopCount);
 	}
 	inRemoteDefinition = false;
@@ -1911,7 +1908,7 @@ void Music::doLoopRemoteCall(int loopCount, uint16_t loopAdr) {
 
 	synchronizeStates();		// // //
 	addNoteLength((loopLabel ? loopLengths[loopLabel] : normalLoopLength) * loopCount);		// // //
-	getActiveTrack().loopLocations.push_back(static_cast<uint16_t>(getActiveTrack().data.size() + 1));		// // //
+	getActiveTrack().AddLoopPosition(1);		// // //
 	return doLoopNative(loopAdr, loopCount);
 }
 
