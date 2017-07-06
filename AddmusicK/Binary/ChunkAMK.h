@@ -65,9 +65,9 @@ using Amplify = ChunkTemplate<1, CmdType::ExtFA, CmdOptionFA::Amplify>;
 using EchoBuffer = ChunkTemplate<1, CmdType::ExtFA, CmdOptionFA::EchoBuffer>;
 using GainOld = ChunkTemplate<1, CmdType::ExtFA, CmdOptionFA::GainOld>;
 using VolTable = ChunkTemplate<1, CmdType::ExtFA, CmdOptionFA::VolTable>;
-using Arpeggio = ChunkTemplate<1, CmdType::Arpeggio>; // the rest will use a separate chunk
-using Trill = ChunkTemplate<2, CmdType::Arpeggio, 0x80>;
-using Glissando = ChunkTemplate<2, CmdType::Arpeggio, 0x81>;
+using Arpeggio = ChunkTemplate<2, CmdType::Arpeggio>; // the arp sequence will use a separate chunk
+using Trill = ChunkTemplate<2, CmdType::Arpeggio, ArpOption::Trill>;
+using Glissando = ChunkTemplate<2, CmdType::Arpeggio, ArpOption::Glissando>;
 using RemoteCall = ChunkTemplate<4, CmdType::Callback>;
 
 } // namespace AMK

@@ -85,6 +85,11 @@ SCOPED_ENUM_START(CmdOptionFC, uint8_t)
 	KeyOn      = 0xFF,
 SCOPED_ENUM_END()
 
+SCOPED_ENUM_START(ArpOption, uint8_t)
+	Trill     = 0x80,
+	Glissando = 0x81,
+SCOPED_ENUM_END()
+
 } // namespace AMKd::Binary
 
 #undef SCOPED_ENUM_START

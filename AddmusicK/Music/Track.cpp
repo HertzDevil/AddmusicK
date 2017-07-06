@@ -43,3 +43,8 @@ void Track::InsertRemoteCalls(Track &loop) {
 		x.second.Flush(loop.streamData_);
 	}
 }
+
+void Track::Append(const AMKd::Binary::IChunk &chunk) {
+	// if (auto loop = dynamic_cast<const AMKd::Binary::ChunkNSPC::Loop &>(chunk)) {
+	streamData_ << chunk;
+}

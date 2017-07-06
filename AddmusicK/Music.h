@@ -126,6 +126,7 @@ private:
 
 public:
 	// // // action methods, these will become objects later
+	void doDirectWrite(int byte);
 	void doNote(int note, int fullTicks, int bendTicks, bool nextPorta);
 	void doOctave(int oct);
 	void doRaiseOctave();
@@ -179,6 +180,9 @@ public:
 	void doDSPWrite(int adr, int val);
 	void doARAMWrite(int adr, int val);
 	void doDataSend(int val1, int val2);
+	void doArpeggio(int dur, const std::vector<uint8_t> &notes);
+	void doTrill(int dur, int offset);
+	void doGlissando(int dur, int offset);
 
 private:
 	template <typename... Args>		// // //

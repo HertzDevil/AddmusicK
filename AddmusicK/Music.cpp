@@ -191,7 +191,7 @@ void Music::init() {
 		channel = stat.firstChannel;
 		if (!usingSMWVTable)
 			doVolumeTable(true);
-		append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::EchoBuffer, echoBufferSize);
+		doEchoBuffer(echoBufferSize);
 	}
 
 	prevChannel = channel = 0;
@@ -693,10 +693,8 @@ void Music::parseHexCommand() {
 		return param ? param.get<0>() : throw AMKd::Utility::SyntaxException {"Error parsing hex command."};
 	}();
 
-	if (!validateHex) {
-		append(currentHex);
-		return;
-	}
+	if (!validateHex)
+		return doDirectWrite(currentHex);
 
 	switch (currentHex) {		// // //
 	case AMKd::Binary::CmdType::Inst:
@@ -892,14 +890,27 @@ void Music::parseHexCommand() {
 		if (auto param = GetParameters<Byte, Byte>(mml_)) {
 			unsigned count, len;
 			std::tie(count, len) = *param;
-			if (count > 0x81)		// // //
-				throw AMKd::Utility::ParamException {"Illegal value for arpeggio command."};
-			append(AMKd::Binary::CmdType::Arpeggio, count, divideByTempoRatio(len, false));
-			for (unsigned j = 0, n = count >= 0x80 ? 2 : count; j < n; ++j) {
-				auto note = GetParameters<Byte>(mml_);
-				note ? append(note.get<0>()) : throw AMKd::Utility::SyntaxException {"Incorrect number of notes for arpeggio command."};
+			switch (count) {
+			case AMKd::Binary::ArpOption::Trill:
+				if (auto offset = GetParameters<Byte>(mml_))
+					return doTrill(len, offset.get<0>());
+				break;
+			case AMKd::Binary::ArpOption::Glissando:
+				if (auto offset = GetParameters<Byte>(mml_))
+					return doGlissando(len, offset.get<0>());
+				break;
+			default:
+				if (count < 0x80) {
+					std::vector<uint8_t> notes;
+					for (unsigned j = 0; j < count; ++j) {
+						auto note = GetParameters<Byte>(mml_);
+						note ? notes.push_back(note.get<0>()) :
+							throw AMKd::Utility::SyntaxException {"Incorrect number of notes for arpeggio command."};
+					}
+					return doArpeggio(len, notes);
+				}
 			}
-			return;
+			throw AMKd::Utility::ParamException {"Illegal value for arpeggio command."};
 		}
 		break;
 	case AMKd::Binary::CmdType::Callback:
@@ -1621,6 +1632,10 @@ const std::string &Music::getFileName() const {
 
 
 // // //
+void Music::doDirectWrite(int byte) {
+	getActiveTrack().Append(AMKd::Binary::MakeByteChunk(byte));
+}
+
 void Music::doNote(int note, int fullTicks, int bendTicks, bool nextPorta) {
 	if (inRemoteDefinition)
 		throw AMKd::Utility::SyntaxException {"Remote definitions cannot contain note data!"};
@@ -2021,4 +2036,17 @@ void Music::doARAMWrite(int /*adr*/, int /*val*/) {
 
 void Music::doDataSend(int val1, int val2) {
 	append(AMKd::Binary::CmdType::DataSend, val1, val2);
+}
+
+void Music::doArpeggio(int dur, const std::vector<uint8_t> &notes) {
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::Arpeggio(notes.size(), divideByTempoRatio(dur, false)));
+	getActiveTrack().Append(AMKd::Binary::ListChunk(notes));
+}
+
+void Music::doTrill(int dur, int offset) {
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::Trill(divideByTempoRatio(dur, false), offset));
+}
+
+void Music::doGlissando(int dur, int offset) {
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::Glissando(divideByTempoRatio(dur, false), offset));
 }

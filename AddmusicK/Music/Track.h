@@ -25,6 +25,7 @@ public:
 	void ShiftPointers(int offset);
 	void InsertRemoteCalls(Track &loop);
 
+	void Append(const AMKd::Binary::IChunk &chunk);		// // //
 	template <typename... Args>
 	void append(Args&&... value) {
 #if __cplusplus > 201402L

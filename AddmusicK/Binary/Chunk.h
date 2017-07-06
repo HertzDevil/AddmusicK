@@ -21,7 +21,7 @@ class ChunkTemplate : public IChunk
 {
 public:
 	template <typename... Ts>
-	ChunkTemplate(Ts... xs) : suffix_ {xs...} { }
+	ChunkTemplate(Ts... xs) : suffix_ {static_cast<uint8_t>(xs)...} { }
 
 private:
 	void Insert(Stream &s) const override {
@@ -30,7 +30,6 @@ private:
 			s << x;
 	}
 
-private:
 	std::array<uint8_t, N> suffix_;
 };
 
@@ -39,7 +38,22 @@ using ByteChunk = ChunkTemplate<N>;
 
 template <typename... Ts>
 auto MakeByteChunk(Ts&&... xs) {
-	return ByteChunk<sizeof...<Ts>>(static_cast<uint8_t>(xs)...);
+	return ByteChunk<sizeof...(Ts)>(static_cast<uint8_t>(xs)...);
 }
+
+class ListChunk : public IChunk
+{
+public:
+	ListChunk(const std::vector<uint8_t> &data) : data_ {data} { }
+	ListChunk(std::vector<uint8_t> &&data) : data_ {std::move(data)} { }
+
+private:
+	void Insert(Stream &s) const override {
+		for (uint8_t x : data_)
+			s << x;
+	}
+
+	std::vector<uint8_t> data_;
+};
 
 } // namespace AMKd::Binary
