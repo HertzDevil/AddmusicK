@@ -663,6 +663,7 @@ void compileMusic() {
 			if (!(i <= highestGlobalSong && !recompileMain)) {
 				musics[i].index = i;
 				musics[i].compile();
+				musics[i].displaySongData();		// // //
 				totalSamplecount += musics[i].mySamples.size();
 			}
 		}

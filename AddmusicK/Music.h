@@ -48,6 +48,7 @@ public:
 	void adjustLoopPointers();		// // //
 
 	void compile();
+	void displaySongData() const;		// // //
 
 private:
 	void init();
@@ -161,6 +162,7 @@ public:
 	void doSampleLoad(int index, int mult);
 	void doLoopEnter();					// Call any time a definition of a loop is entered.
 	void doLoopExit(int loopCount);			// Call any time a definition of a loop is exited.
+	void doLoopLabel(int label);
 	void doLoopRemoteCall(int loopCount, uint16_t loopAdr);		// // // Call any time a normal loop is called remotely.
 	void doLoopNative(int addr, int loopCount);
 	void doSubloopEnter();		// // // Call any time a definition of a super loop is entered.
@@ -205,8 +207,6 @@ private:
 	void insertedZippedSamples(const std::string &path);
 	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, const AMKd::Binary::Stream &cmd);		// // //
 	void insertRemoteConversion(uint8_t cmdtype, uint8_t param, AMKd::Binary::Stream &&cmd);		// // //
-
-	void displaySongData() const;
 
 	void addNoteLength(double ticks);				// Call this every note.  The correct channel/loop will be automatically updated.
 	void writeState(AMKd::Music::TrackState (AMKd::Music::Track::*state), int val);		// // //

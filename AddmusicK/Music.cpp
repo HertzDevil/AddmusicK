@@ -248,20 +248,20 @@ void Music::compile() {
 	init();
 
 	try {
-		while (mml_.HasNextToken()) {		// // // TODO: also call this for selected lexers
+		while (mml_.HasNextToken()) try {		// // // TODO: also call this for selected lexers
 			auto token = tok(mml_, CMDS);
 			token ? (this->*(*token))() :
 				throw AMKd::Utility::SyntaxException {"Unexpected character \"" + *mml_.Trim(".") + "\" found."};
 		}
+		catch (AMKd::Utility::MMLException &e) {
+			::printError(e.what(), name, mml_.GetLineNumber());
+		}
 		if (errorCount)		// // // TODO: remove
-			throw AMKd::Utility::MMLException {"There were errors when compiling the music file.  Compilation aborted.  Your ROM has not been modified."};
+			throw AMKd::Utility::Exception {"There were errors when compiling the music file.  Compilation aborted.  Your ROM has not been modified."};
 		pointersFirstPass();
 	}
-	catch (AMKd::Utility::SyntaxException &e) {
+	catch (AMKd::Utility::Exception &e) {
 		::fatalError(e.what(), name, mml_.GetLineNumber());
-	}
-	catch (AMKd::Utility::MMLException &e) {
-		::printError(e.what(), name, mml_.GetLineNumber());
 	}
 }
 
@@ -293,17 +293,12 @@ void Music::parseComment() {
 
 void Music::parseQMarkDirective() {
 	using namespace AMKd::MML::Lexer;
-	if (auto param = GetParameters<Int>(mml_)) {
-		switch (param.get<0>()) {
-		case 0: doesntLoop = true; break;
-		case 1: getActiveTrack().noMusic[0] = true; break;		// // //
-		case 2: getActiveTrack().noMusic[1] = true; break;
-		default:
-			throw AMKd::Utility::ParamException {DIR_ILLEGAL("\"?\"")};
-		}
+	switch (GetParameters<Option<Int>>(mml_)->value_or(0)) {
+	case 0: doesntLoop = true; return;
+	case 1: getActiveTrack().noMusic[0] = true; return;		// // //
+	case 2: getActiveTrack().noMusic[1] = true; return;
 	}
-	else
-		doesntLoop = true;
+	throw AMKd::Utility::ParamException {DIR_ILLEGAL("\"?\"")};
 }
 
 void Music::parseExMarkDirective() {
@@ -449,13 +444,14 @@ void Music::parseOpenParenCommand() {
 		if (GetParameters<Sep<')', '['>>(mml_)) {		// If this is a loop definition...
 			loopLabel = label + 1;
 			getActiveTrack().isDefiningLabelLoop = true;		// The rest of the code is handled in the respective function.
-			return parseLoopCommand();
+			doLoopLabel(label);		// // //
+			return doLoopEnter();
 		}
 		if (auto loop = GetParameters<Sep<')'>, Option<Int>>(mml_)) {		// Otherwise, if this is a loop call...
-			loopLabel = label + 1;
-			auto it = loopPointers.find(loopLabel);
+			auto it = loopPointers.find(label + 1);
 			if (it == loopPointers.cend())
 				throw AMKd::Utility::ParamException {"Label not yet defined."};
+			loopLabel = label + 1;
 			doLoopRemoteCall(requires(loop->value_or(1), 0x01u, 0xFFu, "Invalid loop count."), it->second);		// // //
 			loopLabel = 0;
 			return;
@@ -467,7 +463,7 @@ void Music::parseOpenParenCommand() {
 	if (auto param = GetParameters<Sep<'@'>, Int>(mml_))
 		sampID = instrToSample[requires(param.get<0>(), 0u, 29u, "Illegal instrument number for sample load command.")];
 	else if (auto param2 = GetParameters<QString>(mml_)) {
-		auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath / param2.get<0>(), this));		// // //
+		auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath / param2.get<0>(), name));		// // //
 		if (it == mySamples.cend())
 			throw AMKd::Utility::ParamException {"The specified sample was not included in this song."};
 		sampID = std::distance(mySamples.cbegin(), it);
@@ -522,14 +518,16 @@ void Music::parseRemoteCodeCommand() {
 			throw AMKd::Utility::MMLException {"TODO: allow inline remote code definitions"};
 		loopLabel = param.get<0>();
 		inRemoteDefinition = true;
-		return parseLoopCommand();
+		if (loopLabel > 0) // TODO: check
+			doLoopLabel(loopLabel - 1);
+		return doLoopEnter();
 	}
 
 	throw AMKd::Utility::SyntaxException {"Error parsing remote code command."};
 }
 
 void Music::parseLoopCommand() {
-	return doLoopEnter();
+	return !loopLabel ? doLoopEnter() : throw AMKd::Utility::SyntaxException {"You cannot nest standard [ ] loops."};
 }
 
 // // //
@@ -745,10 +743,10 @@ void Music::parseHexCommand() {
 				auto samp = first.get<0>() & 0x7F;
 				if (mySamples.empty() && samp > 0x13)
 					throw AMKd::Utility::ParamException {"This song uses custom samples, but has not yet defined its samples with the #samples command."};		// // //
-				auto param = GetParameters<Byte>(mml_);
-				return doSampleLoad(samp, param.get<0>());
+				if (auto param = GetParameters<Byte>(mml_))
+					return doSampleLoad(samp, param.get<0>());
 			}
-			if (auto remain = GetParameters<Byte, Byte>(mml_))
+			else if (auto remain = GetParameters<Byte, Byte>(mml_))
 				return doTremolo(first.get<0>(), remain.get<0>(), remain.get<1>());
 		}
 		break;
@@ -1183,7 +1181,7 @@ void Music::parseInstrumentDefinitions() {
 				const std::string &brrName = brr.get<0>();
 				if (brrName.empty())
 					throw AMKd::Utility::SyntaxException {"Error parsing sample portion of the instrument definition."};
-				auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath / brrName, this));		// // //
+				auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath / brrName, name));		// // //
 				if (it == mySamples.cend())
 					throw AMKd::Utility::ParamException {"The specified sample was not included in this song."};		// // //
 				pushInst(std::distance(mySamples.cbegin(), it));
@@ -1316,16 +1314,16 @@ void Music::pointersFirstPass() {
 
 	for (Track &t : tracks)		// // //
 		if (t.HasData())
-			t.append(AMKd::Binary::CmdType::End);
+			t.Append(AMKd::Binary::ChunkNSPC::End());
 
 	if (mySamples.empty())		// // // If no sample groups were provided...
 		addSampleGroup("default", this);		// // //
 
 	if (optimizeSampleUsage) {
-		int emptySampleIndex = ::getSample("EMPTY.brr", this);
+		int emptySampleIndex = ::getSample("EMPTY.brr", name);
 		if (emptySampleIndex == -1) {
 			addSample("EMPTY.brr", this, true);
-			emptySampleIndex = getSample("EMPTY.brr", this);
+			emptySampleIndex = getSample("EMPTY.brr", name);
 		}
 
 		for (size_t z = 0, n = mySamples.size(); z < n; ++z)		// // //
@@ -1412,8 +1410,6 @@ void Music::pointersFirstPass() {
 		}
 		knowsLength = true;
 	}
-
-	displaySongData();		// // //
 }
 
 void Music::displaySongData() const {
@@ -1859,12 +1855,6 @@ void Music::doSampleLoad(int id, int mult) {
 
 void Music::doLoopEnter() {
 	prevLoop = static_cast<uint16_t>(loopTrack.GetStreamSize());		// // //
-	if (loopLabel > 0) {
-		if (loopPointers.find(loopLabel) != loopPointers.cend())		// // //
-			throw AMKd::Utility::ParamException {"Label redefinition."};
-		loopPointers[loopLabel] = prevLoop;
-	}
-
 	synchronizeStates();		// // //
 	if (std::exchange(inNormalLoop, true))		// // //
 		throw AMKd::Utility::SyntaxException {"You cannot nest standard [ ] loops."};
@@ -1917,6 +1907,12 @@ void Music::doLoopExit(int loopCount) {
 	inRemoteDefinition = false;
 	loopLabel = 0;
 	getActiveTrack().isDefiningLabelLoop = false;		// // //
+}
+
+void Music::doLoopLabel(int label) {
+	if (loopPointers.find(++label) != loopPointers.cend())		// // //
+		throw AMKd::Utility::ParamException {"Label redefinition."};
+	loopPointers[label] = static_cast<uint16_t>(loopTrack.GetStreamSize());
 }
 
 void Music::doLoopRemoteCall(int loopCount, uint16_t loopAdr) {

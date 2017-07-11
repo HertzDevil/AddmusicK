@@ -351,8 +351,9 @@ void addSampleBank(const fs::path &fileName, Music *music) {
 	}
 }
 
-int getSample(const fs::path &name, Music *music) {
-	fs::path actualPath = getSamplePath(name, music->name);		// // //
+// // //
+int getSample(const fs::path &name, const std::string &musicName) {
+	fs::path actualPath = getSamplePath(name, musicName);		// // //
 
 	for (const auto &x : sampleToIndex)
 		if (fs::equivalent(actualPath, x.first))
@@ -364,11 +365,11 @@ int getSample(const fs::path &name, Music *music) {
 // // //
 fs::path getSamplePath(const fs::path &name, const std::string &musicName) {
 	for (const auto &path : {
-		(fs::path("music") / musicName).parent_path() / name,
-		"samples" / name,
+		(fs::path("music") / musicName).parent_path(),
+		fs::path("samples"),
 	})
-		if (fs::exists(path))
-			return path;
+		if (fs::exists(path / name))
+			return path / name;
 
 	fatalError("Could not find sample " + name.string(), musicName);
 }

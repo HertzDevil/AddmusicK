@@ -131,7 +131,7 @@ void addSample(const fs::path &fileName, Music *music, bool important);
 void addSampleGroup(const fs::path &fileName, Music *music);
 void addSampleBank(const fs::path &fileName, Music *music);
 
-int getSample(const fs::path &name, Music *music);
+int getSample(const fs::path &name, const std::string &musicName);		// // //
 fs::path getSamplePath(const fs::path &name, const std::string &musicName);		// // //
 
 // // //
