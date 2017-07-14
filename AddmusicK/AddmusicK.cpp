@@ -258,6 +258,8 @@ int main(int argc, char **argv) try {		// // //
 }
 catch (std::exception &e) {		// // //
 	std::cerr << "Unexpected error: \n" << e.what() << '\n';
+	if (waitAtEnd)
+		quit(1);
 	return 1;
 }
 
@@ -662,7 +664,11 @@ void compileMusic() {
 		if (musics[i].exists) {
 			if (!(i <= highestGlobalSong && !recompileMain)) {
 				musics[i].index = i;
+				musics[i].init();		// // //
 				musics[i].compile();
+				if (errorCount)		// // // TODO: remove
+					::fatalError("There were errors when compiling the music file.  Compilation aborted.  Your ROM has not been modified.");
+				musics[i].pointersFirstPass();		// // //
 				musics[i].displaySongData();		// // //
 				totalSamplecount += musics[i].mySamples.size();
 			}

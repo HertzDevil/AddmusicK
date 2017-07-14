@@ -47,13 +47,12 @@ public:
 	void adjustHeaderPointers();		// // //
 	void adjustLoopPointers();		// // //
 
+	void init();
 	void compile();
+	void pointersFirstPass();
 	void displaySongData() const;		// // //
 
 private:
-	void init();
-	void pointersFirstPass();
-
 	void parseComment();
 	void parseQMarkDirective();
 	void parseExMarkDirective();

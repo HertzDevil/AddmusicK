@@ -245,8 +245,6 @@ void Music::compile() {
 	};
 	AMKd::MML::Lexer::Tokenizer tok;
 
-	init();
-
 	try {
 		while (mml_.HasNextToken()) try {		// // // TODO: also call this for selected lexers
 			auto token = tok(mml_, CMDS);
@@ -256,9 +254,6 @@ void Music::compile() {
 		catch (AMKd::Utility::MMLException &e) {
 			::printError(e.what(), name, mml_.GetLineNumber());
 		}
-		if (errorCount)		// // // TODO: remove
-			throw AMKd::Utility::Exception {"There were errors when compiling the music file.  Compilation aborted.  Your ROM has not been modified."};
-		pointersFirstPass();
 	}
 	catch (AMKd::Utility::Exception &e) {
 		::fatalError(e.what(), name, mml_.GetLineNumber());

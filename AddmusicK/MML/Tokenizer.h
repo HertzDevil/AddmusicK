@@ -10,11 +10,15 @@ struct Tokenizer
 {
 	template <typename T>
 	std::optional<T> operator()(SourceView &file, const AMKd::Utility::Trie<T> &cmds) const {
-		file.prev_ = file.sv_;
-		if (std::optional<T> result = cmds.SearchValue(file.sv_))
-			return result;
-		file.sv_ = file.prev_;
-		return std::nullopt;
+		std::optional<T> result;
+		file.TryProcess([&] (std::string_view &sv) {
+			if (std::optional<T> tok = cmds.SearchValue(sv)) {
+				result = std::move(tok);
+				return true;
+			}
+			return false;
+		});
+		return result;
 	}
 };
 

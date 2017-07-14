@@ -7,10 +7,6 @@
 
 namespace AMKd::MML {
 
-namespace Lexer {
-struct Tokenizer;
-}
-
 // A SourceView wraps around an MML string with methods for tokenization. It
 // also handles replacement macros.
 class SourceView
@@ -26,6 +22,14 @@ public:
 	explicit SourceView(std::string_view data);
 	SourceView(std::string &&data) = delete;
 
+	template <typename F>
+	bool TryProcess(F&& f) {
+		prev_ = sv_;
+		if (std::forward<F>(f)(sv_))
+			return true;
+		sv_ = prev_;
+		return false;
+	}
 	std::optional<std::string> Trim(std::string_view re, bool ignoreCase = false);
 	bool Trim(char re);
 	bool SkipSpaces(); // true if at least one character is skipped
@@ -39,7 +43,6 @@ public:
 	bool PopMacro();
 
 	bool HasNextToken();
-	friend struct Lexer::Tokenizer;
 
 	std::size_t GetLineNumber() const;
 	std::size_t GetReadCount() const;
