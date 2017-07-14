@@ -54,16 +54,13 @@ public:
 	void displaySongData() const;		// // //
 
 private:
-	void parseComment();
 	void parseQMarkDirective();
-	void parseExMarkDirective();
 	void parseChannelDirective();
 	void parseLDirective();
 	void parseGlobalVolumeCommand();
 	void parseVolumeCommand();
 	void parseQuantizationCommand();
 	void parsePanCommand();
-	void parseIntroDirective();
 	// // //
 	void parseTempoCommand();
 	void parseTransposeDirective();
@@ -72,23 +69,13 @@ private:
 	void parseDirectInstCommand();		// // //
 	void parseOpenParenCommand();
 	void parseRemoteCodeCommand();		// // //
-	void parseLoopCommand();
-	void parseSubloopCommand();		// // //
-	void parseErrorLoopCommand();		// // //
 	void parseLoopEndCommand();
 	void parseSubloopEndCommand();		// // //
-	void parseErrorLoopEndCommand();		// // //
 	void parseStarLoopCommand();
 	void parseVibratoCommand();
-	void parseTripletOpenDirective();
-	void parseTripletCloseDirective();
-	void parseRaiseOctaveDirective();
-	void parseLowerOctaveDirective();
 	void parseHexCommand();
 	void parseHDirective();
-	void parseReplacementDirective();
 	void parseNCommand();
-	void parseBarDirective();		// // //
 	
 	void parseNote(int note);		// // //
 	void parseNoteCommon(int offset);
@@ -129,6 +116,8 @@ public:
 	// // // action methods, these will become objects later
 	void doDirectWrite(int byte);
 	void doComment();
+	void doBar();
+	void doExMark();
 	void doNote(int note, int fullTicks, int bendTicks, bool nextPorta);
 	void doOctave(int oct);
 	void doRaiseOctave();
@@ -169,6 +158,7 @@ public:
 	void doSubloopEnter();		// // // Call any time a definition of a super loop is entered.
 	void doSubloopExit(int loopCount);		// // // Call any time a definition of a super loop is exited.
 	void doRemoteCallNative(int addr, int type, int delay = 0);
+	void doIntro();
 	void doYoshiDrums(bool ch5only);
 	void doLegato();
 	void doLightStaccato();
@@ -186,6 +176,7 @@ public:
 	void doArpeggio(int dur, const std::vector<uint8_t> &notes);
 	void doTrill(int dur, int offset);
 	void doGlissando(int dur, int offset);
+	void doTriplet(bool enable);
 
 private:
 	template <typename... Args>		// // //

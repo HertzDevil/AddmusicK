@@ -16,15 +16,28 @@ public:
 
 namespace Parser {
 
-struct Comment
-{
-	void operator()(SourceView &file, ::Music &music);
-};
+#define PARSER_DECL(T) \
+	struct T \
+	{ \
+		void operator()(SourceView &file, ::Music &music); \
+	};
 
-struct Replacement
-{
-	void operator()(SourceView &file, ::Music &music);
-};
+PARSER_DECL(Comment)
+PARSER_DECL(ExMark)
+PARSER_DECL(Bar)
+PARSER_DECL(Replacement)
+PARSER_DECL(RaiseOctave)
+PARSER_DECL(LowerOctave)
+PARSER_DECL(LoopBegin)
+PARSER_DECL(SubloopBegin)
+PARSER_DECL(ErrorBegin)
+PARSER_DECL(ErrorEnd)
+PARSER_DECL(Intro)
+PARSER_DECL(TripletOpen)
+PARSER_DECL(TripletClose)
+;
+
+#undef PARSER_DECL
 
 } // Parser
 

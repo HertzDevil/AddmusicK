@@ -21,14 +21,24 @@ using Entry = AMKd::Utility::TrieEntry<TrieAdaptor<T>, Cs...>;
 } // namespace
 
 void MusicParser::operator()(SourceView &file, ::Music &music) {
-	using AMKd::Utility::TrieEntry;
-	using CMDS = AMKd::Utility::StaticTrie<
-		Entry<Parser::Comment    , ';'>,
-		Entry<Parser::Replacement, '"'>
-	>;
+	constexpr AMKd::Utility::StaticTrie<
+		Entry<Parser::ExMark      , '!'>,
+		Entry<Parser::Comment     , ';'>,
+		Entry<Parser::Bar         , '|'>,
+		Entry<Parser::Replacement , '"'>,
+		Entry<Parser::RaiseOctave , '>'>,
+		Entry<Parser::LowerOctave , '<'>,
+		Entry<Parser::LoopBegin   , '['>,
+		Entry<Parser::SubloopBegin, '[', '['>,
+		Entry<Parser::ErrorBegin  , '[', '[', '['>,
+		Entry<Parser::ErrorEnd    , ']', ']', ']'>,
+		Entry<Parser::Intro       , '/'>,
+		Entry<Parser::TripletOpen , '{'>,
+		Entry<Parser::TripletClose, '}'>
+	> TRIE;
 
 	const auto doParse = [&] (std::string_view &sv) {
-		return AMKd::Utility::ParseTrie(CMDS { }, sv, file, music);
+		return AMKd::Utility::ParseTrie(TRIE, sv, file, music);
 	};
 
 	while (file.HasNextToken()) {		// // // TODO: also call this for selected lexers
@@ -47,6 +57,14 @@ void Parser::Comment::operator()(SourceView &file, ::Music &music) {
 	return music.doComment();
 }
 
+void Parser::ExMark::operator()(SourceView &, ::Music &music) {
+	return music.doExMark();
+}
+
+void Parser::Bar::operator()(SourceView &, ::Music &music) {
+	return music.doBar();
+}
+
 void Parser::Replacement::operator()(SourceView &file, ::Music &) {
 	file.Unput();
 	auto param = GetParameters<QString>(file);
@@ -63,10 +81,49 @@ void Parser::Replacement::operator()(SourceView &file, ::Music &) {
 	while (!findStr.empty() && isspace(findStr.back()))
 		findStr.pop_back();
 	if (findStr.empty())
-		throw AMKd::Utility::ParamException {"Error parsing replacement directive; string to find was of zero length."};
+		throw AMKd::Utility::ParamException {"Replacement string to find cannot be empty."};
 
 	while (!replStr.empty() && isspace(replStr.front()))
 		replStr.erase(0, 1);
 
 	file.AddMacro(findStr, replStr);		// // //
+}
+
+void Parser::RaiseOctave::operator()(SourceView &, ::Music &music) {
+	return music.doRaiseOctave();
+}
+
+void Parser::LowerOctave::operator()(SourceView &, ::Music &music) {
+	return music.doLowerOctave();
+}
+
+void Parser::LoopBegin::operator()(SourceView &, ::Music &music) {
+	return music.doLoopEnter();
+}
+
+void Parser::SubloopBegin::operator()(SourceView &, ::Music &music) {
+	return music.doSubloopEnter();
+}
+
+void Parser::ErrorBegin::operator()(SourceView &, ::Music &) {
+	throw AMKd::Utility::SyntaxException {"An ambiguous use of the [ and [[ loop delimiters was found (\"[[[\").  Separate\n"
+										  "the \"[[\" and \"[\" to clarify your intention."};
+}
+
+void Parser::ErrorEnd::operator()(SourceView &file, ::Music &) {
+	GetParameters<Int>(file);
+	throw AMKd::Utility::SyntaxException {"An ambiguous use of the ] and ]] loop delimiters was found (\"]]]\").  Separate\n"
+										  "the \"]]\" and \"]\" to clarify your intention."};
+}
+
+void Parser::Intro::operator()(SourceView &, ::Music &music) {
+	return music.doIntro();
+}
+
+void Parser::TripletOpen::operator()(SourceView &, ::Music &music) {
+	return music.doTriplet(true);
+}
+
+void Parser::TripletClose::operator()(SourceView &, ::Music &music) {
+	return music.doTriplet(false);
 }

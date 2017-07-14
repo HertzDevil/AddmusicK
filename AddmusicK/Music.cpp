@@ -205,17 +205,11 @@ void Music::compile() {
 // // //
 bool Music::compileStep() {
 	static const AMKd::Utility::Trie<void (Music::*)()> CMDS {		// // //
-		{"!", &Music::parseExMarkDirective},
-		{"\"", &Music::parseReplacementDirective},
 		{"#", &Music::parseChannelDirective},
 		{"$", &Music::parseHexCommand},
 		{"(", &Music::parseOpenParenCommand},
 		{"(!", &Music::parseRemoteCodeCommand},
 		{"*", &Music::parseStarLoopCommand},
-		{"/", &Music::parseIntroDirective},
-		{";", &Music::parseComment},
-		{"<", &Music::parseLowerOctaveDirective},
-		{">", &Music::parseRaiseOctaveDirective},
 		{"?", &Music::parseQMarkDirective},
 		{"@", &Music::parseInstrumentCommand},
 		{"@@", &Music::parseDirectInstCommand},
@@ -238,16 +232,9 @@ bool Music::compileStep() {
 		{"v", &Music::parseVolumeCommand},
 		{"w", &Music::parseGlobalVolumeCommand},
 		{"y", &Music::parsePanCommand},
-		{"[", &Music::parseLoopCommand},
-		{"[[", &Music::parseSubloopCommand},
-		{"[[[", &Music::parseErrorLoopCommand},
 		{"]", &Music::parseLoopEndCommand},
 		{"]]", &Music::parseSubloopEndCommand},
-		{"]]]", &Music::parseErrorLoopEndCommand},
 		{"^", &Music::parseTie},
-		{"{", &Music::parseTripletOpenDirective},
-		{"|", &Music::parseBarDirective},
-		{"}", &Music::parseTripletCloseDirective},
 	};
 	AMKd::MML::Lexer::Tokenizer tok;
 	auto token = tok(mml_, CMDS);
@@ -276,11 +263,6 @@ std::vector<uint8_t> Music::getSongData() const {
 	return buf;
 }
 
-void Music::parseComment() {
-	using namespace AMKd::MML::Lexer;		// // //
-	(void)GetParameters<Row>(mml_);
-}
-
 void Music::parseQMarkDirective() {
 	using namespace AMKd::MML::Lexer;
 	switch (GetParameters<Option<Int>>(mml_)->value_or(0)) {
@@ -289,11 +271,6 @@ void Music::parseQMarkDirective() {
 	case 2: getActiveTrack().noMusic[1] = true; return;
 	}
 	throw AMKd::Utility::ParamException {DIR_ILLEGAL("\"?\"")};
-}
-
-void Music::parseExMarkDirective() {
-	if (songTargetProgram != Target::AMK)
-		mml_.Clear();
 }
 
 void Music::parseChannelDirective() {
@@ -360,23 +337,6 @@ void Music::parsePanCommand() {
 	}
 
 	throw AMKd::Utility::SyntaxException {CMD_ERROR("pan", "y")};		// // //
-}
-
-void Music::parseIntroDirective() {
-	if (inNormalLoop)		// // //
-		throw AMKd::Utility::SyntaxException {"Intro directive found within a loop."};		// // //
-
-	if (!hasIntro)
-		tempoChanges.emplace_back(getActiveTrack().channelLength, -static_cast<int>(tempo));		// // //
-	else		// // //
-		for (auto &x : tempoChanges)
-			if (x.second < 0)
-				x.second = -static_cast<int>(tempo);
-
-	hasIntro = true;
-	getActiveTrack().phrasePointers[1] = static_cast<uint16_t>(getActiveTrack().GetStreamSize());		// // //
-	getActiveTrack().lastDuration = 0;
-	introLength = static_cast<unsigned>(getActiveTrack().channelLength);		// // //
 }
 
 void Music::parseTempoCommand() {
@@ -516,21 +476,6 @@ void Music::parseRemoteCodeCommand() {
 	throw AMKd::Utility::SyntaxException {"Error parsing remote code command."};
 }
 
-void Music::parseLoopCommand() {
-	return !loopLabel ? doLoopEnter() : throw AMKd::Utility::SyntaxException {"You cannot nest standard [ ] loops."};
-}
-
-// // //
-void Music::parseSubloopCommand() {
-	return doSubloopEnter();
-}
-
-// // //
-void Music::parseErrorLoopCommand() {
-	throw AMKd::Utility::SyntaxException {"An ambiguous use of the [ and [[ loop delimiters was found (\"[[[\").  Separate\n"
-										  "the \"[[\" and \"[\" to clarify your intention."};
-}
-
 void Music::parseLoopEndCommand() {
 	using namespace AMKd::MML::Lexer;		// // //
 	return doLoopExit(requires(GetParameters<Option<Int>>(mml_)->value_or(1), 0x01u, 0xFFu, "Invalid loop count."));
@@ -542,12 +487,6 @@ void Music::parseSubloopEndCommand() {
 	if (auto param = GetParameters<Int>(mml_))
 		return doSubloopExit(requires(param.get<0>(), 2u, 256u, CMD_ILLEGAL("subloop", "[[ ]]")));
 	throw AMKd::Utility::SyntaxException {CMD_ERROR("subloop", "[[ ]]")};
-}
-
-// // //
-void Music::parseErrorLoopEndCommand() {
-	throw AMKd::Utility::SyntaxException {"An ambiguous use of the ] and ]] loop delimiters was found (\"]]]\").  Separate\n"
-										  "the \"]]\" and \"]\" to clarify your intention."};
 }
 
 void Music::parseStarLoopCommand() {	
@@ -574,24 +513,6 @@ void Music::parseVibratoCommand() {
 	}
 
 	throw AMKd::Utility::SyntaxException {CMD_ERROR("vibrato", "p")};		// // //
-}
-
-void Music::parseTripletOpenDirective() {
-	if (std::exchange(getActiveTrack().inTriplet, true))		// // //
-		throw AMKd::Utility::SyntaxException {"Triplet on directive found within a triplet block."};
-}
-
-void Music::parseTripletCloseDirective() {
-	if (!std::exchange(getActiveTrack().inTriplet, false))		// // //
-		throw AMKd::Utility::SyntaxException {"Triplet off directive found outside of a triplet block."};
-}
-
-void Music::parseRaiseOctaveDirective() {
-	return doRaiseOctave();		// // //
-}
-
-void Music::parseLowerOctaveDirective() {
-	return doLowerOctave();		// // //
 }
 
 void Music::parseHFDInstrumentHack(int addr, int bytes) {
@@ -1033,11 +954,6 @@ void Music::parseNCommand() {
 	throw AMKd::Utility::SyntaxException {CMD_ERROR("noise", "n")};
 }
 
-// // //
-void Music::parseBarDirective() {
-	// hexLeft = 0;
-}
-
 void Music::parseOptionDirective() {
 	if (targetAMKVersion < 2)		// // //
 		throw AMKd::Utility::SyntaxException {"#option is only supported on #amk 2 or above."};
@@ -1124,32 +1040,6 @@ void Music::parseSpecialDirective() {
 			return (this->*(*func))();
 	}
 	throw AMKd::Utility::SyntaxException {DIR_ERROR("'#'")};
-}
-
-void Music::parseReplacementDirective() {
-	using namespace AMKd::MML::Lexer;		// // //
-	mml_.Unput();
-	auto param = GetParameters<QString>(mml_);
-	if (!param)
-		throw AMKd::Utility::SyntaxException {"Unexpected end of replacement directive."};
-	std::string s = param.get<0>();
-	size_t i = s.find('=');
-	if (i == std::string::npos)
-		throw AMKd::Utility::SyntaxException {"Error parsing replacement directive; could not find '='"};		// // //
-
-	std::string findStr = s.substr(0, i);
-	std::string replStr = s.substr(i + 1);
-
-	// // //
-	while (!findStr.empty() && isspace(findStr.back()))
-		findStr.pop_back();
-	if (findStr.empty())
-		throw AMKd::Utility::ParamException {"Error parsing replacement directive; string to find was of zero length."};
-
-	while (!replStr.empty() && isspace(replStr.front()))
-		replStr.erase(0, 1);
-
-	mml_.AddMacro(findStr, replStr);		// // //
 }
 
 void Music::parseInstrumentDefinitions() {
@@ -1627,6 +1517,17 @@ void Music::doComment() {
 //		throw AMKd::Utility::SyntaxException {"Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2."};		// // //
 }
 
+void Music::doBar() {
+	// hexLeft = 0;
+}
+
+void Music::doExMark() {
+	if (songTargetProgram != Target::AMK)		// // //
+		mml_.Clear();
+	else
+		throw AMKd::Utility::SyntaxException {"The '!' directive is not supported by #amk."};
+}
+
 void Music::doNote(int note, int fullTicks, int bendTicks, bool nextPorta) {
 	if (inRemoteDefinition)
 		throw AMKd::Utility::SyntaxException {"Remote definitions cannot contain note data!"};
@@ -1967,6 +1868,23 @@ void Music::doRemoteCallNative(int addr, int type, int delay) {
 	append(AMKd::Binary::CmdType::Callback, addr & 0xFF, addr >> 8, type, delay);
 }
 
+void Music::doIntro() {
+	if (inNormalLoop)		// // //
+		throw AMKd::Utility::SyntaxException {"Intro directive found within a loop."};		// // //
+
+	if (!hasIntro)
+		tempoChanges.emplace_back(getActiveTrack().channelLength, -static_cast<int>(tempo));		// // //
+	else		// // //
+		for (auto &x : tempoChanges)
+			if (x.second < 0)
+				x.second = -static_cast<int>(tempo);
+
+	hasIntro = true;
+	getActiveTrack().phrasePointers[1] = static_cast<uint16_t>(getActiveTrack().GetStreamSize());		// // //
+	getActiveTrack().lastDuration = 0;
+	introLength = static_cast<unsigned>(getActiveTrack().channelLength);		// // //
+}
+
 void Music::doYoshiDrums(bool ch5only) {
 	append(AMKd::Binary::CmdType::ExtF4, ch5only ? AMKd::Binary::CmdOptionF4::YoshiCh5 : AMKd::Binary::CmdOptionF4::Yoshi);
 	hasYoshiDrums = true;
@@ -2040,4 +1958,10 @@ void Music::doTrill(int dur, int offset) {
 
 void Music::doGlissando(int dur, int offset) {
 	getActiveTrack().Append(AMKd::Binary::ChunkAMK::Glissando(divideByTempoRatio(dur, false), offset));
+}
+
+void Music::doTriplet(bool enable) {
+	if (enable == std::exchange(getActiveTrack().inTriplet, enable))		// // //
+		throw AMKd::Utility::ParamException {"Triplet block mismatch."};
+//		throw AMKd::Utility::SyntaxException {"Triplet on directive found within a triplet block."};
 }
