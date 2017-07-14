@@ -154,7 +154,7 @@ LEXER_FUNC_START(Lexer::RestDur)
 
 LEXER_FUNC_START(Lexer::Acc)
 	Accidental s;
-	s.neutral = file.Trim('_');
+	s.neutral = file.Trim('0');
 	auto acc = *file.Trim("[+\\-]{0,3}");
 	for (char ch : acc)
 		s.offset += ch == '+' ? 1 : -1;

@@ -199,7 +199,7 @@ void Music::init() {
 }
 
 void Music::compile() {
-	AMKd::MML::MusicParser { }.compile(mml_, *this);		// // //
+	AMKd::MML::MusicParser()(mml_, *this);		// // //
 }
 
 // // //

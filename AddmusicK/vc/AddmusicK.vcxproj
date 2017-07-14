@@ -172,6 +172,7 @@
     <ClInclude Include="..\SoundEffect.h" />
     <ClInclude Include="..\Utility\Exception.h" />
     <ClInclude Include="..\Utility\fs.h" />
+    <ClInclude Include="..\Utility\StaticTrie.h" />
     <ClInclude Include="..\Utility\Swallow.h" />
     <ClInclude Include="..\Utility\Trie.h" />
   </ItemGroup>

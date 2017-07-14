@@ -1,27 +1,39 @@
 #include "MusicParser.h"
 #include "../Music.h"
-#include "Tokenizer.h"
 #include "Lexer.h"
 #include "../Utility/Exception.h"
 #include "../globals.h"
+#include "../Utility/StaticTrie.h"
 
 using namespace AMKd::MML;
 using namespace AMKd::MML::Lexer;
 
-void MusicParser::compile(SourceView &file, ::Music &music) {
-	using parse_func_t = decltype(&MusicParser::compile);
-	static const AMKd::Utility::Trie<parse_func_t> CMDS {		// // //
-		{"\"", &MusicParser::parseReplacementDirective},
-		{";", &MusicParser::parseComment},
+namespace {
+template <typename T>
+struct TrieAdaptor
+{
+	void operator()(const std::string_view &, std::size_t, SourceView &file, ::Music &music) {
+		return T()(file, music);
+	}
+};
+template <typename T, char... Cs>
+using Entry = AMKd::Utility::TrieEntry<TrieAdaptor<T>, Cs...>;
+} // namespace
+
+void MusicParser::operator()(SourceView &file, ::Music &music) {
+	using AMKd::Utility::TrieEntry;
+	using CMDS = AMKd::Utility::StaticTrie<
+		Entry<Parser::Comment    , ';'>,
+		Entry<Parser::Replacement, '"'>
+	>;
+
+	const auto doParse = [&] (std::string_view &sv) {
+		return AMKd::Utility::ParseTrie(CMDS { }, sv, file, music);
 	};
 
-	Tokenizer tok;
-
-	while (file.HasNextToken()) {
-		try {		// // // TODO: also call this for selected lexers
-			if (auto token = tok(file, CMDS))
-				(this->*(*token))(file, music);
-			else if (!music.compileStep())		// // // TODO: remove
+	while (file.HasNextToken()) {		// // // TODO: also call this for selected lexers
+		try {
+			if (!file.TryProcess(doParse) && !music.compileStep())		// // // TODO: remove
 				throw AMKd::Utility::SyntaxException {"Unexpected character \"" + *file.Trim(".") + "\" found."};
 		}
 		catch (AMKd::Utility::MMLException &e) {
@@ -30,12 +42,12 @@ void MusicParser::compile(SourceView &file, ::Music &music) {
 	}
 }
 
-void MusicParser::parseComment(SourceView &file, ::Music &music) {
+void Parser::Comment::operator()(SourceView &file, ::Music &music) {
 	(void)GetParameters<Row>(file);
 	return music.doComment();
 }
 
-void MusicParser::parseReplacementDirective(SourceView &file, ::Music &) {
+void Parser::Replacement::operator()(SourceView &file, ::Music &) {
 	file.Unput();
 	auto param = GetParameters<QString>(file);
 	if (!param)

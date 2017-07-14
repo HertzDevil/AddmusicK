@@ -192,6 +192,7 @@ LEXER_DECL(Dur, Duration)
 LEXER_DECL(RestDur, Duration) // variant supporting 'r', will be removed when Music::Actions can merge
 LEXER_DECL(Acc, Accidental)
 LEXER_DECL(Chan, std::bitset</*CHANNELS*/ 8>)
+;
 
 template <char... Cs>
 struct Sep
