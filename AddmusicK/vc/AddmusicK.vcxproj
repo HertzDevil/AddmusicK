@@ -159,6 +159,7 @@
     <ClInclude Include="..\MML\Lexers\Multi.h" />
     <ClInclude Include="..\MML\Lexers\Option.h" />
     <ClInclude Include="..\MML\Lexers\Select.h" />
+    <ClInclude Include="..\MML\MusicParser.h" />
     <ClInclude Include="..\MML\Preprocessor.h" />
     <ClInclude Include="..\MML\SourceView.h" />
     <ClInclude Include="..\MML\Tokenizer.h" />
@@ -186,6 +187,7 @@
     <ClCompile Include="..\globals.cpp" />
     <ClCompile Include="..\MML\Duration.cpp" />
     <ClCompile Include="..\MML\Lexers\Core.cpp" />
+    <ClCompile Include="..\MML\MusicParser.cpp" />
     <ClCompile Include="..\MML\Preprocessor.cpp" />
     <ClCompile Include="..\MML\SourceView.cpp" />
     <ClCompile Include="..\Music.cpp" />

@@ -49,6 +49,7 @@ public:
 
 	void init();
 	void compile();
+	bool compileStep();		// // // TODO: remove
 	void pointersFirstPass();
 	void displaySongData() const;		// // //
 
@@ -127,6 +128,7 @@ private:
 public:
 	// // // action methods, these will become objects later
 	void doDirectWrite(int byte);
+	void doComment();
 	void doNote(int note, int fullTicks, int bendTicks, bool nextPorta);
 	void doOctave(int oct);
 	void doRaiseOctave();

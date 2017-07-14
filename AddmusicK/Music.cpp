@@ -14,6 +14,7 @@
 #include "MML/Lexer.h"		// // //
 #include "MML/Preprocessor.h"		// // //
 #include "MML/Tokenizer.h"		// // //
+#include "MML/MusicParser.h"		// // //
 #include "Utility/Exception.h"		// // //
 #include <functional>
 
@@ -198,6 +199,11 @@ void Music::init() {
 }
 
 void Music::compile() {
+	AMKd::MML::MusicParser { }.compile(mml_, *this);		// // //
+}
+
+// // //
+bool Music::compileStep() {
 	static const AMKd::Utility::Trie<void (Music::*)()> CMDS {		// // //
 		{"!", &Music::parseExMarkDirective},
 		{"\"", &Music::parseReplacementDirective},
@@ -244,20 +250,11 @@ void Music::compile() {
 		{"}", &Music::parseTripletCloseDirective},
 	};
 	AMKd::MML::Lexer::Tokenizer tok;
-
-	try {
-		while (mml_.HasNextToken()) try {		// // // TODO: also call this for selected lexers
-			auto token = tok(mml_, CMDS);
-			token ? (this->*(*token))() :
-				throw AMKd::Utility::SyntaxException {"Unexpected character \"" + *mml_.Trim(".") + "\" found."};
-		}
-		catch (AMKd::Utility::MMLException &e) {
-			::printError(e.what(), name, mml_.GetLineNumber());
-		}
-	}
-	catch (AMKd::Utility::Exception &e) {
-		::fatalError(e.what(), name, mml_.GetLineNumber());
-	}
+	auto token = tok(mml_, CMDS);
+	if (!token)
+		return false;
+	(this->*(*token))();
+	return true;
 }
 
 // // //
@@ -280,8 +277,6 @@ std::vector<uint8_t> Music::getSongData() const {
 }
 
 void Music::parseComment() {
-//	if (songTargetProgram != Target::AMM)		// // //
-//		error("Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2.");		// // //
 	using namespace AMKd::MML::Lexer;		// // //
 	(void)GetParameters<Row>(mml_);
 }
@@ -1625,6 +1620,11 @@ const std::string &Music::getFileName() const {
 // // //
 void Music::doDirectWrite(int byte) {
 	getActiveTrack().Append(AMKd::Binary::MakeByteChunk(byte));
+}
+
+void Music::doComment() {
+//	if (songTargetProgram != Target::AMM)		// // //
+//		throw AMKd::Utility::SyntaxException {"Illegal use of comments. Sorry about that. Should be fixed in AddmusicK 2."};		// // //
 }
 
 void Music::doNote(int note, int fullTicks, int bendTicks, bool nextPorta) {

@@ -114,6 +114,9 @@
     <ClInclude Include="..\Music\TrackState.h">
       <Filter>Header Files\Music</Filter>
     </ClInclude>
+    <ClInclude Include="..\MML\MusicParser.h">
+      <Filter>Header Files\MML</Filter>
+    </ClInclude>
     <ClInclude Include="..\MML\SourceView.h">
       <Filter>Header Files\MML</Filter>
     </ClInclude>
@@ -163,6 +166,9 @@
     </ClCompile>
     <ClCompile Include="..\Music\TrackState.cpp">
       <Filter>Source Files\Music</Filter>
+    </ClCompile>
+    <ClCompile Include="..\MML\MusicParser.cpp">
+      <Filter>Source Files\MML</Filter>
     </ClCompile>
     <ClCompile Include="..\MML\SourceView.cpp">
       <Filter>Source Files\MML</Filter>
