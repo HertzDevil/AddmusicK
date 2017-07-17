@@ -8,33 +8,22 @@
 using namespace AMKd::MML;
 using namespace AMKd::MML::Lexer;
 
-namespace {
-template <typename T>
-struct TrieAdaptor
-{
-	void operator()(const std::string_view &, std::size_t, SourceView &file, ::Music &music) {
-		return T()(file, music);
-	}
-};
-template <typename T, char... Cs>
-using Entry = AMKd::Utility::TrieEntry<TrieAdaptor<T>, Cs...>;
-} // namespace
-
 void MusicParser::operator()(SourceView &file, ::Music &music) {
+	using AMKd::Utility::EntryAdaptor;
 	constexpr AMKd::Utility::StaticTrie<
-		Entry<Parser::ExMark      , '!'>,
-		Entry<Parser::Comment     , ';'>,
-		Entry<Parser::Bar         , '|'>,
-		Entry<Parser::Replacement , '"'>,
-		Entry<Parser::RaiseOctave , '>'>,
-		Entry<Parser::LowerOctave , '<'>,
-		Entry<Parser::LoopBegin   , '['>,
-		Entry<Parser::SubloopBegin, '[', '['>,
-		Entry<Parser::ErrorBegin  , '[', '[', '['>,
-		Entry<Parser::ErrorEnd    , ']', ']', ']'>,
-		Entry<Parser::Intro       , '/'>,
-		Entry<Parser::TripletOpen , '{'>,
-		Entry<Parser::TripletClose, '}'>
+		EntryAdaptor<Parser::ExMark      , '!'>,
+		EntryAdaptor<Parser::Comment     , ';'>,
+		EntryAdaptor<Parser::Bar         , '|'>,
+		EntryAdaptor<Parser::Replacement , '"'>,
+		EntryAdaptor<Parser::RaiseOctave , '>'>,
+		EntryAdaptor<Parser::LowerOctave , '<'>,
+		EntryAdaptor<Parser::LoopBegin   , '['>,
+		EntryAdaptor<Parser::SubloopBegin, '[', '['>,
+		EntryAdaptor<Parser::ErrorBegin  , '[', '[', '['>,
+		EntryAdaptor<Parser::ErrorEnd    , ']', ']', ']'>,
+		EntryAdaptor<Parser::Intro       , '/'>,
+		EntryAdaptor<Parser::TripletOpen , '{'>,
+		EntryAdaptor<Parser::TripletClose, '}'>
 	> TRIE;
 
 	const auto doParse = [&] (std::string_view &sv) {

@@ -20,6 +20,7 @@ class SourceView
 public:
 	SourceView();
 	explicit SourceView(std::string_view data);
+	SourceView(const char *buf, std::size_t size);
 	SourceView(std::string &&data) = delete;
 
 	template <typename F>
@@ -31,7 +32,8 @@ public:
 		return false;
 	}
 	std::optional<std::string> Trim(std::string_view re, bool ignoreCase = false);
-	bool Trim(char re);
+	std::optional<std::string> TrimUntil(std::string_view re, bool ignoreCase = false);
+	bool Trim(char ch);
 	bool SkipSpaces(); // true if at least one character is skipped
 
 	void Clear();

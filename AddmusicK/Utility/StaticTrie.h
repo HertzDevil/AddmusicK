@@ -21,18 +21,30 @@ struct trie_node;
 template <typename, typename...>
 struct trie_val_node;
 
+#ifdef _MSVC_LANG
 template <char K, typename V>
 struct trie_node<trie_pair<K, V>>
 {
 	template <typename... Args>
 	static trie_result_t
 	search(std::string_view &str, size_t offs, Args&&... args) {
-		using next_t = trie_node<>;
 		return str[offs] == K ?
 			V::search(str, offs + 1, std::forward<Args>(args)...) :
-			next_t::search(str, offs, std::forward<Args>(args)...);
+			trie_result_t { };
 	}
 };
+template <typename T, char K, typename V>
+struct trie_val_node<T, trie_pair<K, V>>
+{
+	template <typename... Args>
+	static trie_result_t
+	search(std::string_view &str, size_t offs, Args&&... args) {
+		return str[offs] == K ?
+			V::search(str, offs + 1, std::forward<Args>(args)...) :
+			trie_val_node<T>::search(str, offs, std::forward<Args>(args)...);
+	}
+};
+#endif
 template <char K, typename V, char... Ks, typename... Vs>
 struct trie_node<trie_pair<K, V>, trie_pair<Ks, Vs>...>
 {
@@ -155,6 +167,15 @@ struct make_trie<TrieEntry<T, Cs...>, Args...>
 		typename make_trie<Args...>::type, T, Cs...>;
 };
 
+template <typename T>
+struct SourceViewAdaptor
+{
+	template <typename... Args>
+	void operator()(const std::string_view &, std::size_t, Args&&... args) {
+		return T()(std::forward<Args>(args)...);
+	}
+};
+
 } // namespace details
 
 template <typename... Ts>
@@ -164,5 +185,8 @@ template <typename Tr, typename... Args>
 details::trie_result_t ParseTrie(Tr, std::string_view &str, Args&&... args) {
 	return Tr::search(str, 0, std::forward<Args>(args)...);
 }
+
+template <typename T, char... Cs>
+using EntryAdaptor = AMKd::Utility::TrieEntry<details::SourceViewAdaptor<T>, Cs...>;
 
 } // namespace AMKd::Utility

@@ -36,6 +36,11 @@ SourceView::SourceView(std::string_view data) :
 	Trim("\xEF\xBB\xBF"); // utf-8 bom
 }
 
+SourceView::SourceView(const char *buf, std::size_t size) :
+	SourceView(std::string_view(buf, size))
+{
+}
+
 std::optional<std::string> SourceView::Trim(std::string_view re, bool ignoreCase) {
 	std::cmatch match;
 	std::optional<std::string> z;
@@ -51,9 +56,22 @@ std::optional<std::string> SourceView::Trim(std::string_view re, bool ignoreCase
 	return z;
 }
 
-bool SourceView::Trim(char re) {
+std::optional<std::string> SourceView::TrimUntil(std::string_view re, bool ignoreCase) {
+	std::cmatch match;
+	std::optional<std::string> z;
+
 	prev_ = sv_;
-	if (!sv_.empty() && sv_.front() == re) {
+	if (std::regex_search(sv_.data(), match, get_re(re, ignoreCase))) {
+		z = match.prefix().str();
+		sv_.remove_prefix(match.prefix().length() + match[0].length());
+	}
+
+	return z;
+}
+
+bool SourceView::Trim(char ch) {
+	prev_ = sv_;
+	if (!sv_.empty() && sv_.front() == ch) {
 		sv_.remove_prefix(1);
 		return true;
 	}
@@ -64,7 +82,7 @@ bool SourceView::Trim(char re) {
 bool SourceView::SkipSpaces() {
 	bool ret = false;
 	do {
-		ret = ret || !Trim(R"(\s*)")->empty();
+		ret = !Trim(R"(\s*)")->empty() || ret;
 	} while (sv_.empty() && PopMacro());
 	return ret;
 }

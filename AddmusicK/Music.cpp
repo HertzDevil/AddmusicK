@@ -969,7 +969,7 @@ void Music::parseOptionDirective() {
 	};
 
 	using namespace AMKd::MML::Lexer;		// // //
-	if (auto param = GetParameters<Ident>(mml_)) {
+	if (auto param = GetParameters<String>(mml_)) {
 		downcase(param.get<0>());
 		std::string_view sv {param.get<0>()};
 		if (auto func = CMDS.SearchValue(sv))
@@ -1033,7 +1033,7 @@ void Music::parseSpecialDirective() {
 	};
 
 	using namespace AMKd::MML::Lexer;		// // //
-	if (auto param = GetParameters<Ident>(mml_)) {
+	if (auto param = GetParameters<String>(mml_)) {
 		downcase(param.get<0>());
 		std::string_view sv {param.get<0>()};
 		if (auto func = CMDS.SearchValue(sv))

@@ -537,7 +537,7 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 			samp.exists = true;
 			samp.add0 = add0;
 			if (!isPointer)
-				samp.text = openTextFile(BANK_FOLDER[bank] / *name);
+				samp.loadMML(openTextFile(BANK_FOLDER[bank] / *name));		// // //
 			++SFXCount;
 		}
 	}
@@ -594,7 +594,7 @@ void compileGlobalData() {
 				sfx.posInARAM = static_cast<uint16_t>(getSFXSpace(0) + getSFXSpace(1) + programSize + programPos);
 				sfx.compile();
 				sfxPointers[bank].push_back(sfx.posInARAM);
-				dataTotal[bank] += sfx.data.size() + sfx.code.size();
+				dataTotal[bank] += sfx.dataStream.GetSize() + sfx.code.size();		// // //
 			}
 			else if (!sfx.exists)
 				sfxPointers[bank].push_back(0xFFFF);
@@ -603,7 +603,7 @@ void compileGlobalData() {
 			else
 				fatalError("Error: A sound effect that is a pointer to another sound effect must come after\n"
 						   "the sound effect that it points to.");
-			allSFXData.insert(allSFXData.cend(), sfx.data.cbegin(), sfx.data.cend());		// // //
+			sfx.dataStream.Flush(allSFXData);		// // //
 			allSFXData.insert(allSFXData.cend(), sfx.code.cbegin(), sfx.code.cend());
 		}
 	}
