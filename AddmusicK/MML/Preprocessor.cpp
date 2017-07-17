@@ -24,7 +24,7 @@ namespace {
 	LEXER_FUNC_END()
 } // namespace
 
-Preprocessor::Preprocessor(const std::string &str, const std::string &filename) :
+Preprocessor::Preprocessor(std::string_view str, const std::string &filename) :
 	target(Target::Unknown), version(0), firstChannel(CHANNELS)
 {
 	// Handles #ifdefs.  Maybe more later?

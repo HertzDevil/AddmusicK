@@ -61,7 +61,7 @@ SCOPED_ENUM_START(CmdOptionF4, uint8_t)
 	Sync          = 0x05,
 	Yoshi         = 0x06,
 	TempoImmunity = 0x07,
-	VelocityTable = 0x08,
+	Louder        = 0x08,
 	RestoreInst   = 0x09,
 SCOPED_ENUM_END()
 

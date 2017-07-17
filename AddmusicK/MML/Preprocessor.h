@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <stack>
 #include <map>
 
@@ -16,7 +17,7 @@ class SourceView;
 class Preprocessor
 {
 public:
-	Preprocessor(const std::string &str, const std::string &filename);
+	Preprocessor(std::string_view str, const std::string &filename);
 
 	std::string result;
 	std::string title;

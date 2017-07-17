@@ -732,7 +732,7 @@ void Music::parseHexCommand() {
 			case AMKd::Binary::CmdOptionF4::Sync:          return doSync();
 			case AMKd::Binary::CmdOptionF4::Yoshi:         return doYoshiDrums(false);
 			case AMKd::Binary::CmdOptionF4::TempoImmunity: return doTempoImmunity();
-			case AMKd::Binary::CmdOptionF4::VelocityTable: return doVolumeTable(true);
+			case AMKd::Binary::CmdOptionF4::Louder:        return doVolumeTable(true);
 			case AMKd::Binary::CmdOptionF4::RestoreInst:   return doRestoreInst();
 			}
 			throw AMKd::Utility::ParamException {"Unknown $F4 hex command type."};
@@ -1886,65 +1886,69 @@ void Music::doIntro() {
 }
 
 void Music::doYoshiDrums(bool ch5only) {
-	append(AMKd::Binary::CmdType::ExtF4, ch5only ? AMKd::Binary::CmdOptionF4::YoshiCh5 : AMKd::Binary::CmdOptionF4::Yoshi);
+	if (ch5only)
+		getActiveTrack().Append(AMKd::Binary::ChunkAMK::YoshiCh5());
+	else
+		getActiveTrack().Append(AMKd::Binary::ChunkAMK::Yoshi());
 	hasYoshiDrums = true;
 }
 
 void Music::doLegato() {
-	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::Legato);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::Legato());
 }
 
 void Music::doLightStaccato() {
-	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::LightStaccato);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::LightStaccato());
 }
 
 void Music::doSync() {
-	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::Sync);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::Sync());
 }
 
 void Music::doTempoImmunity() {
-	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::TempoImmunity);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::TempoImmunity());
 }
 
 void Music::doVolumeTable(bool louder) {
 	if (louder)
-		append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::VelocityTable);
+		getActiveTrack().Append(AMKd::Binary::ChunkAMK::Louder());
 	else
-		append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::VolTable, /*louder ? 0x01 :*/ 0x00);
+		getActiveTrack().Append(AMKd::Binary::ChunkAMK::VolTable(0));
+//	getActiveTrack().Append(AMKd::Binary::ChunkAMK::VolTable(louder));
 }
 
 void Music::doRestoreInst() {
-	append(AMKd::Binary::CmdType::ExtF4, AMKd::Binary::CmdOptionF4::RestoreInst);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::RestoreInst());
 }
 
 void Music::doPitchMod(int flag) {
-	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::PitchMod, flag);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::PitchMod(flag));
 }
 
 void Music::doGain(int gain) {
-	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Gain, gain);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::Gain(gain));
 }
 
 void Music::doAmplify(int mult) {
-	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::Amplify, mult);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::Amplify(mult));
 }
 
 void Music::doEchoBuffer(int size) {
-	append(AMKd::Binary::CmdType::ExtFA, AMKd::Binary::CmdOptionFA::EchoBuffer, size);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::EchoBuffer(size));
 	echoBufferSize = std::max(echoBufferSize, size);
 }
 
 void Music::doDSPWrite(int adr, int val) {
-	append(AMKd::Binary::CmdType::DSP, adr, val);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::DSP(adr, val));
 }
 
 void Music::doARAMWrite(int /*adr*/, int /*val*/) {
 	throw AMKd::Utility::MMLException {"ARAM writes are disabled by default."};
-//	append(AMKd::Binary::CmdType::ARAM, val, adr >> 8, adr);
+//	getActiveTrack().Append(AMKd::Binary::ChunkAMK::ARAM(val, adr >> 8, adr));
 }
 
 void Music::doDataSend(int val1, int val2) {
-	append(AMKd::Binary::CmdType::DataSend, val1, val2);
+	getActiveTrack().Append(AMKd::Binary::ChunkAMK::DataSend(val1, val2));
 }
 
 void Music::doArpeggio(int dur, const std::vector<uint8_t> &notes) {
@@ -1963,5 +1967,4 @@ void Music::doGlissando(int dur, int offset) {
 void Music::doTriplet(bool enable) {
 	if (enable == std::exchange(getActiveTrack().inTriplet, enable))		// // //
 		throw AMKd::Utility::ParamException {"Triplet block mismatch."};
-//		throw AMKd::Utility::SyntaxException {"Triplet on directive found within a triplet block."};
 }

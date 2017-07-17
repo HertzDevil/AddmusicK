@@ -2,7 +2,6 @@
 
 #include <string_view>
 #include <utility>
-#include <type_traits>
 
 namespace AMKd::Utility {
 
@@ -187,6 +186,6 @@ details::trie_result_t ParseTrie(Tr, std::string_view &str, Args&&... args) {
 }
 
 template <typename T, char... Cs>
-using EntryAdaptor = AMKd::Utility::TrieEntry<details::SourceViewAdaptor<T>, Cs...>;
+using EntryAdaptor = TrieEntry<details::SourceViewAdaptor<T>, Cs...>;
 
 } // namespace AMKd::Utility
