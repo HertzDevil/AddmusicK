@@ -31,8 +31,8 @@ public:
 		sv_ = prev_;
 		return false;
 	}
-	std::optional<std::string> Trim(std::string_view re, bool ignoreCase = false);
-	std::optional<std::string> TrimUntil(std::string_view re, bool ignoreCase = false);
+	std::optional<std::string_view> Trim(std::string_view re, bool ignoreCase = false);
+	std::optional<std::string_view> TrimUntil(std::string_view re, bool ignoreCase = false);
 	bool Trim(char ch);
 	bool SkipSpaces(); // true if at least one character is skipped
 

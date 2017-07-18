@@ -26,10 +26,10 @@ public:
 	int firstChannel;
 
 private:
-	void doDefine(const std::string &str, int val);
-	void doUndef(const std::string &str);
-	void doIfdef(const std::string &str);
-	void doIfndef(const std::string &str);
+	void doDefine(std::string_view str, int val);
+	void doUndef(std::string_view str);
+	void doIfdef(std::string_view str);
+	void doIfndef(std::string_view str);
 	void doEndif();
 	void doIf(bool enable);
 	void doElseIf(bool enable);		// // //
@@ -40,7 +40,7 @@ private:
 
 	bool parsePredicate(SourceView &row);		// // //
 
-	std::map<std::string, int> defines;
+	std::map<std::string_view, int> defines;
 	std::stack<bool> okayStatus;
 };
 

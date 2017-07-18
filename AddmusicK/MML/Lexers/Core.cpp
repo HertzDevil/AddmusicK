@@ -16,7 +16,7 @@ LEXER_FUNC_START(Lexer::Int)
 //	if (file.Trim("\\$"))
 //		return Hex2()(file);
 	if (auto x = file.Trim("[[:digit:]]+")) {
-		auto ret = static_cast<arg_type>(std::strtoul(x->c_str(), nullptr, 10));
+		auto ret = static_cast<arg_type>(std::strtoul(x->data(), nullptr, 10));
 		if (errno != ERANGE)
 			return ret;
 	}
@@ -24,7 +24,7 @@ LEXER_FUNC_END()
 
 LEXER_FUNC_START(Lexer::HexInt)
 	if (auto x = file.Trim("[[:xdigit:]]+")) {
-		auto ret = static_cast<arg_type>(std::strtoul(x->c_str(), nullptr, 16));
+		auto ret = static_cast<arg_type>(std::strtoul(x->data(), nullptr, 16));
 		if (errno != ERANGE)
 			return ret;
 	}
@@ -32,7 +32,7 @@ LEXER_FUNC_END()
 
 LEXER_FUNC_START(Lexer::SInt)
 	if (auto x = file.Trim("[+-]?[[:digit:]]+")) {
-		auto ret = static_cast<arg_type>(std::strtol(x->c_str(), nullptr, 10));
+		auto ret = static_cast<arg_type>(std::strtol(x->data(), nullptr, 10));
 		if (errno != ERANGE)
 			return ret;
 	}
@@ -40,7 +40,7 @@ LEXER_FUNC_END()
 
 LEXER_FUNC_START(Lexer::Byte)
 	if (auto x = file.Trim("\\$[[:xdigit:]]{2}"))
-		return static_cast<arg_type>(std::strtoul(x->c_str() + 1, nullptr, 16));
+		return static_cast<arg_type>(std::strtoul(x->data() + 1, nullptr, 16));
 LEXER_FUNC_END()
 
 LEXER_FUNC_START(Lexer::Ident)
@@ -63,7 +63,7 @@ LEXER_FUNC_START(Lexer::QString)
 	const std::regex ESC1 {R"(\\\\)", std::regex::optimize};
 	const std::regex ESC2 {R"(\\")", std::regex::optimize};
 	if (auto x = file.Trim(R"/("([^\\"]|\\\\|\\")*")/")) {
-		auto str = std::regex_replace(std::regex_replace(*x, ESC1, "\\"), ESC2, "\"");
+		auto str = std::regex_replace(std::regex_replace(std::string {*x}, ESC1, "\\"), ESC2, "\"");
 		return str.substr(1, str.size() - 2);
 	}
 LEXER_FUNC_END()
@@ -74,8 +74,8 @@ LEXER_FUNC_START(Lexer::Time)
 	if (auto x = file.Trim("[[:digit:]]{1,2}"))
 		if (file.Trim(':'))
 			if (auto y = file.Trim("[[:digit:]]{2}")) {
-				auto m = static_cast<arg_type>(std::strtoul(x->c_str(), nullptr, 10));
-				auto s = static_cast<arg_type>(std::strtoul(y->c_str(), nullptr, 10));
+				auto m = static_cast<arg_type>(std::strtoul(x->data(), nullptr, 10));
+				auto s = static_cast<arg_type>(std::strtoul(y->data(), nullptr, 10));
 				return m * 60 + s;
 			}
 LEXER_FUNC_END()

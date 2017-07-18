@@ -11,7 +11,8 @@ namespace {
 
 	const std::regex &get_re(std::string_view re, bool ignoreCase) {
 		static std::unordered_map<std::string_view, std::regex> regex_cache;
-		auto flag = std::regex::ECMAScript | std::regex::optimize | (ignoreCase ? std::regex::icase : (std::regex_constants::syntax_option_type)0);
+		auto flag = std::regex::ECMAScript | std::regex::optimize |
+			(ignoreCase ? std::regex::icase : (std::regex_constants::syntax_option_type)0);
 
 		auto it = regex_cache.find(re);
 		if (it != regex_cache.cend())
@@ -41,12 +42,12 @@ SourceView::SourceView(const char *buf, std::size_t size) :
 {
 }
 
-std::optional<std::string> SourceView::Trim(std::string_view re, bool ignoreCase) {
+std::optional<std::string_view> SourceView::Trim(std::string_view re, bool ignoreCase) {
 	std::cmatch match;
-	std::optional<std::string> z;
+	std::optional<std::string_view> z;
 
 	prev_ = sv_;
-	if (std::regex_search(sv_.data(), match, get_re(re, ignoreCase),
+	if (std::regex_search(sv_.data(), sv_.data() + sv_.size(), match, get_re(re, ignoreCase),
 						  std::regex_constants::match_continuous)) {
 		size_t len = match[0].length();
 		z = sv_.substr(0, len);
@@ -56,14 +57,15 @@ std::optional<std::string> SourceView::Trim(std::string_view re, bool ignoreCase
 	return z;
 }
 
-std::optional<std::string> SourceView::TrimUntil(std::string_view re, bool ignoreCase) {
+std::optional<std::string_view> SourceView::TrimUntil(std::string_view re, bool ignoreCase) {
 	std::cmatch match;
-	std::optional<std::string> z;
+	std::optional<std::string_view> z;
 
 	prev_ = sv_;
-	if (std::regex_search(sv_.data(), match, get_re(re, ignoreCase))) {
-		z = match.prefix().str();
-		sv_.remove_prefix(match.prefix().length() + match[0].length());
+	if (std::regex_search(sv_.data(), sv_.data() + sv_.size(), match, get_re(re, ignoreCase))) {
+		size_t len = match.prefix().length();
+		z = sv_.substr(0, len);
+		sv_.remove_prefix(len + match[0].length());
 	}
 
 	return z;

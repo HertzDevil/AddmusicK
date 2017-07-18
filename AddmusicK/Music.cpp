@@ -970,8 +970,9 @@ void Music::parseOptionDirective() {
 
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<String>(mml_)) {
-		downcase(param.get<0>());
-		std::string_view sv {param.get<0>()};
+		std::string opt {param.get<0>()};
+		downcase(opt);
+		std::string_view sv {opt};
 		if (auto func = CMDS.SearchValue(sv))
 			return (this->*(*func))();
 	}
@@ -1034,8 +1035,9 @@ void Music::parseSpecialDirective() {
 
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<String>(mml_)) {
-		downcase(param.get<0>());
-		std::string_view sv {param.get<0>()};
+		std::string opt {param.get<0>()};
+		downcase(opt);
+		std::string_view sv {opt};
 		if (auto func = CMDS.SearchValue(sv))
 			return (this->*(*func))();
 	}
@@ -1097,7 +1099,7 @@ void Music::parseSampleDefinitions() {
 					throw AMKd::Utility::ParamException {"The filename for the sample was invalid.  Only \".brr\" and \".bnk\" are allowed."};		// // //
 			}
 			else if (auto group = GetParameters<Sep<'#'>, Ident>(mml_))
-				addSampleGroup(group.get<0>(), this);		// // //
+				addSampleGroup(std::string {group.get<0>()}, this);		// // //
 			else
 				break;
 		}
@@ -1129,7 +1131,7 @@ void Music::parseLouderCommand() {
 void Music::parsePath() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<QString>(mml_))
-		basepath = fs::path {"."} / param.get<0>();
+		basepath = fs::path {"."} / param.get<0>();		// // //
 	else
 		throw AMKd::Utility::SyntaxException {"Unexpected symbol found in path command. Expected a quoted string."};
 }
@@ -1401,8 +1403,8 @@ void Music::parseSPCInfo() {
 		throw AMKd::Utility::SyntaxException {"Could not find opening brace in SPC info command."};
 
 	while (auto item = GetParameters<Sep<'#'>, Ident, QString>(mml_)) {
-		const std::string &metaName = item.get<0>();
-		std::string metaParam = item.get<1>();
+		const std::string_view &metaName = item.get<0>();
+		std::string_view metaParam = item.get<1>();
 
 		if (metaName == "length") {
 			guessLength = (metaParam == "auto");
@@ -1419,12 +1421,12 @@ void Music::parseSPCInfo() {
 		}
 
 		if (metaName == "dumper" && metaParam.size() > 16) {		// // //
-			metaParam.erase(16);
-			printWarning("#dumper field was too long.  Truncating to \"" + metaParam + "\".");		// // //
+			metaParam.remove_suffix(metaParam.size() - 16);
+			printWarning(std::string {"#dumper field was too long.  Truncating to \""} + std::string {metaParam} + "\".");		// // //
 		}
 		else if (metaParam.size() > 32) {
-			metaParam.erase(32);
-			printWarning('#' + metaName + " field was too long.  Truncating to \"" + metaParam + "\".");		// // //
+			metaParam.remove_suffix(metaParam.size() - 32);
+			printWarning(std::string {"#"} + std::string {metaName} + " field was too long.  Truncating to \"" + std::string {metaParam} + "\".");		// // //
 		}
 
 		if (metaName == "author")

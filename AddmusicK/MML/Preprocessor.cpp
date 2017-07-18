@@ -35,11 +35,11 @@ Preprocessor::Preprocessor(std::string_view str, const std::string &filename) :
 	try {
 		while (text) {
 			// don't use GetParameters because all whitespaces are to be kept verbatim
-			std::string row_ = *text.Trim("[^\\r\\n]*");
+			std::string_view row_ = *text.Trim("[^\\r\\n]*");
 			SourceView row {row_};
 			text.Trim('\r');
 
-			std::string add = *row.Trim("\\s*");
+			std::string add {*row.Trim("\\s*")};
 			bool allowDirectives = true;
 
 			const auto doDirective = [&] (auto &&f, auto&&... args) {
@@ -48,7 +48,7 @@ Preprocessor::Preprocessor(std::string_view str, const std::string &filename) :
 				(this->*f)(std::forward<decltype(args)>(args)...);
 				if (row.SkipSpaces(), row.Trim(';')) {
 					bool setTitle = row.Trim("\\s*title\\s*=\\s*") && row;
-					std::string rest = *row.Trim(".*");
+					std::string_view rest = *row.Trim(".*");
 					if (setTitle)
 						title = rest;
 				}
@@ -96,7 +96,7 @@ Preprocessor::Preprocessor(std::string_view str, const std::string &filename) :
 						else if (*ident == "error") {
 							row.SkipSpaces();
 							auto msg = *row.Trim("[^;]*");
-							fatalError(!msg.empty() ? msg : "(empty #error directive)", filename, text.GetLineNumber());
+							fatalError(!msg.empty() ? std::string {msg} : "(empty #error directive)", filename, text.GetLineNumber());
 						}
 						else if (*ident == "amm")
 							doDirective(&Preprocessor::doTarget, Target::AMM);
@@ -110,11 +110,11 @@ Preprocessor::Preprocessor(std::string_view str, const std::string &filename) :
 						}
 						else {
 							allowDirectives = false;
-							add += '#' + spaces + *ident;
+							add += '#' + std::string {spaces} + std::string {*ident};
 						}
 					else {
 						allowDirectives = false;
-						add += '#' + spaces;
+						add += '#' + std::string {spaces};
 						if (auto num = row.Trim("[0-7]+")) {
 							add += *num;
 							for (char ch : *num)
@@ -150,22 +150,22 @@ Preprocessor::Preprocessor(std::string_view str, const std::string &filename) :
 	}
 }
 
-void Preprocessor::doDefine(const std::string &str, int val) {
+void Preprocessor::doDefine(std::string_view str, int val) {
 	if (okayStatus.top())
 		if (!defines.insert(std::make_pair(str, val)).second)
 			throw AMKd::Utility::SyntaxException {"Preprocessor constant redefinition."};
 }
 
-void Preprocessor::doUndef(const std::string &str) {
+void Preprocessor::doUndef(std::string_view str) {
 	if (okayStatus.top())
 		defines.erase(str);
 }
 
-void Preprocessor::doIfdef(const std::string &str) {
+void Preprocessor::doIfdef(std::string_view str) {
 	doIf(defines.find(str) != defines.cend());
 }
 
-void Preprocessor::doIfndef(const std::string &str) {
+void Preprocessor::doIfndef(std::string_view str) {
 	doIf(defines.find(str) == defines.cend());
 }
 

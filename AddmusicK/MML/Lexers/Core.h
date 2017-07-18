@@ -183,9 +183,9 @@ LEXER_DECL(Int, unsigned)
 LEXER_DECL(HexInt, unsigned)
 LEXER_DECL(SInt, int)
 LEXER_DECL(Byte, uint8_t)
-LEXER_DECL(Ident, std::string)
-LEXER_DECL(Row, std::string)
-LEXER_DECL(String, std::string)
+LEXER_DECL(Ident, std::string_view)
+LEXER_DECL(Row, std::string_view)
+LEXER_DECL(String, std::string_view)
 LEXER_DECL(QString, std::string)
 LEXER_DECL(Time, unsigned)
 LEXER_DECL(Dur, Duration)
@@ -232,7 +232,7 @@ struct Hex
 	using arg_type = unsigned;
 	std::optional<arg_type> operator()(SourceView &file) {
 		if (auto x = file.Trim(fmt))
-			return static_cast<arg_type>(std::strtol(x->c_str(), nullptr, 16));
+			return static_cast<arg_type>(std::strtol(x->data(), nullptr, 16));
 		return std::nullopt;
 	}
 };

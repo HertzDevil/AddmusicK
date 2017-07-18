@@ -82,7 +82,7 @@ int main(int argc, char **argv) try {		// // //
 		AMKd::MML::SourceView options {optionStr};
 		using namespace AMKd::MML::Lexer;
 		while (auto line = GetParameters<Row>(options))
-			arguments.push_back(std::move(line.get<0>()));
+			arguments.push_back(std::string {line.get<0>()});
 	}
 	else
 		for (int i = 1; i < argc; i++)
@@ -258,6 +258,9 @@ int main(int argc, char **argv) try {		// // //
 }
 catch (std::exception &e) {		// // //
 	std::cerr << "Unexpected error: \n" << e.what() << '\n';
+#ifdef _DEBUG
+	__debugbreak();
+#endif
 	if (waitAtEnd)
 		quit(1);
 	return 1;
@@ -482,7 +485,7 @@ void loadSampleList() {
 		sg.bankName = nameParam.get<0>();		// // //
 
 		while (auto item = GetParameters<QString, Option<Sep<'!'>>>(list))
-			sg.samples.push_back({item.get<0>(), item.get<1>().has_value()});
+			sg.samples.push_back({std::move(item.get<0>()), item.get<1>().has_value()});
 
 		if (!GetParameters<Sep<'}'>>(list))
 			fatalError("Error: Unexpected character in sample group definition.", SAMPGROUP_NAME, list.GetLineNumber());
@@ -537,7 +540,7 @@ void loadSFXList() {		// Very similar to loadMusicList, but with a few differenc
 			samp.exists = true;
 			samp.add0 = add0;
 			if (!isPointer)
-				samp.loadMML(openTextFile(BANK_FOLDER[bank] / *name));		// // //
+				samp.loadMML(openTextFile(BANK_FOLDER[bank] / samp.name));		// // //
 			++SFXCount;
 		}
 	}

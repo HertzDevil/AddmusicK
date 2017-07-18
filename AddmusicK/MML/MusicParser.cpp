@@ -33,7 +33,7 @@ void MusicParser::operator()(SourceView &file, ::Music &music) {
 	while (file.HasNextToken()) {		// // // TODO: also call this for selected lexers
 		try {
 			if (!file.TryProcess(doParse) && !music.compileStep())		// // // TODO: remove
-				throw AMKd::Utility::SyntaxException {"Unexpected character \"" + *file.Trim(".") + "\" found."};
+				throw AMKd::Utility::SyntaxException {"Unexpected character \"" + std::string {*file.Trim(".")} + "\" found."};
 		}
 		catch (AMKd::Utility::MMLException &e) {
 			::printError(e.what(), music.name, file.GetLineNumber());
@@ -59,23 +59,23 @@ void Parser::Replacement::operator()(SourceView &file, ::Music &) {
 	auto param = GetParameters<QString>(file);
 	if (!param)
 		throw AMKd::Utility::SyntaxException {"Unexpected end of replacement directive."};
-	std::string s = param.get<0>();
+	std::string_view s = param.get<0>();
 	size_t i = s.find('=');
-	if (i == std::string::npos)
+	if (i == std::string_view::npos)
 		throw AMKd::Utility::SyntaxException {"Error parsing replacement directive; could not find '='"};		// // //
 
-	std::string findStr = s.substr(0, i);
-	std::string replStr = s.substr(i + 1);
+	std::string_view findStr = s.substr(0, i);
+	std::string_view replStr = s.substr(i + 1);
 
 	while (!findStr.empty() && isspace(findStr.back()))
-		findStr.pop_back();
+		findStr.remove_suffix(1);
 	if (findStr.empty())
 		throw AMKd::Utility::ParamException {"Replacement string to find cannot be empty."};
 
 	while (!replStr.empty() && isspace(replStr.front()))
-		replStr.erase(0, 1);
+		replStr.remove_prefix(1);
 
-	file.AddMacro(findStr, replStr);		// // //
+	file.AddMacro(std::string {findStr}, std::string {replStr});		// // //
 }
 
 void Parser::RaiseOctave::operator()(SourceView &, ::Music &music) {
