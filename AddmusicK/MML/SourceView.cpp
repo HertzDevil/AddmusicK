@@ -14,11 +14,9 @@ namespace {
 		auto flag = std::regex::ECMAScript | std::regex::optimize |
 			(ignoreCase ? std::regex::icase : (std::regex_constants::syntax_option_type)0);
 
-		auto it = regex_cache.find(re);
-		if (it != regex_cache.cend())
+		if (auto it = std::as_const(regex_cache).find(re); it != regex_cache.cend())
 			return it->second;
-		std::regex cache {re.data(), flag};
-		auto result = regex_cache.insert(std::make_pair(re, cache));
+		auto result = regex_cache.insert(std::make_pair(re, std::regex {re.data(), flag}));
 		return result.first->second;
 	}
 
@@ -136,22 +134,21 @@ bool SourceView::HasNextToken() {
 }
 
 bool SourceView::DoReplacement() {
-	while (true) {
-		auto it = std::find_if(repl_.cbegin(), repl_.cend(), [&] (const auto &x) {
-			const std::string &rhs = x.first;
-			return std::string_view(sv_.data(), rhs.length()) == rhs;
-		});
-		if (it == repl_.cend())
+	const auto matchFunc = [&] (const auto &x) {
+		const std::string &rhs = x.first;
+		return std::string_view(sv_.data(), rhs.length()) == rhs;
+	};
+
+	while (true)
+		if (auto it = std::find_if(repl_.cbegin(), repl_.cend(), matchFunc); it == repl_.cend())
 			break;
-		if (!PushMacro(it->first, it->second))
+		else if (!PushMacro(it->first, it->second))
 			return false;
-	}
 	return true;
 }
 
 std::size_t SourceView::GetLineNumber() const {
-	return std::count(mml_.cbegin(), mml_.cend(), '\n') -
-		std::count(sv_.cbegin(), sv_.cend(), '\n') + 1;
+	return std::count(mml_.cbegin(), mml_.cend(), '\n') - std::count(sv_.cbegin(), sv_.cend(), '\n') + 1;
 }
 
 std::size_t SourceView::GetReadCount() const {

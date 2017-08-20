@@ -329,10 +329,9 @@ void Music::parseQuantizationCommand() {
 void Music::parsePanCommand() {
 	using namespace AMKd::MML::Lexer;
 	if (auto param = GetParameters<Int>(mml_)) {
+		auto surround = GetParameters<Comma, Bool, Comma, Bool>(mml_);
 		unsigned pan = requires(param.get<0>(), 0u, 20u, CMD_ILLEGAL("pan", "y"));
-		bool sLeft = false, sRight = false;
-		if (auto surround = GetParameters<Comma, Bool, Comma, Bool>(mml_))
-			std::tie(sLeft, sRight) = *surround;
+		auto [sLeft, sRight] = surround ? *surround : std::make_tuple(false, false);
 		return doPan(pan, sLeft, sRight);
 	}
 
@@ -349,14 +348,13 @@ void Music::parseTempoCommand() {
 void Music::parseTransposeDirective() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Sep<'['>, Int, Sep<']'>, Sep<'='>, SInt>(mml_)) {
-		unsigned inst; int trsp;
-		std::tie(inst, trsp) = *param;
+		auto [inst, trsp] = *param;
 		while (true) {
 			transposeMap[requires(inst++, 0u, 0xFFu, DIR_ILLEGAL("tuning"))] = trsp;
-			auto ext = GetParameters<Comma, SInt>(mml_);
-			if (!ext)
+			if (auto ext = GetParameters<Comma, SInt>(mml_))
+				trsp = ext.get<0>();
+			else
 				return;
-			std::tie(trsp) = *ext;
 		}
 	}
 
@@ -409,17 +407,17 @@ void Music::parseOpenParenCommand() {
 		throw AMKd::Utility::SyntaxException {"Error parsing label loop."};
 	}
 	
-	int sampID;
-	if (auto param = GetParameters<Sep<'@'>, Int>(mml_))
-		sampID = instrToSample[requires(param.get<0>(), 0u, 29u, "Illegal instrument number for sample load command.")];
-	else if (auto param2 = GetParameters<QString>(mml_)) {
-		auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath / param2.get<0>(), name));		// // //
-		if (it == mySamples.cend())
+	int sampID = [&] {
+		if (auto param = GetParameters<Sep<'@'>, Int>(mml_))
+			return instrToSample[requires(param.get<0>(), 0u, 29u, "Illegal instrument number for sample load command.")];
+		if (auto param = GetParameters<QString>(mml_)) {
+			if (auto it = std::find(mySamples.cbegin(), mySamples.cend(), getSample(basepath / param.get<0>(), name));		// // //
+				it != mySamples.cend())
+				return std::distance(mySamples.cbegin(), it);
 			throw AMKd::Utility::ParamException {"The specified sample was not included in this song."};
-		sampID = std::distance(mySamples.cbegin(), it);
-	}
-	else
+		}
 		throw AMKd::Utility::SyntaxException {"Error parsing sample load command."};
+	}();
 
 	if (auto ext = GetParameters<Comma, Byte, Sep<')'>>(mml_))
 		return doSampleLoad(sampID, ext.get<0>());
@@ -437,22 +435,19 @@ void Music::parseRemoteCodeCommand() {
 		if (!channelDefined)
 			throw AMKd::Utility::MMLException {"TODO: allow calling remote codes inside definitions"};
 
-		int remoteID = param.get<0>();
-		int remoteOpt = param.get<1>();
-		int remoteLen = 0;
-		if (remoteOpt == AMKd::Binary::CmdOptionFC::Sustain || remoteOpt == AMKd::Binary::CmdOptionFC::Release) {
+		auto [remoteID, remoteOpt] = *param;
+		int remoteLen = [&] {
+			if (remoteOpt != AMKd::Binary::CmdOptionFC::Sustain && remoteOpt != AMKd::Binary::CmdOptionFC::Release)
+				return 0;
 			if (auto len = GetParameters<Comma, Byte>(mml_))
-				remoteLen = len.get<0>();
-			else if (auto len2 = GetParameters<Comma, Dur>(mml_)) {		// // //
-				remoteLen = getRawTicks(len2.get<0>());
-				if (remoteLen > 0x100)
+				return static_cast<int>(len.get<0>());
+			if (auto len = GetParameters<Comma, Dur>(mml_)) {		// // //
+				int x = getRawTicks(len.get<0>());
+				return x <= 0x100 ? (remoteLen & 0xFF) :
 					throw AMKd::Utility::ParamException {"Note length specified was too large."};		// // //
-				else if (remoteLen == 0x100)
-					remoteLen = 0;
 			}
-			else
-				throw AMKd::Utility::SyntaxException {"Error parsing remote code setup."};
-		}
+			throw AMKd::Utility::SyntaxException {"Error parsing remote code setup."};
+		}();
 
 		if (!GetParameters<Sep<')'>, Sep<'['>>(mml_))
 			throw AMKd::Utility::SyntaxException {"Error parsing remote code setup."};
@@ -498,15 +493,8 @@ void Music::parseStarLoopCommand() {
 void Music::parseVibratoCommand() {
 	using namespace AMKd::MML::Lexer;		// // //
 	if (auto param = GetParameters<Int, Comma, Int>(mml_)) {
-		unsigned delay, rate, depth;
-		if (auto param2 = GetParameters<Comma, Int>(mml_)) {
-			std::tie(delay, rate) = *param;
-			std::tie(depth) = *param2;
-		}
-		else {
-			delay = 0;
-			std::tie(rate, depth) = *param;
-		}
+		auto param2 = GetParameters<Comma, Int>(mml_);
+		auto [delay, rate, depth] = param2 ? std::tuple_cat(*param, *param2) : std::tuple_cat(std::make_tuple(0u), *param);
 		return doVibrato(requires(delay, 0x00u, 0xFFu, "Illegal value for vibrato delay."),
 						 requires(rate, 0x00u, 0xFFu, "Illegal value for vibrato rate."),
 						 requires(depth, 0x00u, 0xFFu, "Illegal value for vibrato extent."));		// // //
@@ -546,8 +534,7 @@ void Music::parseHFDHex() {
 		switch (kind.get<0>()) {
 		case 0x80:
 			if (auto param = GetParameters<Byte, Byte>(mml_)) {		// // //
-				unsigned reg, val;
-				std::tie(reg, val) = *param;
+				auto [reg, val] = *param;
 				return (reg == 0x6D || reg == 0x7D) ? (void)(songTargetProgram = Target::AM4) : // Do not write the HFD header hex bytes.
 					reg == 0x6C ? doNoise(val) : // Noise command gets special treatment.
 					doDSPWrite(reg, val);		// // //
@@ -761,9 +748,7 @@ void Music::parseHexCommand() {
 	case AMKd::Binary::CmdType::ExtFA:
 		if (auto param = GetParameters<Byte, Byte>(mml_)) {
 			using namespace AMKd::Binary;
-			uint8_t cmdType, cmdVal;
-			std::tie(cmdType, cmdVal) = *param;
-			switch (cmdType) {
+			switch (auto [cmdType, cmdVal] = *param; cmdType) {
 			case CmdOptionFA::PitchMod:   return doPitchMod(cmdVal);
 			case CmdOptionFA::Gain:       return doGain(cmdVal);
 			case CmdOptionFA::Transpose:  return doTranspose(cmdVal);
@@ -797,9 +782,7 @@ void Music::parseHexCommand() {
 		break;
 	case AMKd::Binary::CmdType::Arpeggio:
 		if (auto param = GetParameters<Byte, Byte>(mml_)) {
-			unsigned count, len;
-			std::tie(count, len) = *param;
-			switch (count) {
+			switch (auto [count, len] = *param; count) {
 			case AMKd::Binary::ArpOption::Trill:
 				if (auto offset = GetParameters<Byte>(mml_))
 					return doTrill(len, offset.get<0>());
@@ -828,8 +811,7 @@ void Music::parseHexCommand() {
 				using namespace AMKd::Binary;
 				//if (tempoRatio != 1) error("#halvetempo cannot be used on AMK 1 songs that use the $FA $05 or old $FC command.")
 				auto &track = getBaseTrack();		// // //
-				uint8_t delay, gain;
-				std::tie(delay, gain) = *param;
+				auto [delay, gain] = *param;
 
 				auto s = Stream() << ChunkAMK::Gain(gain) << ChunkNSPC::End();
 				track.usingFC = (delay != 0);
@@ -972,8 +954,7 @@ void Music::parseOptionDirective() {
 	if (auto param = GetParameters<String>(mml_)) {
 		std::string opt {param.get<0>()};
 		downcase(opt);
-		std::string_view sv {opt};
-		if (auto func = CMDS.SearchValue(sv))
+		if (std::string_view sv {opt}; auto func = CMDS.SearchValue(sv))
 			return (this->*(*func))();
 	}
 	throw AMKd::Utility::ParamException {"Unknown option type for '#option' directive."};		// // //
@@ -1037,8 +1018,7 @@ void Music::parseSpecialDirective() {
 	if (auto param = GetParameters<String>(mml_)) {
 		std::string opt {param.get<0>()};
 		downcase(opt);
-		std::string_view sv {opt};
-		if (auto func = CMDS.SearchValue(sv))
+		if (std::string_view sv {opt}; auto func = CMDS.SearchValue(sv))
 			return (this->*(*func))();
 	}
 	throw AMKd::Utility::SyntaxException {DIR_ERROR("'#'")};

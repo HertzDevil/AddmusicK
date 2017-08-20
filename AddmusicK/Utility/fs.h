@@ -1,6 +1,6 @@
 #pragma once
 
-#if __cplusplus > 201402L
+#if __cplusplus >= 201703L
 // conforming C++17 compiler
 #	if __has_include(<filesystem>)
 #		include <filesystem>

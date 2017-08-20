@@ -110,17 +110,13 @@ struct tup_assigner
 	bool operator()(SourceView &file, U &tup) const {
 		file.SkipSpaces();
 		std::optional<typename T::arg_type> ret = T()(file);
-		if (ret.has_value())
-			std::get<I>(tup) = *ret;
+		if constexpr (I != -1) {
+			if (ret.has_value())
+				std::get<I>(tup) = *ret;
+		}
+		else
+			(void)tup;
 		return ret.has_value();
-	}
-};
-template <typename T, typename U>
-struct tup_assigner<T, U, -1>
-{
-	bool operator()(SourceView &file, U &) const {
-		file.SkipSpaces();
-		return T()(file).has_value();
 	}
 };
 
@@ -197,24 +193,29 @@ LEXER_DECL(Chan, std::bitset</*CHANNELS*/ 8>)
 template <char... Cs>
 struct Sep
 {
-	using arg_type = char; // bool;
+	using arg_type = bool;
 
 private:
-	std::optional<arg_type> call_impl(SourceView &file, std::index_sequence<>) = delete;
-	template <char C, std::size_t I>
-	std::optional<arg_type> call_impl(SourceView &file, std::index_sequence<I>) {
-		if (file.Trim(C))
-			return C;
-		return std::nullopt;
+	std::optional<arg_type> call_impl(SourceView &) {
+		return true;
 	}
-	template <char C, char... Cs_, std::size_t I, std::size_t... Is>
-	std::optional<arg_type> call_impl(SourceView &file, std::index_sequence<I, Is...>) {
+	template <char C>
+	std::optional<arg_type> call_impl(SourceView &file) {
+		if (!file.Trim(C))
+			return std::nullopt;
+		return C;
+	}
+	template <char C, char... Cs_>
+	std::optional<arg_type> call_impl(SourceView &file) {
 		return !file.Trim(C) ? std::nullopt : call_impl<Cs_...>(file, std::index_sequence<Is...> { });
 	}
 
 public:
 	std::optional<arg_type> operator()(SourceView &file) {
-		return call_impl<Cs...>(file, std::make_index_sequence<sizeof...(Cs)> { });
+		for (char x : {Cs...})
+			if (!file.Trim(x))
+				return std::nullopt;
+		return true;
 	}
 };
 template <char... Cs>
