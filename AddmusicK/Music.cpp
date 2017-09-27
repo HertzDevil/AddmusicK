@@ -443,7 +443,7 @@ void Music::parseRemoteCodeCommand() {
 				return static_cast<int>(len.get<0>());
 			if (auto len = GetParameters<Comma, Dur>(mml_)) {		// // //
 				int x = getRawTicks(len.get<0>());
-				return x <= 0x100 ? (remoteLen & 0xFF) :
+				return x <= 0x100 ? (x & 0xFF) :
 					throw AMKd::Utility::ParamException {"Note length specified was too large."};		// // //
 			}
 			throw AMKd::Utility::SyntaxException {"Error parsing remote code setup."};
