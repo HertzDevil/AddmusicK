@@ -2,12 +2,31 @@ dist: trusty
 sudo: false
 language: cpp
 
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "s/1pdEtAFLSNhfuATM9DjtVFmk7ln+VsjomuG7XbjzI5c4JbtiRRNobaHCHTikrqsWAenl+DUs5q6b9MrG406sHCESXcKdO1SpDuO6cyUuCiK/UeJtX9M9lnWGBIPe1f+mzv8mAUsOyXSJX8f8WstASVW2VWgT9RYhCOgVfXfoAzXN/hqcjhyt4Zt5gOezUBK8sk0N/QH8GGzcj7oBDXR8/2FPPCENlQnAJkJQOD626bMsQQ3xO658xu73GNn4EU5pmJidESS0M5ym388y6cEYEw7yNuWsInXvBWNTe3J5ekSLTDKfLGef+depaVywnXS/CrQUtA5IULCje2bX6yTWClEHIMhT9jEVzHKXoQKNbSvxHw3k4XnzMFbTbDDZkNcH1q5sKHIwgtp875CWUT8OfFzGv64flw+bvJKH8HH7oRUhVqTLRONIZXml14SAb6Buihyv5amhvORhm1KYU7bvDn0x3z1d/jiWtel7MF9A6SBntYg1DTXane4dzsNqTvqJ49ZKR+KsivRipiUT4a8boTUsi6fTlKttA2u0KxW8YVUFiwMmKP3P7h9W3ZGHzBJ/DOr90F5wXoiSHEhXAZ57jMXtfcuEuNa8Jw8taRA/+DFGwzQFubNQhz2Q5KgZcKCeFD0NRzT8xEi6Z+dXYi2jBVaxoN0ulL38SGmcbre+4="
+
 addons:
   apt:
     sources:
       - ubuntu-toolchain-r-test
     packages:
       - g++-7
+  coverity_scan:
+    project:
+      name: "HertzDevil/AddmusicK"
+      description: "MML Compiler-Inserter for Super Mario World"
+    notification_email: nicetas.c@gmail.com
+    build_command_prepend: "make clean -CAddmusicK"
+    build_command: "CXX=/usr/bin/g++-7 CC=/usr/bin/gcc-7 make -CAddmusicK -j4"
+    branch_pattern: coverity_scan
 
 script:
-  CXX=/usr/bin/g++-7 CC=/usr/bin/gcc-7 make -CAddmusicK -j4
+  - if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then
+  -   CXX=/usr/bin/g++-7 CC=/usr/bin/gcc-7 make -CAddmusicK -j4;
+  - fi
+
+before_install:
+  - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
