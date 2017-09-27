@@ -24,9 +24,10 @@ addons:
     branch_pattern: coverity_scan
 
 script:
-  - if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then
-  -   CXX=/usr/bin/g++-7 CC=/usr/bin/gcc-7 make -CAddmusicK -j4;
-  - fi
+  - |
+    if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then
+      CXX=/usr/bin/g++-7 CC=/usr/bin/gcc-7 make -CAddmusicK -j4
+    fi
 
 before_install:
   - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
