@@ -1,5 +1,4 @@
 dist: trusty
-sudo: false
 language: cpp
 
 env:
@@ -20,14 +19,15 @@ addons:
       description: "MML Compiler-Inserter for Super Mario World"
     notification_email: nicetas.c@gmail.com
     build_command_prepend: "make clean -CAddmusicK"
-    build_command: "CXX=/usr/bin/g++-7 CC=/usr/bin/gcc-7 make -CAddmusicK -j4"
+    build_command: "make -CAddmusicK -j4"
     branch_pattern: coverity_scan
+
+before_install:
+  - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-7 90
 
 script:
   - |
     if [ "${COVERITY_SCAN_BRANCH}" != 1 ]; then
       CXX=/usr/bin/g++-7 CC=/usr/bin/gcc-7 make -CAddmusicK -j4
     fi
-
-before_install:
-  - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
