@@ -8,7 +8,7 @@
 // // //
 #include "../AM405Remover/AM405Remover.h"
 #include <cstdint>
-#include "lodepng.h"
+// // //#include "lodepng.h"
 #include <thread>
 #include "asardll.h"		// // //
 #include "SoundEffect.h"		// // //
@@ -1387,6 +1387,7 @@ std::time_t getLastModifiedTime() {
 
 void generatePNGs()
 {
+	/*
 	const int width = 1024;
 	const int height = 64;
 
@@ -1411,4 +1412,5 @@ void generatePNGs()
 
 		lodepng::encode("Visualizations" / fs::path {current.getFileName()}.stem().replace_extension(".png"), bitmap, width, height);
 	}
+	*/
 }

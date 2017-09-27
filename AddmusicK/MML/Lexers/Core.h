@@ -110,7 +110,7 @@ struct tup_assigner
 	bool operator()(SourceView &file, U &tup) const {
 		file.SkipSpaces();
 		std::optional<typename T::arg_type> ret = T()(file);
-		if constexpr (I != -1) {
+		if constexpr (I != std::size_t(-1)) {
 			if (ret.has_value())
 				std::get<I>(tup) = *ret;
 		}
@@ -188,7 +188,7 @@ LEXER_DECL(Dur, Duration)
 LEXER_DECL(RestDur, Duration) // variant supporting 'r', will be removed when Music::Actions can merge
 LEXER_DECL(Acc, Accidental)
 LEXER_DECL(Chan, std::bitset</*CHANNELS*/ 8>)
-;
+//;
 
 template <char... Cs>
 struct Sep
@@ -207,7 +207,7 @@ private:
 	}
 	template <char C, char... Cs_>
 	std::optional<arg_type> call_impl(SourceView &file) {
-		return !file.Trim(C) ? std::nullopt : call_impl<Cs_...>(file, std::index_sequence<Is...> { });
+		return !file.Trim(C) ? std::nullopt : call_impl<Cs_...>(file);
 	}
 
 public:

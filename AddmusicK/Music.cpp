@@ -407,7 +407,7 @@ void Music::parseOpenParenCommand() {
 		throw AMKd::Utility::SyntaxException {"Error parsing label loop."};
 	}
 	
-	int sampID = [&] {
+	auto sampID = [&] () -> int {
 		if (auto param = GetParameters<Sep<'@'>, Int>(mml_))
 			return instrToSample[requires(param.get<0>(), 0u, 29u, "Illegal instrument number for sample load command.")];
 		if (auto param = GetParameters<QString>(mml_)) {

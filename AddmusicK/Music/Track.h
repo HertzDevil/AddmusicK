@@ -29,7 +29,7 @@ public:
 	template <typename... Args>
 	void append(Args&&... value) {
 #if __cplusplus >= 201703L
-		(data.push_back(static_cast<uint8_t>(value)), ...);
+		(streamData_ << static_cast<uint8_t>(value), ...);
 #else
 		SWALLOW(streamData_ << static_cast<uint8_t>(value));
 #endif

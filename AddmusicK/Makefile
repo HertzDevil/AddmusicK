@@ -1,8 +1,8 @@
 CXX = g++-7
-CXXFLAGS = -Wall -pedantic -std=c++17 -g
+CXXFLAGS = -Wall -pedantic -std=c++17 -O3
 LDFLAGS = -lstdc++fs -ldl
 
-SRCS = *.cpp MML/*.cpp asardll.c ../AM405Remover/AddMusic.cpp
+SRCS = *.cpp MML/*.cpp Music/*.cpp Binary/*.cpp asardll.c ../AM405Remover/AddMusic.cpp
 
 all: addmusick
 

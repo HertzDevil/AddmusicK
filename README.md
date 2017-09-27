@@ -1,5 +1,7 @@
 # AddmusicK
 
+![Travis CI](https://travis-ci.org/HertzDevil/AddmusicK.svg?branch=master)
+
 You saw this coming!
 
 This repository is based on AddmusicK version 1.0.5. (The new 1.1.0 beta will not be considered at this moment, but some of the changes planned / implemented here might be ported over there.) Changes to existing code are marked with `// // //`.

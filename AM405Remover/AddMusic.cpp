@@ -1,3 +1,4 @@
+#define __STDC_WANT_LIB_EXT1__ 1
 #include "AddMusic.h"
 #include <cctype>
 #include <cstring>		// // //
@@ -30,10 +31,18 @@ void fwrite_safe(const void *src, size_t size, FILE *file) {		// // //
 }
 
 bool fopen_safe(FILE **file, const char *str, const char *mode) {
+#ifdef _WIN32
 	if (!::fopen_s(file, str, mode)) {		// // //
 		return true;
 	}
 	return false;
+#else
+	if (FILE *f = ::fopen(str, mode)) {		// // //
+		*file = f;
+		return true;
+	}
+	return false;
+#endif
 }
 
 /***************************************************************

@@ -35,7 +35,7 @@ PARSER_DECL(ErrorEnd)
 PARSER_DECL(Intro)
 PARSER_DECL(TripletOpen)
 PARSER_DECL(TripletClose)
-;
+//;
 
 #undef PARSER_DECL
 
