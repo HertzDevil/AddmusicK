@@ -18,7 +18,7 @@ addons:
       name: "HertzDevil/AddmusicK"
       description: "MML Compiler-Inserter for Super Mario World"
     notification_email: nicetas.c@gmail.com
-    build_command_prepend: "make clean -CAddmusicK"
+    build_command_prepend: "cov-configure --comptype gcc --compiler g++-7 --template"
     build_command: "make -CAddmusicK -j4"
     branch_pattern: coverity_scan
 
